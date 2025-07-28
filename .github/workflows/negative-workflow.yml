@@ -1,0 +1,96 @@
+name: 🧪 Negative Workflow
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      postman_collection_id:
+        type: string
+        required: true
+      postman_environment_id:
+        type: string
+        required: true
+    secrets:
+      postman_api_key:
+        required: true
+
+jobs:
+
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set_environment.outputs.environment }}
+      postman_environment_id: ${{ steps.set_environment.outputs.postman_environment_id }}
+
+    steps:
+
+      - name: 🌍 Set Environment
+        id: set_environment
+        env:
+          WORKFLOW_DISPATCH_ENV: ${{ inputs.environment || github.event.inputs.environment }}
+        run: |
+          # Default to dev if not set
+          ENV="${WORKFLOW_DISPATCH_ENV:-DEV}"
+          
+          # Set the environment ID based on the selected environment
+          case "$ENV" in
+            "DEV")
+              POSTMAN_ENV_ID="${{ inputs.postman_dev_environment_id }}"
+              ;;
+            "UAT")
+              POSTMAN_ENV_ID="${{ inputs.postman_uat_environment_id }}"
+              ;;
+            *)
+              echo "ERROR: Invalid environment selected: $ENV"
+              exit 1
+              ;;
+          esac
+          
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "postman_environment_id=$POSTMAN_ENV_ID" >> $GITHUB_OUTPUT
+          echo "DEBUG: Workflow Dispatch Environment = $WORKFLOW_DISPATCH_ENV"
+          echo "DEBUG: Postman Environment ID = $POSTMAN_ENV_ID"
+
+  negative-test:
+    needs: setup
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      test_results: ${{ steps.aggregate.outputs.test_results }}
+      detailed_output: ${{ steps.aggregate.outputs.detailed_output }}
+
+    steps:
+
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📮 Setup Postman
+        uses: ./.github/actions/postman-setup
+        with:
+          postman_api_key: ${{ secrets.postman_api_key }}
+
+      - name: 🧪 [N] Wait 5 seconds
+        id: test-1
+        if: always()
+        uses: ./.github/actions/postman-test-runner
+        with:
+          test-name: "[N] Wait 5 seconds"
+          collection-id: ${{ inputs.postman_collection_id }}
+          environment-id: ${{ needs.setup.outputs.postman_environment_id }}
+          folder-id: "4032962-28c65bac-19f7-4abb-bab1-9657441099a5"
+          results-filename: "wait-5-seconds-results.json"
+
+      - name: 🛟 Aggregate Results
+        if: always()
+        id: aggregate
+        shell: bash
+        run: |
+          echo "test_results<<EOF" >> $GITHUB_OUTPUT
+          echo "${{ steps.test-1.outputs.results-summary || '[N] Wait 5 seconds:skipped' }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "detailed_output<<EOF" >> $GITHUB_OUTPUT
+          echo "${{ steps.test-1.outputs.detailed-output }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT

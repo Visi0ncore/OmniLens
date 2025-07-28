@@ -1,0 +1,19 @@
+{
+  "categories": {
+    "trigger": {
+      "name": "Trigger Workflows", 
+      "workflows": ["trigger.yml"]
+    },
+    "testing": {
+      "name": "Testing Workflows",
+      "workflows": ["single-workflow.yml"]
+    },
+    "utility": {
+      "name": "Utility Workflows",
+      "workflows": []
+    }
+  },
+  "trigger_mappings": {
+    "trigger.yml": ["workflow-1.yml", "workflow-2.yml"]
+  }
+} 

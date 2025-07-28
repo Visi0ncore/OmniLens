@@ -1,0 +1,14 @@
+name: 'Setup Postman CLI'
+description: 'Install and authenticate Postman CLI'
+inputs:
+  postman_api_key:
+    description: 'Postman API key for authentication'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: 📮 Install Postman CLI & Login
+      shell: bash
+      run: |
+        curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
+        postman login --with-api-key ${{ inputs.postman_api_key }} 

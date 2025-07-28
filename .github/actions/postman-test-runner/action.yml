@@ -1,0 +1,60 @@
+name: 'Run Postman Test'
+description: 'Execute a single Postman test with consistent formatting'
+inputs:
+  test-name:
+    description: 'Human-readable test name'
+    required: true
+  collection-id:
+    description: 'Postman collection ID'
+    required: true
+  environment-id:
+    description: 'Postman environment ID'
+    required: true
+  folder-id:
+    description: 'Postman folder ID to run'
+    required: true
+  results-filename:
+    description: 'Custom filename for results JSON'
+    required: false
+    default: 'test-results.json'
+outputs:
+  test-outcome:
+    description: 'Test outcome (success/failure/skipped)'
+    value: ${{ steps.run-test.outcome }}
+  detailed-output:
+    description: 'Detailed failure information'
+    value: ${{ steps.parse-results.outputs.detailed-output }}
+  results-summary:
+    description: 'Test name and outcome for aggregation'
+    value: '${{ inputs.test-name }}:${{ steps.run-test.outcome }}'
+runs:
+  using: 'composite'
+  steps:
+    - name: 🧪 ${{ inputs.test-name }}
+      id: run-test
+      shell: bash
+      run: |
+        set -o pipefail
+        postman collection run ${{ inputs.collection-id }} \
+          -e ${{ inputs.environment-id }} \
+          -i ${{ inputs.folder-id }} \
+          -r cli,json \
+          --reporter-json-export ${{ inputs.results-filename }}
+    
+    - name: 🛟 Parse Results
+      id: parse-results
+      if: always()
+      shell: bash
+      run: |
+        chmod +x utils/parse-postman-results.sh
+        
+        # Only parse detailed output for failures
+        if [ "${{ steps.run-test.outcome }}" = "failure" ]; then
+          detailed_output=$(./utils/parse-postman-results.sh "${{ inputs.test-name }}" "${{ steps.run-test.outcome }}" ${{ inputs.results-filename }} | grep -v "^test_results=" || true)
+        else
+          detailed_output=""
+        fi
+        
+        echo "detailed-output<<EOF" >> $GITHUB_OUTPUT
+        echo "$detailed_output" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT 
