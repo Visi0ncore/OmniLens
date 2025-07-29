@@ -1,4 +1,4 @@
-# GitHub Workflows Dashboard
+# 👁️ OmniLens
 
 A real-time dashboard for monitoring GitHub workflow runs across different categories.
 

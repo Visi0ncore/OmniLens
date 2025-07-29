@@ -2,8 +2,8 @@ name: 🔫 Trigger Workflow
 
 on:
   schedule:
-    # Execute everyday at 03:50am (UTC+2)
-    - cron: "50 1 * * *"
+    # Execute everyday at 06:00am (UTC+2)
+    - cron: "00 1 * * *"
 
   workflow_dispatch:
     inputs:

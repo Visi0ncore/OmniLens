@@ -14,6 +14,6 @@
     }
   },
   "trigger_mappings": {
-    "trigger.yml": ["workflow-1.yml", "workflow-2.yml"]
+    "trigger.yml": ["positive-workflow.yml", "negative-workflow.yml"]
   }
 } 
