@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OmniLens - Workflow Intelligence Platform</title>
+    <link rel="icon" type="image/jpeg" href="/logo.jpeg">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -295,7 +296,6 @@
                 const data = await response.json();
                 if (!data.error) {
                     document.getElementById('joinedCount').textContent = (data.count || 0).toLocaleString();
-                    document.getElementById('projectCount').textContent = data.latestSignups || 0;
                 }
             } catch (error) {
                 console.error('Failed to load stats:', error);
