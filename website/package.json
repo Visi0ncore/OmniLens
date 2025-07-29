@@ -1,6 +1,6 @@
 {
   "name": "omnilens-website",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "dependencies": {
     "express-rate-limit": "^8.0.1",
     "next": "14.0.0",

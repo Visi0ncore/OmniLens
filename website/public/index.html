@@ -104,12 +104,13 @@
 <body class="min-h-screen bg-background font-sans antialiased">
     <div class="hero-gradient min-h-screen">
         <!-- Header -->
-        <header class="container mx-auto px-6 pt-8">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="text-2xl">👁️</span>
-                    <h1 class="text-xl font-bold tracking-tight text-foreground">OmniLens</h1>
-                </div>
+        <header class="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+            <div class="container mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" id="logoLink">
+                        <span class="text-2xl">👁️</span>
+                        <h1 class="text-xl font-bold tracking-tight text-foreground">OmniLens</h1>
+                    </div>
                 <nav class="hidden md:flex items-center gap-6">
                     <a href="#features" class="text-muted-foreground hover:text-foreground transition-colors">Features</a>
                     <a href="#about" class="text-muted-foreground hover:text-foreground transition-colors">About</a>
@@ -124,7 +125,7 @@
         </header>
 
         <!-- Hero Section -->
-        <main class="container mx-auto px-6 py-20">
+        <main class="container mx-auto px-6 py-20 pt-32">
             <div class="max-w-4xl mx-auto text-center space-y-8">
                 <div class="fade-in">
                     <h1 class="text-4xl md:text-6xl font-bold tracking-tight text-foreground mb-6">
@@ -417,6 +418,14 @@
                         block: 'start'
                     });
                 }
+            });
+        });
+
+        // Add click handler for logo to scroll to top
+        document.getElementById('logoLink').addEventListener('click', function() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
             });
         });
 
