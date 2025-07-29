@@ -109,7 +109,7 @@ function recordAttempt(ip, email) {
   emailAttempts.set(email, now);
 }
 
-export function securityMiddleware(req, res, next) {
+function securityMiddleware(req, res, next) {
   const ip = getClientIP(req);
   
   // Log attempt for monitoring
@@ -123,7 +123,7 @@ export function securityMiddleware(req, res, next) {
   next();
 }
 
-export function validateAndRateLimit(req, res) {
+function validateAndRateLimit(req, res) {
   const ip = getClientIP(req);
   const { email } = req.body;
   
@@ -154,4 +154,9 @@ export function validateAndRateLimit(req, res) {
   recordAttempt(ip, sanitizedEmail);
   
   return { valid: true, email: sanitizedEmail };
-} 
+}
+
+module.exports = {
+  securityMiddleware,
+  validateAndRateLimit
+}; 

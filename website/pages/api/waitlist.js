@@ -1,5 +1,5 @@
-import { Pool } from 'pg';
-import { validateAndRateLimit } from '../../lib/security.js';
+const { Pool } = require('pg');
+const { validateAndRateLimit } = require('../../lib/security');
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
