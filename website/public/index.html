@@ -142,7 +142,7 @@
                                 <input 
                                     type="email" 
                                     id="emailInput" 
-                                    placeholder="hello@email" 
+                                    placeholder="hello@0.email" 
                                     class="flex-1 h-12 px-4 rounded-md bg-input border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                                 >
                                 <button id="waitlistBtn" class="btn-primary inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-lg font-medium h-12 px-6 shadow-lg">
@@ -269,11 +269,19 @@
         function showSuccess(message) {
             const statusElement = document.getElementById('statusMessage');
             statusElement.textContent = message;
-            statusElement.className = 'text-sm min-h-[1rem] px-1 mt-6 text-muted-foreground whitespace-pre-line';
+            statusElement.className = 'text-sm min-h-[1rem] px-1 mt-6 text-green-400 whitespace-pre-line';
             statusElement.style.opacity = '1';
         }
         
-        // Helper function to clear success message
+        // Helper function to show error message
+        function showError(message) {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.textContent = message;
+            statusElement.className = 'text-sm min-h-[1rem] px-1 mt-6 text-red-400 whitespace-pre-line';
+            statusElement.style.opacity = '1';
+        }
+        
+        // Helper function to clear messages
         function clearSuccess() {
             const statusElement = document.getElementById('statusMessage');
             statusElement.textContent = '';
@@ -298,6 +306,10 @@
         // Load stats on page load
         loadWaitlistStats();
         
+        // Frontend rate limiting
+        let lastSubmitTime = 0;
+        const SUBMIT_COOLDOWN = 5000; // 5 seconds between attempts
+        
         // Add click handler for the waiting list button
         document.getElementById('waitlistBtn').addEventListener('click', async function() {
             const emailInput = document.getElementById('emailInput');
@@ -306,19 +318,38 @@
             // Clear any previous success message
             clearSuccess();
             
-            // Basic email validation
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            // Check rate limiting (frontend protection)
+            const now = Date.now();
+            if (now - lastSubmitTime < SUBMIT_COOLDOWN) {
+                const remainingTime = Math.ceil((SUBMIT_COOLDOWN - (now - lastSubmitTime)) / 1000);
+                showError(`Please wait ${remainingTime} seconds before trying again.`);
+                return;
+            }
+            
+            // Enhanced email validation
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
             
             if (!email) {
+                showError('Please enter your email address.');
+                emailInput.focus();
+                return;
+            }
+            
+            if (email.length > 254) {
+                showError('Email address is too long.');
                 emailInput.focus();
                 return;
             }
             
             if (!emailRegex.test(email)) {
+                showError('Please enter a valid email address.');
                 emailInput.focus();
                 return;
             }
 
+            // Record attempt time
+            lastSubmitTime = now;
+            
             // Show loading state
             const originalText = this.textContent;
             this.textContent = 'Joining...';
@@ -344,10 +375,12 @@
                     emailInput.value = '';
                     showSuccess(data.message);
                 } else {
-                    console.error('Signup failed:', data.message);
+                    // Show user-friendly error message
+                    showError(data.message || 'Something went wrong. Please try again.');
                 }
             } catch (error) {
                 console.error('Waitlist error:', error);
+                showError('Network error. Please check your connection and try again.');
             } finally {
                 // Reset button
                 this.textContent = originalText;

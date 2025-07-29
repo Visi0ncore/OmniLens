@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { validateAndRateLimit } from '../../lib/security.js';
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
@@ -9,6 +10,11 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Add security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
@@ -18,28 +24,45 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { email } = req.body;
-
-      // Basic email validation
-      if (!email || !email.includes('@')) {
-        return res.status(400).json({ 
+      // Apply security validation and rate limiting
+      const validation = validateAndRateLimit(req, res);
+      
+      if (!validation.valid) {
+        return res.status(validation.status).json({ 
           success: false, 
-          message: 'Please enter a valid email address' 
+          message: validation.error 
         });
       }
 
+      const email = validation.email;
       const client = await pool.connect();
       
       try {
-        // Insert email with conflict handling
+        // Check if email already exists (additional protection)
+        const existingCheck = await client.query(
+          'SELECT id FROM waitlist_signups WHERE email = $1',
+          [email]
+        );
+        
+        if (existingCheck.rows.length > 0) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'This email is already on the waitlist' 
+          });
+        }
+
+        // Insert email
         await client.query(
-          'INSERT INTO waitlist_signups (email) VALUES ($1) ON CONFLICT (email) DO NOTHING',
+          'INSERT INTO waitlist_signups (email) VALUES ($1)',
           [email]
         );
 
         // Get total count
         const countResult = await client.query('SELECT COUNT(*) FROM waitlist_signups');
         const count = parseInt(countResult.rows[0].count);
+        
+        // Log successful signup for monitoring
+        console.log(`✅ Successful signup: ${email} (Total: ${count})`);
         
         res.status(200).json({ 
           success: true, 
@@ -50,10 +73,12 @@ export default async function handler(req, res) {
         client.release();
       }
     } catch (error) {
-      console.error('Waitlist error:', error);
+      console.error('❌ Waitlist error:', error);
+      
+      // Don't expose internal errors to potential attackers
       res.status(500).json({ 
         success: false, 
-        message: "Something went wrong. Please try again." 
+        message: "Something went wrong. Please try again later." 
       });
     }
   } else {
