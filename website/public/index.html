@@ -154,8 +154,7 @@
                         <div class="flex items-center justify-center gap-2 text-sm">
                             <div class="w-2 h-2 bg-green-500 rounded-full"></div>
                             <span class="text-muted-foreground">
-                                <span id="joinedCount" class="text-foreground font-medium">1,247</span> people joined • 
-                                <span id="projectCount" class="text-foreground font-medium">183</span> projects submitted
+                                <span id="joinedCount" class="text-foreground font-medium">0</span> people have joined the waitlist
                             </span>
                         </div>
                     </div>
@@ -280,9 +279,27 @@
             statusElement.textContent = '';
             statusElement.style.opacity = '0';
         }
+
+        // Load real stats from API
+        async function loadWaitlistStats() {
+            try {
+                const response = await fetch('/api/waitlist/stats');
+                const data = await response.json();
+                if (!data.error) {
+                    document.getElementById('joinedCount').textContent = (data.count || 0).toLocaleString();
+                    document.getElementById('projectCount').textContent = data.latestSignups || 0;
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+                // Keep default numbers if API fails
+            }
+        }
+
+        // Load stats on page load
+        loadWaitlistStats();
         
         // Add click handler for the waiting list button
-        document.getElementById('waitlistBtn').addEventListener('click', function() {
+        document.getElementById('waitlistBtn').addEventListener('click', async function() {
             const emailInput = document.getElementById('emailInput');
             const email = emailInput.value.trim();
             
@@ -301,16 +318,41 @@
                 emailInput.focus();
                 return;
             }
+
+            // Show loading state
+            const originalText = this.textContent;
+            this.textContent = 'Joining...';
+            this.disabled = true;
             
-            // Simulate adding to waitlist (in real implementation, this would be an API call)
-            const joinedCount = document.getElementById('joinedCount');
-            const currentCount = parseInt(joinedCount.textContent.replace(',', ''));
-            const newCount = currentCount + 1;
-            joinedCount.textContent = newCount.toLocaleString();
-            
-            // Clear the input and show success message
-            emailInput.value = '';
-            showSuccess(`Thanks for joining the waitlist!\nWe'll notify you at ${email} when OmniLens is ready.`);
+            try {
+                // Call real API
+                const response = await fetch('/api/waitlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Update counter with real count
+                    if (data.count) {
+                        document.getElementById('joinedCount').textContent = data.count.toLocaleString();
+                    }
+                    
+                    // Clear input and show success
+                    emailInput.value = '';
+                    showSuccess(data.message);
+                } else {
+                    console.error('Signup failed:', data.message);
+                }
+            } catch (error) {
+                console.error('Waitlist error:', error);
+            } finally {
+                // Reset button
+                this.textContent = originalText;
+                this.disabled = false;
+            }
             
             // Add visual feedback
             this.style.transform = 'scale(0.95)';
