@@ -24,37 +24,33 @@ on:
         options:
           - DEV
 
-env:
-  postman_collection_id: 4032962-0e025640-bfff-4a7f-bb8e-6a78089b9de7
-  postman_environment_id: 4032962-d4db2ed5-980b-4830-9e5a-870775472a2c
-
 jobs:
-  run-workflow-1:
+  run-positive-workflow:
     name: Workflow 1
     if: >-
       always() &&
       (github.event_name == 'schedule' ||
        github.event.inputs.workflow_selection == 'all' ||
        github.event.inputs.workflow_selection == 'workflow-1')
-    uses: ./.github/workflows/workflow-1.yml
+    uses: ./.github/workflows/positive-workflow.yml
     with:
       environment: ${{ github.event.inputs.environment || 'DEV' }}
-      postman_collection_id: ${{ env.postman_collection_id }}
-      postman_environment_id: ${{ env.postman_environment_id }}
+      postman_collection_id: 4032962-0e025640-bfff-4a7f-bb8e-6a78089b9de7
+      postman_environment_id: 4032962-d4db2ed5-980b-4830-9e5a-870775472a2c
     secrets:
       postman_api_key: ${{ secrets.POSTMAN_API_KEY }}
 
-  run-workflow-2:
+  run-negative-workflow:
     name: Workflow 2
     if: >-
       always() &&
       (github.event_name == 'schedule' ||
        github.event.inputs.workflow_selection == 'all' ||
        github.event.inputs.workflow_selection == 'workflow-2')
-    uses: ./.github/workflows/workflow-2.yml
+    uses: ./.github/workflows/negative-workflow.yml
     with:
       environment: ${{ github.event.inputs.environment || 'DEV' }}
-      postman_collection_id: ${{ env.postman_collection_id }}
-      postman_environment_id: ${{ env.postman_environment_id }}
+      postman_collection_id: 4032962-0e025640-bfff-4a7f-bb8e-6a78089b9de7
+      postman_environment_id: 4032962-d4db2ed5-980b-4830-9e5a-870775472a2c
     secrets:
       postman_api_key: ${{ secrets.POSTMAN_API_KEY }}

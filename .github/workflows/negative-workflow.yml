@@ -37,10 +37,10 @@ jobs:
           # Set the environment ID based on the selected environment
           case "$ENV" in
             "DEV")
-              POSTMAN_ENV_ID="${{ inputs.postman_dev_environment_id }}"
+              POSTMAN_ENV_ID="${{ inputs.postman_environment_id }}"
               ;;
             "UAT")
-              POSTMAN_ENV_ID="${{ inputs.postman_uat_environment_id }}"
+              POSTMAN_ENV_ID="${{ inputs.postman_environment_id }}"
               ;;
             *)
               echo "ERROR: Invalid environment selected: $ENV"
