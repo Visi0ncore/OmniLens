@@ -48,7 +48,59 @@ GET /api/repositories
 GET /api/repositories
 ```
 
-### 2. Get Workflow Data
+### 2. Get Repositories with Metrics
+**Endpoint:** 
+```
+GET /api/repositories/metrics
+```
+
+**Required Values:**
+- None
+
+**Request Body:**
+- None (GET request)
+
+**Response Body:**
+```json
+{
+  "repositories": [
+    {
+      "slug": "repo1",
+      "repoPath": "owner/repo",
+      "envKey": "GITHUB_REPO_1",
+      "displayName": "Owner/Repo",
+      "hasConfig": true,
+      "hasWorkflows": true,
+      "metrics": {
+        "totalWorkflows": 5,
+        "passedRuns": 3,
+        "failedRuns": 1,
+        "inProgressRuns": 1,
+        "successRate": 75,
+        "hasActivity": true
+      }
+    }
+  ]
+}
+```
+
+**Note:** 
+- The `displayName` field contains the repository name extracted from the corresponding environment variable
+- The `metrics` field contains today's workflow summary data for the home page display
+- `metrics` will be `null` if the repository has no workflows configured or if there was an error fetching data
+- `successRate` is calculated as `(passedRuns / (passedRuns + failedRuns)) * 100`, rounded to nearest integer
+- `hasActivity` indicates if there were any completed runs or runs in progress today
+
+**Expected Result Code:** 
+- `200` - Success (individual repository errors don't fail the entire request)
+- `500` - Server error (missing env vars, config issues, etc.)
+
+**Example Request:**
+```http
+GET /api/repositories/metrics
+```
+
+### 3. Get Workflow Data
 **Endpoint:** 
 ```
 GET /api/workflows

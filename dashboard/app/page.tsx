@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, AlertCircle } from "lucide-react";
+import CompactMetricsOverview from "@/components/CompactMetricsOverview";
 
 
 // Helper function to format repository name for display (same as dashboard)
@@ -25,9 +26,17 @@ interface RepositoryCardProps {
   hasError: boolean;
   errorMessage?: string;
   hasWorkflows?: boolean;
+  metrics?: {
+    totalWorkflows: number;
+    passedRuns: number;
+    failedRuns: number;
+    inProgressRuns: number;
+    successRate: number;
+    hasActivity: boolean;
+  } | null;
 }
 
-function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessage, hasWorkflows }: RepositoryCardProps) {
+function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessage, hasWorkflows, metrics }: RepositoryCardProps) {
   const cardContent = (
     <Card className={`h-full transition-all duration-200 ${
       hasError 
@@ -52,10 +61,19 @@ function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessag
               {errorMessage || "Unable to access repository"}
             </p>
           </div>
+        ) : hasWorkflows && metrics ? (
+          <CompactMetricsOverview
+            totalWorkflows={metrics.totalWorkflows}
+            passedRuns={metrics.passedRuns}
+            failedRuns={metrics.failedRuns}
+            inProgressRuns={metrics.inProgressRuns}
+            successRate={metrics.successRate}
+            hasActivity={metrics.hasActivity}
+          />
         ) : (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              {hasWorkflows ? 'Click to view workflow dashboard' : 'No workflows configured'}
+              No workflows configured
             </p>
           </div>
         )}
@@ -106,6 +124,14 @@ export default function HomePage() {
     displayName: string;
     hasConfig: boolean;
     hasWorkflows?: boolean;
+    metrics?: {
+      totalWorkflows: number;
+      passedRuns: number;
+      failedRuns: number;
+      inProgressRuns: number;
+      successRate: number;
+      hasActivity: boolean;
+    } | null;
   }>>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -114,9 +140,9 @@ export default function HomePage() {
   React.useEffect(() => {
     const fetchRepositories = async () => {
       try {
-        const response = await fetch('/api/repositories');
+        const response = await fetch('/api/repositories/metrics');
         if (!response.ok) {
-          throw new Error('Failed to fetch repositories');
+          throw new Error('Failed to fetch repository metrics');
         }
         const data = await response.json();
         setAvailableRepos(data.repositories);
@@ -179,34 +205,25 @@ export default function HomePage() {
   const repositoryData = availableRepos.map(repo => {
     let hasError = false;
     let errorMessage = '';
-    let hasWorkflows = false;
 
     if (!repo.hasConfig) {
       hasError = true;
       errorMessage = 'Repository not found in configuration';
-    } else {
-      // Check if repository has any workflows configured
-      const { getRepoConfig } = require('@/lib/utils');
-      const repoConfig = getRepoConfig(repo.slug);
-      if (repoConfig) {
-        const totalWorkflows = Object.values(repoConfig.categories).reduce((total: number, category: any) => 
-          total + category.workflows.length, 0
-        );
-        hasWorkflows = totalWorkflows > 0;
-        
-        if (!hasWorkflows) {
-          hasError = true;
-          errorMessage = 'No workflows configured';
-        }
-      }
+    } else if (!repo.hasWorkflows) {
+      hasError = true;
+      errorMessage = 'No workflows configured';
     }
 
     return {
       ...repo,
       hasError,
-      errorMessage,
-      hasWorkflows
+      errorMessage
     };
+  }).sort((a, b) => {
+    // Sort alphabetically by repository name (not org/user)
+    const repoNameA = formatRepoDisplayName(a.displayName);
+    const repoNameB = formatRepoDisplayName(b.displayName);
+    return repoNameA.localeCompare(repoNameB);
   });
 
   return (
@@ -226,6 +243,7 @@ export default function HomePage() {
               hasError={repo.hasError}
               errorMessage={repo.errorMessage}
               hasWorkflows={repo.hasWorkflows}
+              metrics={repo.metrics}
             />
           ))}
         </div>
