@@ -222,12 +222,26 @@ export default function DashboardPage() {
     refetchOnMount: true, // Refetch when component mounts
   });
 
-    // Extract data from the single response
+  // Query for yesterday's data for Daily Metrics comparison
+  const { data: yesterdayData, isLoading: yesterdayLoading, refetch: refetchYesterday } = useQuery({
+    queryKey: ["yesterdayWorkflowData", format(selectedDate, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const yesterday = new Date(selectedDate);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return await fetchWorkflowData(yesterday);
+    },
+    staleTime: 5 * 60 * 1000, // Data is stale after 5 minutes
+    cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    refetchOnWindowFocus: false, // Don't refetch on window focus for historical data
+    refetchOnMount: true, // Refetch when component mounts
+  });
+
+    // Extract data from the responses
   const workflowData = todayData?.workflowRuns;
   const overviewData = todayData?.overviewData;
-  const yesterdayWorkflowData = null; // Disabled yesterday data fetching
+  const yesterdayWorkflowData = yesterdayData?.workflowRuns;
 
-    // Log only selected date data when available
+    // Log selected date and yesterday data when available
   React.useEffect(() => {
     if (workflowData) {
       console.log(`\n🏠 === DASHBOARD DATA FOR ${format(selectedDate, "yyyy-MM-dd")} ===`);
@@ -250,7 +264,18 @@ export default function DashboardPage() {
         });
       }
     }
-  }, [workflowData, selectedDate]);
+
+    // Log yesterday data for Daily Metrics
+    if (yesterdayWorkflowData) {
+      const yesterday = new Date(selectedDate);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = format(yesterday, "yyyy-MM-dd");
+      
+      console.log(`\n📈 === YESTERDAY DATA FOR ${yesterdayStr} ===`);
+      console.log(`   🎯 Yesterday workflow runs: ${yesterdayWorkflowData.length}`);
+      console.log(`   📊 Daily Metrics comparison data available`);
+    }
+  }, [workflowData, yesterdayWorkflowData, selectedDate]);
 
   const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
   const isSelectedDateToday = isToday(selectedDate);
@@ -424,18 +449,19 @@ export default function DashboardPage() {
               onClick={() => {
                 console.log('🔄 Manual refresh triggered');
                 refetchToday();
+                refetchYesterday();
               }}
-              disabled={todayLoading}
+              disabled={todayLoading || yesterdayLoading}
               className="flex items-center gap-2"
             >
-              <RefreshCw className={`h-4 w-4 ${todayLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${(todayLoading || yesterdayLoading) ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
         </div>
       </header>
 
-      {todayLoading && <SkeletonCards />}
+      {(todayLoading || yesterdayLoading) && <SkeletonCards />}
       {todayError && <ErrorState />}
 
       {/* Compact Overview Row */}
