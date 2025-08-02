@@ -332,6 +332,35 @@ export default function DashboardPage({ params }: PageProps) {
     });
   };
 
+  // Helper function to check and auto-collapse a category if all workflows are reviewed
+  const checkAndAutoCollapseCategory = (workflowId: number, reviewedState: Record<number, boolean>) => {
+    if (categories) {
+      // Find which category contains the workflow that was just reviewed
+      const categoryWithWorkflow = Object.entries(categories).find(([_, workflows]) =>
+        workflows.some(workflow => workflow.id === workflowId)
+      );
+
+      if (categoryWithWorkflow) {
+        const [categoryKey, workflows] = categoryWithWorkflow;
+        const allReviewed = workflows.every(workflow => reviewedState[workflow.id]);
+
+        if (allReviewed && workflows.length > 0) {
+          setCollapsedCategories(prevCollapsed => {
+            const newCollapsedState = {
+              ...prevCollapsed,
+              [categoryKey]: true
+            };
+
+            // Save to localStorage
+            saveCollapsedCategories(selectedDate, newCollapsedState);
+
+            return newCollapsedState;
+          });
+        }
+      }
+    }
+  };
+
   const toggleReviewed = (workflowId: number) => {
     setReviewedWorkflows(prev => {
       const newState = {
@@ -342,26 +371,8 @@ export default function DashboardPage({ params }: PageProps) {
       // Save to localStorage
       saveReviewedWorkflows(selectedDate, newState);
 
-      // Simple rule: Check if we need to auto-collapse any categories
-      if (categories) {
-        Object.entries(categories).forEach(([categoryKey, workflows]) => {
-          const allReviewed = workflows.every(workflow => newState[workflow.id]);
-
-          if (allReviewed && workflows.length > 0) {
-            setCollapsedCategories(prevCollapsed => {
-              const newCollapsedState = {
-                ...prevCollapsed,
-                [categoryKey]: true
-              };
-
-              // Save to localStorage
-              saveCollapsedCategories(selectedDate, newCollapsedState);
-
-              return newCollapsedState;
-            });
-          }
-        });
-      }
+      // Check if we need to auto-collapse the category containing this workflow
+      checkAndAutoCollapseCategory(workflowId, newState);
 
       return newState;
     });
@@ -407,6 +418,10 @@ export default function DashboardPage({ params }: PageProps) {
               [triggerWorkflowId]: true
             };
             saveReviewedWorkflows(selectedDate, newReviewedState);
+            
+            // Check if we need to auto-collapse the category containing this workflow
+            checkAndAutoCollapseCategory(triggerWorkflowId, newReviewedState);
+            
             return newReviewedState;
           });
         }
