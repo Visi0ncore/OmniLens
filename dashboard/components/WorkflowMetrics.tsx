@@ -31,13 +31,21 @@ function compareWorkflows(todayRuns: WorkflowRun[], yesterdayRuns: WorkflowRun[]
   // Using workflow_id as the primary key since it's more reliable than names
   const yesterdayMap = new Map<number, string>();
   yesterdayRuns.forEach(run => {
-    const status = run.conclusion === 'success' ? 'passed' : 'failed';
+    const status = run.conclusion === 'success' ? 'passed' : 
+                   run.conclusion === null && run.status === 'in_progress' ? 'running' : 'failed';
     yesterdayMap.set(run.workflow_id, status);
   });
 
   todayRuns.forEach(run => {
-    const todayStatus = run.conclusion === 'success' ? 'passed' : 'failed';
+    const todayStatus = run.conclusion === 'success' ? 'passed' : 
+                       run.conclusion === null && run.status === 'in_progress' ? 'running' : 'failed';
     const yesterdayStatus = yesterdayMap.get(run.workflow_id) || 'unknown';
+
+    // Skip workflows that are currently running (don't categorize them in daily metrics)
+    if (todayStatus === 'running') {
+      // Don't add to any metrics - running workflows shouldn't be compared
+      return;
+    }
 
     if (todayStatus === 'passed' && yesterdayStatus === 'passed') {
       metrics.consistent.push(run);
@@ -83,7 +91,7 @@ export default function WorkflowMetrics({ todayRuns, yesterdayRuns, onMetricHove
         <div className={`${color} flex-shrink-0`}>{icon}</div>
         <span className="text-sm truncate">{label}</span>
       </div>
-      <div className={`font-semibold flex-shrink-0 ${count === 0 ? 'text-muted-foreground' : color}`}>
+      <div className={`font-semibold flex-shrink-0 ${count === 0 ? 'text-muted-foreground' : 'text-white'}`}>
         {count}
       </div>
     </div>

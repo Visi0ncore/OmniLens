@@ -105,11 +105,11 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
               <div className="space-y-1">
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-xs">{data.passedRuns}</span>
+                  <span className={`text-xs ${data.passedRuns === 0 ? 'text-muted-foreground' : 'text-white'}`}>{data.passedRuns}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="text-xs">{data.failedRuns}</span>
+                  <span className={`text-xs ${data.failedRuns === 0 ? 'text-muted-foreground' : 'text-white'}`}>{data.failedRuns}</span>
                 </div>
               </div>
             </div>
@@ -123,7 +123,7 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
                 <Pause className="h-4 w-4 text-orange-500 flex-shrink-0" />
                 <span className="text-sm truncate">In Progress</span>
               </div>
-              <div className={`font-semibold flex-shrink-0 ${data.inProgressRuns === 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className={`font-semibold flex-shrink-0 ${data.inProgressRuns === 0 ? 'text-muted-foreground' : 'text-white'}`}>
                 {data.inProgressRuns}
               </div>
             </div>
@@ -134,7 +134,9 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
                 <Play className="h-4 w-4 text-blue-500 flex-shrink-0" />
                 <span className="text-sm truncate">Total Workflows</span>
               </div>
-              <div className="font-semibold flex-shrink-0">{data.totalWorkflows}</div>
+              <div className={`font-semibold flex-shrink-0 ${data.totalWorkflows === 0 ? 'text-muted-foreground' : 'text-white'}`}>
+                {data.totalWorkflows}
+              </div>
             </div>
 
             {/* Didn't Run */}
@@ -149,7 +151,7 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
                 {/* eslint-disable-next-line react/no-unescaped-entities */}
                 <span className="text-sm truncate">Didn't Run</span>
               </div>
-              <div className={`font-semibold flex-shrink-0 ${data.didntRunCount === 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className={`font-semibold flex-shrink-0 ${data.didntRunCount === 0 ? 'text-muted-foreground' : 'text-white'}`}>
                 {data.didntRunCount}
               </div>
             </div>
@@ -160,7 +162,9 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
                 <Clock className="h-4 w-4 text-purple-500 flex-shrink-0" />
                 <span className="text-sm truncate">Runtime</span>
               </div>
-              <div className="font-semibold text-sm flex-shrink-0">{formatDuration(data.totalRuntime)}</div>
+              <div className={`font-semibold text-sm flex-shrink-0 ${data.totalRuntime === 0 ? 'text-muted-foreground' : 'text-white'}`}>
+                {formatDuration(data.totalRuntime)}
+              </div>
             </div>
           </div>
         </div>
