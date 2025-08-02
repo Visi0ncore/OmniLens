@@ -51,15 +51,16 @@ function getEnvVars() {
 // Helper function to find which configured workflow file a run corresponds to
 function getConfiguredWorkflowFile(run: WorkflowRun): string | null {
   const configuredWorkflows = getAllConfiguredWorkflows();
-  // Use only fields that exist in the WorkflowRun interface
-  const workflowFile = run.path || run.workflow_name;
   
-  // Find the configured workflow that matches this run
-  const matchingWorkflow = configuredWorkflows.find(configWorkflow => 
-    workflowFile && workflowFile.includes(configWorkflow)
-  );
+  // Extract just the filename from the run path (e.g., ".github/workflows/build-workflow.yml" -> "build-workflow.yml")
+  const workflowPath = run.path || run.workflow_name;
+  if (!workflowPath) return null;
   
-  return matchingWorkflow || null;
+  const filename = workflowPath.split('/').pop();
+  if (!filename) return null;
+  
+  // Only return exact matches from workflows.json - no partial matching
+  return configuredWorkflows.includes(filename) ? filename : null;
 }
 
 // Helper function to get only the latest run of each workflow
@@ -88,7 +89,7 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
     
     // Skip runs that don't match any configured workflow (should not happen after filtering)
     if (!configuredWorkflowFile) {
-      console.warn(`Run "${run.name}" does not match any configured workflow file`);
+      // Silently skip unmatched runs - they're either not in workflows.json or from old workflow files
       return;
     }
     
