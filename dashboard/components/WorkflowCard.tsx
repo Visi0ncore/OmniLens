@@ -12,11 +12,11 @@ function duration(start: string, end: string): string {
   const startTime = new Date(start);
   const endTime = new Date(end);
   const diff = endTime.getTime() - startTime.getTime();
-  
+
   const hours = Math.floor(diff / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
   const seconds = Math.floor((diff % 60000) / 1000);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${seconds}s`;
   } else if (minutes > 0) {
@@ -41,11 +41,11 @@ interface WorkflowCardProps {
   onToggleTestingWorkflowReviewed?: (testingWorkflowName: string) => void;
 }
 
-export default function WorkflowCard({ 
-  run, 
-  isReviewed, 
-  onToggleReviewed, 
-  isHighlighted = false, 
+export default function WorkflowCard({
+  run,
+  isReviewed,
+  onToggleReviewed,
+  isHighlighted = false,
   highlightColor = '',
   allWorkflowRuns = [],
   reviewedTestingWorkflows = new Set(),
@@ -54,13 +54,13 @@ export default function WorkflowCard({
   const status = run.conclusion ?? run.status;
   const isSuccess = status === "success";
   const isDidntRun = status === "didnt_run" || run.isMissing;
-  
+
   // Check if this is a trigger workflow - try both name and workflow_name
-  const isTrigger = isTriggerWorkflow(run.name) || isTriggerWorkflow(run.workflow_name);
-  
+  const isTrigger = isTriggerWorkflow(run.name) || isTriggerWorkflow(run.workflow_name || '');
+
   // Get testing workflows for this trigger workflow - try both name and workflow_name
-  const testingWorkflowFiles = isTrigger ? 
-    (getTestingWorkflowsForTrigger(run.name) || getTestingWorkflowsForTrigger(run.workflow_name)) : [];
+  const testingWorkflowFiles = isTrigger ?
+    (getTestingWorkflowsForTrigger(run.name) || getTestingWorkflowsForTrigger(run.workflow_name || '')) : [];
   const testingWorkflows = testingWorkflowFiles.map(file => {
     const workflowName = file.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     // Try to find the workflow run by matching the file name in the workflow name
@@ -68,10 +68,10 @@ export default function WorkflowCard({
       const runName = r.name.toLowerCase();
       const fileName = file.replace('.yml', '').toLowerCase();
       // Try multiple matching strategies
-      return runName.includes(fileName) || 
-             runName.includes(fileName.replace('-', ' ')) ||
-             runName.includes(fileName.replace('-', '')) ||
-             fileName.includes(runName.replace(/\s+/g, ''));
+      return runName.includes(fileName) ||
+        runName.includes(fileName.replace('-', ' ')) ||
+        runName.includes(fileName.replace('-', '')) ||
+        fileName.includes(runName.replace(/\s+/g, ''));
     });
     return {
       name: workflowName,
@@ -79,11 +79,11 @@ export default function WorkflowCard({
       run: matchingRun
     };
   }); // Remove the filter to see all testing workflows, even if not found
-  
+
   // Check if all testing workflows are reviewed
-  const allTestingWorkflowsReviewed = isTrigger && testingWorkflows.length > 0 && 
+  const allTestingWorkflowsReviewed = isTrigger && testingWorkflows.length > 0 &&
     testingWorkflows.every(wf => reviewedTestingWorkflows.has(wf.name));
-  
+
   // Debug logging for trigger workflows
   if (isTrigger) {
     console.log('Trigger workflow:', run.name);
@@ -104,9 +104,9 @@ export default function WorkflowCard({
     <Card className={`${isTrigger ? 'min-h-[200px]' : 'h-full'} transition-all duration-200 ${getBorderClass()}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-                           <h3 className="font-semibold text-sm leading-tight truncate pr-2">
-                   {cleanWorkflowName(run.name)}
-                 </h3>
+          <h3 className="font-semibold text-sm leading-tight truncate pr-2">
+            {cleanWorkflowName(run.name)}
+          </h3>
           <div className="flex items-center gap-2">
             {/* Show run count badge if workflow was run multiple times */}
             {run.run_count && run.run_count > 1 && (
@@ -129,7 +129,7 @@ export default function WorkflowCard({
                             <span className="font-mono w-24">
                               #{runDetail.id}
                             </span>
-                            <Badge 
+                            <Badge
                               variant={runDetail.conclusion === 'success' ? "success" : "destructive"}
                               className="text-xs justify-self-start"
                             >
@@ -150,10 +150,11 @@ export default function WorkflowCard({
                 </PopoverContent>
               </Popover>
             )}
-            <Badge 
+            <Badge
               variant={isSuccess ? "success" : isDidntRun ? "warning" : "destructive"}
               className="shrink-0"
             >
+              {/* eslint-disable-next-line react/no-unescaped-entities */}
               {isSuccess ? "Pass" : isDidntRun ? "Didn't Run" : "Fail"}
             </Badge>
           </div>
@@ -161,7 +162,7 @@ export default function WorkflowCard({
       </CardHeader>
       <CardContent className="pt-0">
 
-        
+
         {/* Show testing workflows for trigger workflows */}
         {isTrigger && testingWorkflows.length > 0 && (
           <div className="mb-3 p-2 bg-muted/50 rounded-md">
@@ -174,9 +175,9 @@ export default function WorkflowCard({
                       {testingWorkflow.name}
                     </span>
                     <div className="flex items-center gap-1">
-                      <Button 
+                      <Button
                         variant={reviewedTestingWorkflows.has(testingWorkflow.name) ? "default" : "outline"}
-                        size="sm" 
+                        size="sm"
                         className={`h-5 px-2 text-xs ${reviewedTestingWorkflows.has(testingWorkflow.name) ? "bg-green-600 hover:bg-green-700" : ""}`}
                         onClick={() => {
                           if (onToggleTestingWorkflowReviewed) {
@@ -194,7 +195,7 @@ export default function WorkflowCard({
             </div>
           </div>
         )}
-        
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
@@ -214,9 +215,9 @@ export default function WorkflowCard({
                 View
               </Button>
             )}
-            <Button 
+            <Button
               variant={isReviewed ? "default" : "outline"}
-              size="sm" 
+              size="sm"
               onClick={onToggleReviewed}
               disabled={isTrigger && testingWorkflows.length > 0 && !allTestingWorkflowsReviewed}
               className={isReviewed ? "bg-green-600 hover:bg-green-700" : ""}

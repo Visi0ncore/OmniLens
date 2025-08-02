@@ -1,11 +1,12 @@
 import { format, startOfDay, endOfDay } from "date-fns";
-import { removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows } from "./utils";
+import { removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getAllConfiguredWorkflows } from "./utils";
 
 export interface WorkflowRun {
   id: number;
   name: string;
   workflow_id: number;
-  workflow_name: string;
+  workflow_name?: string; // Made optional since GitHub API doesn't provide this
+  path?: string; // Added path field from GitHub API
   conclusion: string | null;
   status: string;
   html_url: string;
@@ -47,12 +48,27 @@ function getEnvVars() {
   return { token, repo };
 }
 
+// Helper function to find which configured workflow file a run corresponds to
+function getConfiguredWorkflowFile(run: WorkflowRun): string | null {
+  const configuredWorkflows = getAllConfiguredWorkflows();
+  // Use only fields that exist in the WorkflowRun interface
+  const workflowFile = run.path || run.workflow_name;
+  
+  // Find the configured workflow that matches this run
+  const matchingWorkflow = configuredWorkflows.find(configWorkflow => 
+    workflowFile && workflowFile.includes(configWorkflow)
+  );
+  
+  return matchingWorkflow || null;
+}
+
 // Helper function to get only the latest run of each workflow
 // This prevents displaying multiple runs when a workflow is triggered multiple times in a day
+// Groups by configured workflow file name from workflows.json
 function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
-  const latestRuns = new Map<number, WorkflowRun>();
-  const duplicateCount = new Map<number, number>();
-  const allRunsForWorkflow = new Map<number, Array<{
+  const latestRuns = new Map<string, WorkflowRun>();
+  const duplicateCount = new Map<string, number>();
+  const allRunsForWorkflow = new Map<string, Array<{
     id: number;
     conclusion: string | null;
     status: string;
@@ -65,12 +81,21 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
     new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime()
   );
 
-  // Keep only the latest run for each workflow_id, but collect all runs
+  // Keep only the latest run for each configured workflow file, but collect all runs
+  // Use configured workflow file name as the key (from workflows.json)
   sortedRuns.forEach(run => {
-    if (!latestRuns.has(run.workflow_id)) {
-      latestRuns.set(run.workflow_id, run);
-      duplicateCount.set(run.workflow_id, 1);
-      allRunsForWorkflow.set(run.workflow_id, [{
+    const configuredWorkflowFile = getConfiguredWorkflowFile(run);
+    
+    // Skip runs that don't match any configured workflow (should not happen after filtering)
+    if (!configuredWorkflowFile) {
+      console.warn(`Run "${run.name}" does not match any configured workflow file`);
+      return;
+    }
+    
+    if (!latestRuns.has(configuredWorkflowFile)) {
+      latestRuns.set(configuredWorkflowFile, run);
+      duplicateCount.set(configuredWorkflowFile, 1);
+      allRunsForWorkflow.set(configuredWorkflowFile, [{
         id: run.id,
         conclusion: run.conclusion,
         status: run.status,
@@ -79,9 +104,9 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
       }]);
     } else {
       // Count duplicates for logging
-      duplicateCount.set(run.workflow_id, (duplicateCount.get(run.workflow_id) || 0) + 1);
+      duplicateCount.set(configuredWorkflowFile, (duplicateCount.get(configuredWorkflowFile) || 0) + 1);
       // Add this run to the collection
-      const existingRuns = allRunsForWorkflow.get(run.workflow_id) || [];
+      const existingRuns = allRunsForWorkflow.get(configuredWorkflowFile) || [];
       existingRuns.push({
         id: run.id,
         conclusion: run.conclusion,
@@ -89,25 +114,26 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
         html_url: run.html_url,
         run_started_at: run.run_started_at
       });
-      allRunsForWorkflow.set(run.workflow_id, existingRuns);
+      allRunsForWorkflow.set(configuredWorkflowFile, existingRuns);
     }
   });
 
   // Log workflows that had multiple runs
-  duplicateCount.forEach((count, workflowId) => {
+  duplicateCount.forEach((count, configuredWorkflowFile) => {
     if (count > 1) {
-      const workflow = latestRuns.get(workflowId);
-      const cleanName = cleanWorkflowName(workflow?.workflow_name || workflow?.name || 'Unknown');
-      // console.log(`Workflow "${cleanName}" (ID: ${workflowId}) had ${count} runs - using latest`);
+      console.log(`Configured workflow "${configuredWorkflowFile}" had ${count} runs - using latest`);
     }
   });
 
   // Add run count and all runs to each workflow run
-  const result = Array.from(latestRuns.values()).map(run => ({
-    ...run,
-    run_count: duplicateCount.get(run.workflow_id) || 1,
-    all_runs: allRunsForWorkflow.get(run.workflow_id) || []
-  }));
+  const result = Array.from(latestRuns.values()).map(run => {
+    const configuredWorkflowFile = getConfiguredWorkflowFile(run);
+    return {
+      ...run,
+      run_count: duplicateCount.get(configuredWorkflowFile!) || 1,
+      all_runs: allRunsForWorkflow.get(configuredWorkflowFile!) || []
+    };
+  });
 
   return result;
 }
@@ -120,31 +146,56 @@ export async function getWorkflowRunsForDate(date: Date): Promise<WorkflowRun[]>
     // Format date to ISO string for GitHub API
     const dateStr = format(date, "yyyy-MM-dd");
 
-    const res = await fetch(
-      `${API_BASE}/repos/${repo}/actions/runs?created=${dateStr}&per_page=100`,
-      {
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${token}`,
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-      }
-    );
+    // Try broader time range to capture all runs for the date
+    const startOfDay = `${dateStr}T00:00:00Z`;
+    const endOfDay = `${dateStr}T23:59:59Z`;
+    
+    // Fetch all workflow runs for the date, handling pagination
+    let allRuns: WorkflowRun[] = [];
+    let page = 1;
+    let hasMorePages = true;
+    
+    while (hasMorePages) {
+      const res = await fetch(
+        `${API_BASE}/repos/${repo}/actions/runs?created=${startOfDay}..${endOfDay}&per_page=100&page=${page}`,
+        {
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${token}`,
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        }
+      );
 
-    if (!res.ok) {
-      throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+      if (!res.ok) {
+        throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      const pageRuns = json.workflow_runs as WorkflowRun[];
+      
+      allRuns = allRuns.concat(pageRuns);
+      
+      // Check if we need to fetch more pages
+      hasMorePages = pageRuns.length === 100; // If we got 100 results, there might be more
+      page++;
+      
+      console.log(`Page ${page - 1}: ${pageRuns.length} runs, Total so far: ${allRuns.length}`);
+      
+      // Safety break to avoid infinite loops
+      if (page > 10) {
+        console.warn('Breaking pagination after 10 pages to avoid infinite loop');
+        break;
+      }
     }
 
-    const json = await res.json();
-    const allRuns = json.workflow_runs as WorkflowRun[];
-
-    // console.log(`\nFetched ${allRuns.length} total workflow runs for ${dateStr}`);
+    console.log(`GitHub API returned ${allRuns.length} total runs for ${dateStr}`);
 
     // Return only the latest run of each workflow to avoid duplicates
     // when workflows are triggered multiple times throughout the day
     const latestRuns = getLatestWorkflowRuns(allRuns);
 
-    // console.log(`After deduplication: ${latestRuns.length} unique workflows\n`);
+    console.log(`After deduplication: ${latestRuns.length} unique workflows`);
 
     return latestRuns;
 

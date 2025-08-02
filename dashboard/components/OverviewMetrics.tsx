@@ -24,7 +24,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${secs}s`;
   } else if (minutes > 0) {
@@ -36,7 +36,7 @@ function formatDuration(seconds: number): string {
 
 export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: OverviewMetricsProps) {
   const passedPercentage = data.completedRuns > 0 ? Math.round((data.passedRuns / data.completedRuns) * 100) : 0;
-  
+
   // Create missing workflow IDs for hover functionality
   const missingWorkflowIds = data.missingWorkflows.map(workflow => `missing-${workflow}`);
 
@@ -65,7 +65,7 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
                       stroke="hsl(var(--muted))"
                       strokeWidth="6"
                     />
-                    
+
                     {/* Passed (Green) */}
                     {data.passedRuns > 0 && (
                       <circle
@@ -80,7 +80,7 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
                         strokeLinecap="round"
                       />
                     )}
-                    
+
                     {/* Failed (Red) */}
                     {data.failedRuns > 0 && (
                       <circle
@@ -147,7 +147,7 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
             {/* Right Column: Didn't Run and Runtime */}
             <div className="space-y-3">
               {/* Didn't Run */}
-              <div 
+              <div
                 className="flex items-center gap-3 cursor-pointer"
                 title={data.missingWorkflows.length > 0 ? `Missing workflows: ${data.missingWorkflows.join(', ')}` : 'All configured workflows ran'}
                 onMouseEnter={() => onMetricHover?.('didnt_run', missingWorkflowIds)}
@@ -155,6 +155,7 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
               >
                 <div className="flex items-center gap-2 min-w-[8rem] sm:w-32">
                   <XCircle className="h-4 w-4 text-red-500" />
+                  {/* eslint-disable-next-line react/no-unescaped-entities */}
                   <span className="text-sm">Didn't Run</span>
                 </div>
                 <div className={`font-semibold ${data.didntRunCount === 0 ? 'text-green-500' : 'text-red-500'}`}>

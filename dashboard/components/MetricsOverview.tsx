@@ -10,15 +10,15 @@ interface MetricsOverviewProps {
 function PieChart({ passed, failed }: { passed: number; failed: number }) {
   const total = passed + failed;
   if (total === 0) return null;
-  
+
   const passedPercentage = (passed / total) * 100;
   const failedPercentage = (failed / total) * 100;
-  
+
   // SVG pie chart with simple arcs
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
   const passedOffset = circumference - (passedPercentage / 100) * circumference;
-  
+
   return (
     <div className="flex items-center gap-4">
       <div className="relative">
@@ -69,7 +69,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${secs}s`;
   } else if (minutes > 0) {
@@ -84,14 +84,14 @@ export default function MetricsOverview({ runs }: MetricsOverviewProps) {
   const inProgressRuns = runs.filter(run => !run.conclusion && run.status === 'in_progress');
   const passedRuns = completedRuns.filter(run => run.conclusion === 'success');
   const failedRuns = completedRuns.filter(run => run.conclusion === 'failure');
-  
+
   // Calculate total runtime for completed workflows
   const totalRuntime = completedRuns.reduce((total, run) => {
     const start = new Date(run.run_started_at).getTime();
     const end = new Date(run.updated_at).getTime();
     return total + Math.floor((end - start) / 1000);
   }, 0);
-  
+
   // This component is legacy - it doesn't have access to missing workflows calculation
   // It should use the new OverviewMetrics component instead
   const didntRunCount = 0; // Legacy component - use OverviewMetrics for accurate count
@@ -175,6 +175,7 @@ export default function MetricsOverview({ runs }: MetricsOverviewProps) {
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <XCircle className="h-4 w-4" />
+            {/* eslint-disable-next-line react/no-unescaped-entities */}
             Didn't Run
           </CardTitle>
         </CardHeader>

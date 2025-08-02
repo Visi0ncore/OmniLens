@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format, isToday } from "date-fns";
 
 import WorkflowCard from "@/components/WorkflowCard";
@@ -13,8 +13,15 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar, Hammer } from "lucide-react";
+import { Zap, Target, TestTube, Calendar, Hammer, RefreshCw } from "lucide-react";
 import workflowConfig from "@/config/workflows.json";
+
+// Type the imported config
+type WorkflowConfig = {
+  categories: Record<string, { name: string; workflows: string[] }>;
+  trigger_mappings: Record<string, string[]>;
+};
+const config = workflowConfig as WorkflowConfig;
 import { removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows } from "@/lib/utils";
 
 // Types for hover state management
@@ -25,26 +32,22 @@ interface HoverState {
 }
 
 function categorizeWorkflows(runs: any[], missingWorkflows: string[] = []) {
-  // Debug: log the full structure of a workflow run
-  if (runs.length > 0) {
-    console.log("Full workflow run object:", runs[0]);
-  }
   
   const categories: Record<string, any[]> = {};
   
-  Object.entries(workflowConfig.categories).forEach(([key, config]) => {
+  Object.entries(config.categories).forEach(([key, categoryConfig]) => {
     // Get actual workflow runs for this category
     const actualRuns = runs.filter(run => {
       // Try different possible fields that might contain the workflow file name
       const workflowFile = run.path || run.workflow_path || run.head_commit?.message || run.workflow_name;
-      return config.workflows.some(configWorkflow => 
+      return categoryConfig.workflows.some(configWorkflow => 
         workflowFile && workflowFile.includes(configWorkflow)
       );
     });
     
     // Create mock workflow runs for missing workflows in this category
     const missingInCategory = missingWorkflows.filter(workflow => 
-      config.workflows.includes(workflow)
+      categoryConfig.workflows.includes(workflow)
     );
     
     const mockMissingRuns = missingInCategory.map(workflowFile => ({
@@ -109,7 +112,7 @@ export default function DashboardPage() {
     return `reviewedTestingWorkflows-${format(date, "yyyy-MM-dd")}`;
   };
 
-  const loadReviewedWorkflows = (date: Date) => {
+  const loadReviewedWorkflows = useCallback((date: Date) => {
     try {
       const stored = localStorage.getItem(getStorageKey(date));
       if (stored) {
@@ -119,9 +122,9 @@ export default function DashboardPage() {
       console.error('Failed to load reviewed workflows from localStorage:', error);
     }
     return {};
-  };
+  }, []);
 
-  const loadCollapsedCategories = (date: Date) => {
+  const loadCollapsedCategories = useCallback((date: Date) => {
     try {
       const stored = localStorage.getItem(getCollapsedCategoriesKey(date));
       if (stored) {
@@ -131,9 +134,9 @@ export default function DashboardPage() {
       console.error('Failed to load collapsed categories from localStorage:', error);
     }
     return {};
-  };
+  }, []);
 
-  const loadReviewedTestingWorkflows = (date: Date) => {
+  const loadReviewedTestingWorkflows = useCallback((date: Date) => {
     try {
       const stored = localStorage.getItem(getTestingWorkflowsKey(date));
       if (stored) {
@@ -149,7 +152,7 @@ export default function DashboardPage() {
       console.error('Failed to load reviewed testing workflows from localStorage:', error);
     }
     return {};
-  };
+  }, []);
 
   const saveReviewedWorkflows = (date: Date, reviewedState: Record<number, boolean>) => {
     try {
@@ -189,14 +192,16 @@ export default function DashboardPage() {
     setReviewedWorkflows(storedReviewed);
     setCollapsedCategories(storedCollapsed);
     setReviewedTestingWorkflows(storedTestingWorkflows);
-  }, [selectedDate]);
+  }, [selectedDate, loadReviewedWorkflows, loadCollapsedCategories, loadReviewedTestingWorkflows]);
   
   // Single query for today's data
-  const { data: todayData, isLoading: todayLoading, isError: todayError } = useQuery({
+  const { data: todayData, isLoading: todayLoading, isError: todayError, refetch: refetchToday } = useQuery({
     queryKey: ["workflowData", format(selectedDate, "yyyy-MM-dd")],
     queryFn: async () => {
       return await fetchWorkflowData(selectedDate);
     },
+    staleTime: 30000, // Consider data stale after 30 seconds
+    cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes (React Query v4 uses cacheTime)
   });
 
   // Also fetch yesterday's data for comparison
@@ -381,6 +386,16 @@ export default function DashboardPage() {
               }}
               placeholder="Select Date"
             />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchToday()}
+              disabled={todayLoading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${todayLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
         </div>
       </header>
@@ -407,7 +422,7 @@ export default function DashboardPage() {
       
       {categories && (
         <div className="space-y-12">
-          {Object.entries(workflowConfig.categories).map(([key, config]) => {
+          {Object.entries(config.categories).map(([key, categoryConfig]) => {
             const getIcon = (categoryKey: string) => {
               switch (categoryKey) {
                 case 'utility': return <Zap className="h-6 w-6" />;
@@ -436,7 +451,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2">
                     {getIcon(key)}
                     <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
-                      {config.name}
+                      {categoryConfig.name}
                     </h2>
                   </div>
                   <div className="hidden sm:block flex-1 h-px bg-border"></div>
