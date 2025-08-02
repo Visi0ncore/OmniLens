@@ -1,8 +1,14 @@
-# OmniLens Website - Secure Waiting List
+# 🌐 OmniLens Website
 
-A bulletproof Next.js website with PostgreSQL-backed waiting list functionality for OmniLens, featuring comprehensive security and abuse prevention.
+> **Secure landing page and waitlist management for OmniLens**
 
-## Features
+A bulletproof Next.js website with PostgreSQL-backed waiting list functionality, featuring comprehensive security and abuse prevention. This component serves as the public-facing website for OmniLens with secure user registration capabilities.
+
+![Next.js](https://img.shields.io/badge/Next.js-14-black)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-blue)
+![Security](https://img.shields.io/badge/Security-Multi--Layer-green)
+
+## ✨ Features
 
 - ✅ **Secure Waiting List**: PostgreSQL database with direct pg client
 - ✅ **Multi-Layer Security**: Rate limiting, IP blocking, and abuse prevention
@@ -12,7 +18,7 @@ A bulletproof Next.js website with PostgreSQL-backed waiting list functionality 
 - ✅ **Real-time Statistics**: Live counter updates via API
 - ✅ **Production Ready**: Comprehensive error handling and monitoring
 
-## Security Features
+## 🔒 Security Features
 
 🛡️ **Backend Protection:**
 - **Rate Limiting**: Max 5 signups per IP per hour
@@ -23,19 +29,19 @@ A bulletproof Next.js website with PostgreSQL-backed waiting list functionality 
 - **SQL Injection Protection**: Parameterized queries only
 - **Security Headers**: XSS, CSRF, and clickjacking protection
 
-🛡️ **Frontend Protection:**
+🪖 **Frontend Protection:**
 - **5-second cooldown** between form submissions
 - **Enhanced email validation** (254 character limit, proper regex)
 - **User-friendly error messages** with visual feedback
 - **Network error handling** with retry guidance
 
-🛡️ **Monitoring & Logging:**
+⛑️ **Monitoring & Logging:**
 - **Successful signups logged** with email and count
 - **Failed attempts logged** with IP addresses and timestamps
 - **Automatic cleanup** of old rate limit data
 - **Attack pattern detection** and blocking
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Install Dependencies
 
@@ -92,7 +98,7 @@ bun run dev
 
 Visit [http://localhost:3000](http://localhost:3000)
 
-## API Endpoints
+## 📡 API Endpoints
 
 ### POST `/api/waitlist`
 
@@ -141,7 +147,7 @@ Get current waiting list statistics.
 }
 ```
 
-## Database Management Commands
+## 🗄️ Database Management
 
 **Secure database access without exposing passwords:**
 
@@ -162,7 +168,7 @@ bun run db:connect
 bun run db:reset
 ```
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 website/
@@ -182,7 +188,7 @@ website/
 └── .env.local                   # Environment variables (not in repo)
 ```
 
-## Security Implementation Details
+## 🔒 Security Implementation
 
 ### Rate Limiting Configuration
 
@@ -206,7 +212,7 @@ const RATE_LIMITS = {
 - ✅ **XSS attacks**: Security headers and input sanitization
 - ✅ **CSRF attacks**: Proper headers and origin validation
 
-## Development Commands
+## 🛠️ Development Commands
 
 ```bash
 # Start development server
@@ -224,7 +230,7 @@ bun run build                 # Build for production
 bun run start                 # Start production server
 ```
 
-## Environment Variables
+## ⚙️ Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
@@ -232,7 +238,7 @@ bun run start                 # Start production server
 | `POSTGRES_PRISMA_URL` | Pooled connection string | Yes |
 | `POSTGRES_URL_NON_POOLING` | Direct connection string | Yes |
 
-## Deployment to Production
+## 🚀 Production Deployment
 
 ### 1. Database Setup
 
@@ -250,7 +256,7 @@ Configure environment variables with your production database credentials.
 - Monitor logs for abuse patterns
 - Consider using Redis for rate limiting in high-traffic scenarios
 
-## Monitoring and Maintenance
+## 📊 Monitoring & Maintenance
 
 ### Log Monitoring
 
@@ -274,7 +280,7 @@ bun run db:recent
 bun run db:reset
 ```
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### Database Connection Issues
 
@@ -301,6 +307,19 @@ Monitor logs for patterns like:
 - Invalid email formats
 - Repeated duplicate email attempts
 
-## License
+## 📄 License
 
-MIT License - see LICENSE file for details 
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+
+## 🔗 Related
+
+- **[Main OmniLens Dashboard](../dashboard/)** - Real-time workflow monitoring
+- **[Contributing Guide](../CONTRIBUTING.md)** - Development and contribution guidelines
+- **[Project Documentation](../docs/)** - Comprehensive guides and API reference
+
+---
+
+<div align="center">
+  <strong>Part of the OmniLens ecosystem</strong><br>
+  <a href="../README.md">← Back to main project</a>
+</div> 
