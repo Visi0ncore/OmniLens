@@ -100,8 +100,12 @@ export default function WorkflowCard({
     return 'border-2 border-border'; // Use the default border color with consistent width
   };
 
+  // Determine card height - trigger cards should only be taller when testing workflows are visible
+  const shouldShowTestingWorkflows = isTrigger && testingWorkflows.length > 0 && !isReviewed;
+  const cardHeightClass = shouldShowTestingWorkflows ? 'min-h-[200px]' : 'h-full';
+
   return (
-    <Card className={`${isTrigger ? 'min-h-[200px]' : 'h-full'} transition-all duration-200 ${getBorderClass()}`}>
+    <Card className={`${cardHeightClass} transition-all duration-200 ${getBorderClass()}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm leading-tight truncate pr-2">
@@ -183,38 +187,36 @@ export default function WorkflowCard({
       <CardContent className="pt-0">
 
 
-        {/* Show testing workflows for trigger workflows */}
-        {isTrigger && testingWorkflows.length > 0 && (
+        {/* Show testing workflows for trigger workflows only when not reviewed */}
+        {isTrigger && testingWorkflows.length > 0 && !isReviewed && (
           <div className="mb-3 p-2 bg-muted/50 rounded-md">
             <div className="text-xs font-medium text-muted-foreground mb-1">Testing Workflows:</div>
-            {!isReviewed && (
-              <div className="space-y-1">
-                {testingWorkflows.map((testingWorkflow, index) => {
-                  return (
-                    <div key={index} className="flex items-center justify-between text-xs">
-                      <span className="truncate pr-2">
-                        {testingWorkflow.name}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant={reviewedTestingWorkflows.has(testingWorkflow.name) ? "default" : "outline"}
-                          size="sm"
-                          className={`h-5 px-2 text-xs ${reviewedTestingWorkflows.has(testingWorkflow.name) ? "bg-green-600 hover:bg-green-700" : ""}`}
-                          onClick={() => {
-                            if (onToggleTestingWorkflowReviewed) {
-                              onToggleTestingWorkflowReviewed(testingWorkflow.name);
-                            }
-                          }}
-                        >
-                          <Check className="h-3 w-3 mr-1" />
-                          {reviewedTestingWorkflows.has(testingWorkflow.name) ? "" : "Review"}
-                        </Button>
-                      </div>
+            <div className="space-y-1">
+              {testingWorkflows.map((testingWorkflow, index) => {
+                return (
+                  <div key={index} className="flex items-center justify-between text-xs">
+                    <span className="truncate pr-2">
+                      {testingWorkflow.name}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant={reviewedTestingWorkflows.has(testingWorkflow.name) ? "default" : "outline"}
+                        size="sm"
+                        className={`h-5 px-2 text-xs ${reviewedTestingWorkflows.has(testingWorkflow.name) ? "bg-green-600 hover:bg-green-700" : ""}`}
+                        onClick={() => {
+                          if (onToggleTestingWorkflowReviewed) {
+                            onToggleTestingWorkflowReviewed(testingWorkflow.name);
+                          }
+                        }}
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        {reviewedTestingWorkflows.has(testingWorkflow.name) ? "" : "Review"}
+                      </Button>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
