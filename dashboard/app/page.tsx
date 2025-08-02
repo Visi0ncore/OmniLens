@@ -22,7 +22,7 @@ type WorkflowConfig = {
   trigger_mappings: Record<string, string[]>;
 };
 const config = workflowConfig as WorkflowConfig;
-import { removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows } from "@/lib/utils";
+import { removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getTestingWorkflowsForTrigger } from "@/lib/utils";
 
 // Types for hover state management
 type MetricType = 'consistent' | 'improved' | 'regressed' | 'regressing' | 'didnt_run';
@@ -352,18 +352,41 @@ export default function DashboardPage() {
       // Save to localStorage
       saveReviewedTestingWorkflows(selectedDate, newState);
 
-      // Check if we need to unmark the trigger workflow as reviewed
-      // If we're removing a testing workflow from reviewed, and the trigger is currently reviewed,
-      // then unmark the trigger as reviewed
-      if (!newSet.has(testingWorkflowName) && reviewedWorkflows[triggerWorkflowId]) {
-        setReviewedWorkflows(prev => {
-          const newReviewedState = {
-            ...prev,
-            [triggerWorkflowId]: false
-          };
-          saveReviewedWorkflows(selectedDate, newReviewedState);
-          return newReviewedState;
-        });
+      // Find the trigger workflow to get its testing workflows
+      const triggerWorkflow = workflowData?.find((run: any) => run.id === triggerWorkflowId);
+      if (triggerWorkflow) {
+        const testingWorkflowFiles = getTestingWorkflowsForTrigger(triggerWorkflow.name) || getTestingWorkflowsForTrigger(triggerWorkflow.workflow_name || '');
+        const testingWorkflowNames = testingWorkflowFiles.map((file: string) => 
+          file.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+        );
+
+        // Check if all testing workflows are now reviewed
+        const allTestingWorkflowsReviewed = testingWorkflowNames.length > 0 && 
+          testingWorkflowNames.every((name: string) => newSet.has(name));
+
+        // If all testing workflows are reviewed, automatically mark the trigger as reviewed
+        if (allTestingWorkflowsReviewed && !reviewedWorkflows[triggerWorkflowId]) {
+          setReviewedWorkflows(prev => {
+            const newReviewedState = {
+              ...prev,
+              [triggerWorkflowId]: true
+            };
+            saveReviewedWorkflows(selectedDate, newReviewedState);
+            return newReviewedState;
+          });
+        }
+        // If we're removing a testing workflow from reviewed, and the trigger is currently reviewed,
+        // then unmark the trigger as reviewed
+        else if (!newSet.has(testingWorkflowName) && reviewedWorkflows[triggerWorkflowId]) {
+          setReviewedWorkflows(prev => {
+            const newReviewedState = {
+              ...prev,
+              [triggerWorkflowId]: false
+            };
+            saveReviewedWorkflows(selectedDate, newReviewedState);
+            return newReviewedState;
+          });
+        }
       }
 
       return newState;

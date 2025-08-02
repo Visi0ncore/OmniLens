@@ -131,19 +131,18 @@ export default function WorkflowCard({
                             </span>
                             <Badge
                               variant={
-                                runDetail.conclusion === 'success' ? "success" : 
-                                runDetail.conclusion === null && runDetail.status === 'in_progress' ? "destructive" :
-                                "destructive"
+                                runDetail.conclusion === 'success' ? "success" :
+                                  runDetail.conclusion === null && runDetail.status === 'in_progress' ? "destructive" :
+                                    "destructive"
                               }
-                              className={`text-xs justify-self-start ${
-                                runDetail.conclusion === null && runDetail.status === 'in_progress' 
-                                  ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                              className={`text-xs justify-self-start ${runDetail.conclusion === null && runDetail.status === 'in_progress'
+                                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
                                   : ''
-                              }`}
+                                }`}
                             >
-                              {runDetail.conclusion === 'success' ? "Pass" : 
-                               runDetail.conclusion === null && runDetail.status === 'in_progress' ? "Running" :
-                               "Fail"}
+                              {runDetail.conclusion === 'success' ? "Pass" :
+                                runDetail.conclusion === null && runDetail.status === 'in_progress' ? "Running" :
+                                  "Fail"}
                             </Badge>
                             <Button variant="ghost" size="sm" asChild className="h-6 px-1">
                               <Link href={runDetail.html_url} target="_blank">
@@ -162,22 +161,21 @@ export default function WorkflowCard({
             )}
             <Badge
               variant={
-                isSuccess ? "success" : 
-                isDidntRun ? "warning" : 
-                status === "in_progress" ? "destructive" :
-                "destructive"
+                isSuccess ? "success" :
+                  isDidntRun ? "warning" :
+                    status === "in_progress" ? "destructive" :
+                      "destructive"
               }
-              className={`shrink-0 ${
-                status === "in_progress" 
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+              className={`shrink-0 ${status === "in_progress"
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
                   : ''
-              }`}
+                }`}
             >
               {/* eslint-disable-next-line react/no-unescaped-entities */}
-              {isSuccess ? "Pass" : 
-               isDidntRun ? "Didn't Run" : 
-               status === "in_progress" ? "Running" :
-               "Fail"}
+              {isSuccess ? "Pass" :
+                isDidntRun ? "Didn't Run" :
+                  status === "in_progress" ? "Running" :
+                    "Fail"}
             </Badge>
           </div>
         </div>
@@ -188,33 +186,35 @@ export default function WorkflowCard({
         {/* Show testing workflows for trigger workflows */}
         {isTrigger && testingWorkflows.length > 0 && (
           <div className="mb-3 p-2 bg-muted/50 rounded-md">
-            <div className="text-xs font-medium text-muted-foreground mb-2">Testing Workflows:</div>
-            <div className="space-y-1">
-              {testingWorkflows.map((testingWorkflow, index) => {
-                return (
-                  <div key={index} className="flex items-center justify-between text-xs">
-                    <span className="truncate pr-2">
-                      {testingWorkflow.name}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant={reviewedTestingWorkflows.has(testingWorkflow.name) ? "default" : "outline"}
-                        size="sm"
-                        className={`h-5 px-2 text-xs ${reviewedTestingWorkflows.has(testingWorkflow.name) ? "bg-green-600 hover:bg-green-700" : ""}`}
-                        onClick={() => {
-                          if (onToggleTestingWorkflowReviewed) {
-                            onToggleTestingWorkflowReviewed(testingWorkflow.name);
-                          }
-                        }}
-                      >
-                        <Check className="h-3 w-3 mr-1" />
-                        {reviewedTestingWorkflows.has(testingWorkflow.name) ? "" : "Review"}
-                      </Button>
+            <div className="text-xs font-medium text-muted-foreground mb-1">Testing Workflows:</div>
+            {!isReviewed && (
+              <div className="space-y-1">
+                {testingWorkflows.map((testingWorkflow, index) => {
+                  return (
+                    <div key={index} className="flex items-center justify-between text-xs">
+                      <span className="truncate pr-2">
+                        {testingWorkflow.name}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant={reviewedTestingWorkflows.has(testingWorkflow.name) ? "default" : "outline"}
+                          size="sm"
+                          className={`h-5 px-2 text-xs ${reviewedTestingWorkflows.has(testingWorkflow.name) ? "bg-green-600 hover:bg-green-700" : ""}`}
+                          onClick={() => {
+                            if (onToggleTestingWorkflowReviewed) {
+                              onToggleTestingWorkflowReviewed(testingWorkflow.name);
+                            }
+                          }}
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          {reviewedTestingWorkflows.has(testingWorkflow.name) ? "" : "Review"}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
