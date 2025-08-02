@@ -1,4 +1,4 @@
-name: 🧪 Positive Workflow
+name: 🧪 Positive Test
 
 on:
   workflow_call:
