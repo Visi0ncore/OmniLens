@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { format, isToday } from "date-fns";
 
 import WorkflowCard from "@/components/WorkflowCard";
@@ -32,24 +32,24 @@ interface HoverState {
 }
 
 function categorizeWorkflows(runs: any[], missingWorkflows: string[] = []) {
-  
+
   const categories: Record<string, any[]> = {};
-  
+
   Object.entries(config.categories).forEach(([key, categoryConfig]) => {
     // Get actual workflow runs for this category
     const actualRuns = runs.filter(run => {
       // Try different possible fields that might contain the workflow file name
       const workflowFile = run.path || run.workflow_path || run.head_commit?.message || run.workflow_name;
-      return categoryConfig.workflows.some(configWorkflow => 
+      return categoryConfig.workflows.some(configWorkflow =>
         workflowFile && workflowFile.includes(configWorkflow)
       );
     });
-    
+
     // Create mock workflow runs for missing workflows in this category
-    const missingInCategory = missingWorkflows.filter(workflow => 
+    const missingInCategory = missingWorkflows.filter(workflow =>
       categoryConfig.workflows.includes(workflow)
     );
-    
+
     const mockMissingRuns = missingInCategory.map(workflowFile => ({
       id: `missing-${workflowFile}`, // Unique ID for missing workflows
       name: workflowFile.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
@@ -62,10 +62,10 @@ function categorizeWorkflows(runs: any[], missingWorkflows: string[] = []) {
       updated_at: new Date().toISOString(),
       isMissing: true // Flag to identify mock workflows
     }));
-    
+
     // Combine actual and missing runs
     const allRuns = [...actualRuns, ...mockMissingRuns];
-    
+
     categories[key] = allRuns.sort((a, b) => {
       // Sort alphabetically by cleaned workflow names (without emojis and trigger prefix)
       const cleanNameA = cleanWorkflowName(a.name);
@@ -73,20 +73,34 @@ function categorizeWorkflows(runs: any[], missingWorkflows: string[] = []) {
       return cleanNameA.localeCompare(cleanNameB);
     });
   });
-  
+
   return categories;
 }
 
 // Helper function to fetch data from API
 const fetchWorkflowData = async (date: Date) => {
   const dateStr = format(date, "yyyy-MM-dd");
-  const response = await fetch(`/api/workflows?date=${dateStr}`);
+  const timestamp = new Date().toLocaleTimeString();
+  
+  console.log(`🔄 [${timestamp}] Fetching data for ${dateStr}...`);
+  
+  const response = await fetch(`/api/workflows?date=${dateStr}&_t=${Date.now()}`, {
+    // Add cache-busting headers to prevent browser caching
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    }
+  });
   
   if (!response.ok) {
     throw new Error('Failed to fetch workflow data');
   }
   
-  return response.json();
+  const data = await response.json();
+  console.log(`✅ [${timestamp}] Received data: ${data.workflowRuns?.length || 0} workflow runs`);
+  
+  return data;
 };
 
 export default function DashboardPage() {
@@ -94,8 +108,8 @@ export default function DashboardPage() {
   const [reviewedWorkflows, setReviewedWorkflows] = useState<Record<number, boolean>>({});
   const [reviewedTestingWorkflows, setReviewedTestingWorkflows] = useState<Record<string, Set<string>>>({});
   const [hoverState, setHoverState] = useState<HoverState>({ metricType: null, workflowIds: new Set() });
-  
-  // Initialize with today's date explicitly
+
+  // Initialize with today's date explicitly  
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
 
@@ -188,37 +202,80 @@ export default function DashboardPage() {
     const storedReviewed = loadReviewedWorkflows(selectedDate);
     const storedCollapsed = loadCollapsedCategories(selectedDate);
     const storedTestingWorkflows = loadReviewedTestingWorkflows(selectedDate);
-    
+
     setReviewedWorkflows(storedReviewed);
     setCollapsedCategories(storedCollapsed);
     setReviewedTestingWorkflows(storedTestingWorkflows);
   }, [selectedDate, loadReviewedWorkflows, loadCollapsedCategories, loadReviewedTestingWorkflows]);
-  
-  // Single query for today's data
+
+  // Single query for today's data with more aggressive real-time updates
   const { data: todayData, isLoading: todayLoading, isError: todayError, refetch: refetchToday } = useQuery({
     queryKey: ["workflowData", format(selectedDate, "yyyy-MM-dd")],
     queryFn: async () => {
       return await fetchWorkflowData(selectedDate);
     },
-    staleTime: 30000, // Consider data stale after 30 seconds
-    cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes (React Query v4 uses cacheTime)
+    staleTime: 0, // Data is immediately stale (always refetch)
+    cacheTime: 30 * 1000, // Keep in cache for only 30 seconds
+    refetchInterval: 5000, // Auto-refetch every 5 seconds
+    refetchIntervalInBackground: true, // Continue refetching even when tab is not active
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchOnMount: true, // Refetch when component mounts
   });
 
-  // Also fetch yesterday's data for comparison
-  const yesterday = new Date(selectedDate);
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  const { data: yesterdayData } = useQuery({
-    queryKey: ["workflowData", format(yesterday, "yyyy-MM-dd")],
+  // Query for yesterday's data for Daily Metrics comparison
+  const { data: yesterdayData, isLoading: yesterdayLoading, refetch: refetchYesterday } = useQuery({
+    queryKey: ["yesterdayWorkflowData", format(selectedDate, "yyyy-MM-dd")],
     queryFn: async () => {
+      const yesterday = new Date(selectedDate);
+      yesterday.setDate(yesterday.getDate() - 1);
       return await fetchWorkflowData(yesterday);
     },
+    staleTime: 5 * 60 * 1000, // Data is stale after 5 minutes
+    cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    refetchOnWindowFocus: false, // Don't refetch on window focus for historical data
+    refetchOnMount: true, // Refetch when component mounts
   });
 
-  // Extract data from the single response
+    // Extract data from the responses
   const workflowData = todayData?.workflowRuns;
   const overviewData = todayData?.overviewData;
   const yesterdayWorkflowData = yesterdayData?.workflowRuns;
+
+    // Log selected date and yesterday data when available
+  React.useEffect(() => {
+    if (workflowData) {
+      console.log(`\n🏠 === DASHBOARD DATA FOR ${format(selectedDate, "yyyy-MM-dd")} ===`);
+      console.log(`⏰ Last updated: ${new Date().toLocaleTimeString()}`);
+      
+      console.log(`\n📊 SELECTED DATE DATA:`);
+      console.log(`   🎯 Workflow runs received: ${workflowData.length}`);
+      workflowData.forEach((run: any, index: number) => {
+        console.log(`     ${index + 1}. "${run.name}" - Run Count: ${run.run_count || 1}, All Runs: ${run.all_runs?.length || 0}`);
+      });
+      
+      // Check for multiple runs
+      const multipleRuns = workflowData.filter((run: any) => (run.run_count || 1) > 1);
+      
+      if (multipleRuns.length > 0) {
+        console.log(`\n🔍 MULTIPLE RUNS DETECTED:`);
+        console.log(`   📅 ${format(selectedDate, "yyyy-MM-dd")}: ${multipleRuns.length} workflows with multiple runs`);
+        multipleRuns.forEach((run: any) => {
+          console.log(`     - "${run.name}": ${run.run_count} runs`);
+        });
+      }
+    }
+
+    // Log yesterday data for Daily Metrics
+    if (yesterdayWorkflowData) {
+      const yesterday = new Date(selectedDate);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = format(yesterday, "yyyy-MM-dd");
+      
+      console.log(`\n📈 === YESTERDAY DATA FOR ${yesterdayStr} ===`);
+      console.log(`   🎯 Yesterday workflow runs: ${yesterdayWorkflowData.length}`);
+      console.log(`   📊 Daily Metrics comparison data available`);
+    }
+  }, [workflowData, yesterdayWorkflowData, selectedDate]);
 
   const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
   const isSelectedDateToday = isToday(selectedDate);
@@ -232,10 +289,10 @@ export default function DashboardPage() {
         ...prev,
         [categoryKey]: !prev[categoryKey]
       };
-      
+
       // Save to localStorage
       saveCollapsedCategories(selectedDate, newState);
-      
+
       return newState;
     });
   };
@@ -246,31 +303,31 @@ export default function DashboardPage() {
         ...prev,
         [workflowId]: !prev[workflowId]
       };
-      
+
       // Save to localStorage
       saveReviewedWorkflows(selectedDate, newState);
-      
+
       // Simple rule: Check if we need to auto-collapse any categories
       if (categories) {
         Object.entries(categories).forEach(([categoryKey, workflows]) => {
           const allReviewed = workflows.every(workflow => newState[workflow.id]);
-          
+
           if (allReviewed && workflows.length > 0) {
             setCollapsedCategories(prevCollapsed => {
               const newCollapsedState = {
                 ...prevCollapsed,
                 [categoryKey]: true
               };
-              
+
               // Save to localStorage
               saveCollapsedCategories(selectedDate, newCollapsedState);
-              
+
               return newCollapsedState;
             });
           }
         });
       }
-      
+
       return newState;
     });
   };
@@ -280,21 +337,21 @@ export default function DashboardPage() {
       const triggerKey = triggerWorkflowId.toString();
       const currentSet = prev[triggerKey] || new Set();
       const newSet = new Set(currentSet);
-      
+
       if (newSet.has(testingWorkflowName)) {
         newSet.delete(testingWorkflowName);
       } else {
         newSet.add(testingWorkflowName);
       }
-      
+
       const newState = {
         ...prev,
         [triggerKey]: newSet
       };
-      
+
       // Save to localStorage
       saveReviewedTestingWorkflows(selectedDate, newState);
-      
+
       // Check if we need to unmark the trigger workflow as reviewed
       // If we're removing a testing workflow from reviewed, and the trigger is currently reviewed,
       // then unmark the trigger as reviewed
@@ -308,7 +365,7 @@ export default function DashboardPage() {
           return newReviewedState;
         });
       }
-      
+
       return newState;
     });
   };
@@ -389,37 +446,41 @@ export default function DashboardPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => refetchToday()}
-              disabled={todayLoading}
+              onClick={() => {
+                console.log('🔄 Manual refresh triggered');
+                refetchToday();
+                refetchYesterday();
+              }}
+              disabled={todayLoading || yesterdayLoading}
               className="flex items-center gap-2"
             >
-              <RefreshCw className={`h-4 w-4 ${todayLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${(todayLoading || yesterdayLoading) ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
         </div>
       </header>
 
-      {todayLoading && <SkeletonCards />}
+      {(todayLoading || yesterdayLoading) && <SkeletonCards />}
       {todayError && <ErrorState />}
-      
+
       {/* Compact Overview Row */}
       {workflowData && overviewData && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-8">
-          <OverviewMetrics 
-            data={overviewData} 
+          <OverviewMetrics
+            data={overviewData}
             onMetricHover={handleMetricHover}
             onMetricLeave={handleMetricLeave}
           />
-          <WorkflowMetrics 
-            todayRuns={filterWorkflowsByCategories(workflowData || [])} 
-            yesterdayRuns={filterWorkflowsByCategories(yesterdayWorkflowData || [])} 
+          <WorkflowMetrics
+            todayRuns={filterWorkflowsByCategories(workflowData || [])}
+            yesterdayRuns={filterWorkflowsByCategories(yesterdayWorkflowData || [])}
             onMetricHover={handleMetricHover}
             onMetricLeave={handleMetricLeave}
           />
         </div>
       )}
-      
+
       {categories && (
         <div className="space-y-12">
           {Object.entries(config.categories).map(([key, categoryConfig]) => {
@@ -432,19 +493,19 @@ export default function DashboardPage() {
                 default: return null;
               }
             };
-            
+
             const isCollapsed = collapsedCategories[key];
             const workflowCount = categories[key]?.length || 0;
             const reviewedCount = categories[key]?.filter(workflow => reviewedWorkflows[workflow.id]).length || 0;
             const allReviewed = workflowCount > 0 && reviewedCount === workflowCount;
-            
+
             // Determine badge variant based on review state
             let badgeVariant = "secondary";
             if (allReviewed) {
               badgeVariant = "success"; // Green when all workflows are reviewed
             }
             // If no workflows are reviewed or some workflows are reviewed, keep as secondary (grey)
-            
+
             return (
               <div key={key} className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -455,36 +516,36 @@ export default function DashboardPage() {
                     </h2>
                   </div>
                   <div className="hidden sm:block flex-1 h-px bg-border"></div>
-                  <Badge 
-                    variant={badgeVariant as any} 
+                  <Badge
+                    variant={badgeVariant as any}
                     className="text-xs cursor-pointer hover:opacity-80 transition-opacity self-start sm:self-auto"
                     onClick={() => toggleCategory(key)}
                   >
                     {reviewedCount} / {workflowCount} workflows
                   </Badge>
                 </div>
-                
+
                 {!isCollapsed && (
                   <>
                     {categories[key] && categories[key].length > 0 ? (
                       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {categories[key].map((run) => {
                           const isHighlighted = hoverState.metricType !== null && hoverState.workflowIds.has(run.id);
-                          const highlightColor = isHighlighted && hoverState.metricType 
-                            ? getBorderColorForMetric(hoverState.metricType) 
+                          const highlightColor = isHighlighted && hoverState.metricType
+                            ? getBorderColorForMetric(hoverState.metricType)
                             : '';
-                          
+
                           return (
-                            <WorkflowCard 
-                              key={run.id} 
-                              run={run} 
+                            <WorkflowCard
+                              key={run.id}
+                              run={run}
                               isReviewed={reviewedWorkflows[run.id] || false}
                               onToggleReviewed={() => toggleReviewed(run.id)}
                               isHighlighted={isHighlighted}
                               highlightColor={highlightColor}
                               allWorkflowRuns={workflowData || []}
                               reviewedTestingWorkflows={reviewedTestingWorkflows[run.id.toString()] || new Set()}
-                              onToggleTestingWorkflowReviewed={(testingWorkflowName) => 
+                              onToggleTestingWorkflowReviewed={(testingWorkflowName) =>
                                 toggleTestingWorkflowReviewed(run.id, testingWorkflowName)
                               }
                             />

@@ -53,5 +53,3 @@ bun install
 ```bash
 bun run dev
 ```
-
-The dashboard will be available at `http://localhost:3000`

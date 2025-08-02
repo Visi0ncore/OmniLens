@@ -130,10 +130,20 @@ export default function WorkflowCard({
                               #{runDetail.id}
                             </span>
                             <Badge
-                              variant={runDetail.conclusion === 'success' ? "success" : "destructive"}
-                              className="text-xs justify-self-start"
+                              variant={
+                                runDetail.conclusion === 'success' ? "success" : 
+                                runDetail.conclusion === null && runDetail.status === 'in_progress' ? "destructive" :
+                                "destructive"
+                              }
+                              className={`text-xs justify-self-start ${
+                                runDetail.conclusion === null && runDetail.status === 'in_progress' 
+                                  ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                                  : ''
+                              }`}
                             >
-                              {runDetail.conclusion === 'success' ? "Pass" : "Fail"}
+                              {runDetail.conclusion === 'success' ? "Pass" : 
+                               runDetail.conclusion === null && runDetail.status === 'in_progress' ? "Running" :
+                               "Fail"}
                             </Badge>
                             <Button variant="ghost" size="sm" asChild className="h-6 px-1">
                               <Link href={runDetail.html_url} target="_blank">
@@ -151,11 +161,23 @@ export default function WorkflowCard({
               </Popover>
             )}
             <Badge
-              variant={isSuccess ? "success" : isDidntRun ? "warning" : "destructive"}
-              className="shrink-0"
+              variant={
+                isSuccess ? "success" : 
+                isDidntRun ? "warning" : 
+                status === "in_progress" ? "destructive" :
+                "destructive"
+              }
+              className={`shrink-0 ${
+                status === "in_progress" 
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                  : ''
+              }`}
             >
               {/* eslint-disable-next-line react/no-unescaped-entities */}
-              {isSuccess ? "Pass" : isDidntRun ? "Didn't Run" : "Fail"}
+              {isSuccess ? "Pass" : 
+               isDidntRun ? "Didn't Run" : 
+               status === "in_progress" ? "Running" :
+               "Fail"}
             </Badge>
           </div>
         </div>
