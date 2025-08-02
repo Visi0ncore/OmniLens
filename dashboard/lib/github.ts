@@ -1,5 +1,5 @@
 import { format, startOfDay, endOfDay } from "date-fns";
-import { removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getAllConfiguredWorkflows } from "./utils";
+import { filterWorkflowsByCategories, calculateMissingWorkflows, getAllConfiguredWorkflows } from "./utils";
 
 export interface WorkflowRun {
   id: number;
@@ -51,21 +51,21 @@ function getEnvVars() {
 // Helper function to find which configured workflow file a run corresponds to
 function getConfiguredWorkflowFile(run: WorkflowRun): string | null {
   const configuredWorkflows = getAllConfiguredWorkflows();
-  
+
   // Extract just the filename from the run path (e.g., ".github/workflows/build-workflow.yml" -> "build-workflow.yml")
   const workflowPath = run.path || run.workflow_name;
   if (!workflowPath) return null;
-  
+
   const filename = workflowPath.split('/').pop();
   if (!filename) return null;
-  
+
   // Only return exact matches from workflows.json - no partial matching
   return configuredWorkflows.includes(filename) ? filename : null;
 }
 
-// Helper function to get only the latest run of each workflow
-// This prevents displaying multiple runs when a workflow is triggered multiple times in a day
-// Groups by configured workflow file name from workflows.json
+// Helper function to get one card per workflow but collect all run data
+// This shows one card per workflow (latest run) but the card displays total run count
+// and clicking the count shows all individual runs
 function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
   const latestRuns = new Map<string, WorkflowRun>();
   const duplicateCount = new Map<string, number>();
@@ -82,17 +82,15 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
     new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime()
   );
 
-  // Keep only the latest run for each configured workflow file, but collect all runs
   // Use configured workflow file name as the key (from workflows.json)
   sortedRuns.forEach(run => {
     const configuredWorkflowFile = getConfiguredWorkflowFile(run);
-    
+
     // Skip runs that don't match any configured workflow (should not happen after filtering)
     if (!configuredWorkflowFile) {
-      // Silently skip unmatched runs - they're either not in workflows.json or from old workflow files
       return;
     }
-    
+
     if (!latestRuns.has(configuredWorkflowFile)) {
       latestRuns.set(configuredWorkflowFile, run);
       duplicateCount.set(configuredWorkflowFile, 1);
@@ -104,9 +102,9 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
         run_started_at: run.run_started_at
       }]);
     } else {
-      // Count duplicates for logging
+      // Count duplicates for the total run count
       duplicateCount.set(configuredWorkflowFile, (duplicateCount.get(configuredWorkflowFile) || 0) + 1);
-      // Add this run to the collection
+      // Add this run to the all_runs collection
       const existingRuns = allRunsForWorkflow.get(configuredWorkflowFile) || [];
       existingRuns.push({
         id: run.id,
@@ -119,14 +117,16 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
     }
   });
 
-  // Log workflows that had multiple runs
-  duplicateCount.forEach((count, configuredWorkflowFile) => {
-    if (count > 1) {
-      console.log(`Configured workflow "${configuredWorkflowFile}" had ${count} runs - using latest`);
-    }
-  });
+  // Log workflows that had multiple runs (only if more than 1)
+  const multipleRunsWorkflows = Array.from(duplicateCount.entries())
+    .filter(([_, count]) => count > 1)
+    .map(([workflow, count]) => `${workflow}(${count})`);
+  
+  if (multipleRunsWorkflows.length > 0) {
+    console.log(`📊 Multiple runs: ${multipleRunsWorkflows.join(', ')}`);
+  }
 
-  // Add run count and all runs to each workflow run
+  // Add run count and all runs to each workflow run for the UI
   const result = Array.from(latestRuns.values()).map(run => {
     const configuredWorkflowFile = getConfiguredWorkflowFile(run);
     return {
@@ -139,6 +139,28 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
   return result;
 }
 
+// Comprehensive logging function to analyze workflow runs by category
+async function logWorkflowAnalysis(runs: WorkflowRun[], dateStr: string) {
+  const config = await import('../config/workflows.json');
+
+  // Summary
+  const totalConfiguredWorkflows = Object.values(config.categories).reduce((sum, cat) => sum + cat.workflows.length, 0);
+  const uniqueWorkflowsWithRuns = new Set();
+
+  runs.forEach(run => {
+    const runPath = run.path || run.workflow_name || '';
+    Object.values(config.categories).forEach(categoryConfig => {
+      categoryConfig.workflows.forEach(workflowFile => {
+        if (runPath.includes(workflowFile) || runPath.endsWith(workflowFile)) {
+          uniqueWorkflowsWithRuns.add(workflowFile);
+        }
+      });
+    });
+  });
+
+  console.log(`📊 Summary: ${uniqueWorkflowsWithRuns.size}/${totalConfiguredWorkflows} workflows had runs`);
+}
+
 // Get workflow runs for a specific date
 export async function getWorkflowRunsForDate(date: Date): Promise<WorkflowRun[]> {
   try {
@@ -147,26 +169,54 @@ export async function getWorkflowRunsForDate(date: Date): Promise<WorkflowRun[]>
     // Format date to ISO string for GitHub API
     const dateStr = format(date, "yyyy-MM-dd");
 
-    // Try broader time range to capture all runs for the date
+        // Use broader time range to account for timezone differences (extend by 2 hours each side)
     const startOfDay = `${dateStr}T00:00:00Z`;
     const endOfDay = `${dateStr}T23:59:59Z`;
+    
+    // For debugging, let's also try a broader range
+    const broaderStart = new Date(date);
+    broaderStart.setDate(broaderStart.getDate() - 1);
+    broaderStart.setHours(22, 0, 0, 0); // 10 PM previous day UTC
+    
+    const broaderEnd = new Date(date);
+    broaderEnd.setDate(broaderEnd.getDate() + 1);
+    broaderEnd.setHours(2, 0, 0, 0); // 2 AM next day UTC
+    
+    const broaderStartStr = broaderStart.toISOString();
+    const broaderEndStr = broaderEnd.toISOString();
+    
+    // Add clear visual separator for this API call
+    const timestamp = new Date().toISOString();
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`🚀 NEW API CALL - ${timestamp}`);
+    console.log(`${'='.repeat(80)}`);
+    
+    console.log(`🔍 GitHub API Query: ${API_BASE}/repos/${repo}/actions/runs?created=${broaderStartStr}..${broaderEndStr}&per_page=100&page=1`);
+    console.log(`🔍 Broader date range: ${broaderStartStr} to ${broaderEndStr}`);
+    console.log(`🔍 Original date range: ${startOfDay} to ${endOfDay}`);
+    console.log(`🔍 Target date: ${dateStr} (${date.toISOString()})`);
+    console.log(`⏰ API call timestamp: ${timestamp}`);
     
     // Fetch all workflow runs for the date, handling pagination
     let allRuns: WorkflowRun[] = [];
     let page = 1;
     let hasMorePages = true;
-    
+    let pagesFetched = 0;
+
     while (hasMorePages) {
-      const res = await fetch(
-        `${API_BASE}/repos/${repo}/actions/runs?created=${startOfDay}..${endOfDay}&per_page=100&page=${page}`,
-        {
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: `Bearer ${token}`,
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-        }
-      );
+          // Use broader time range to account for timezone differences
+    const res = await fetch(
+      `${API_BASE}/repos/${repo}/actions/runs?created=${broaderStartStr}..${broaderEndStr}&per_page=100&page=${page}&_t=${Date.now()}`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${token}`,
+          "X-GitHub-Api-Version": "2022-11-28",
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      }
+    );
 
       if (!res.ok) {
         throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
@@ -174,15 +224,19 @@ export async function getWorkflowRunsForDate(date: Date): Promise<WorkflowRun[]>
 
       const json = await res.json();
       const pageRuns = json.workflow_runs as WorkflowRun[];
-      
+
+      // Log summary of runs found on this page
+      if (pageRuns.length > 0) {
+        console.log(`📄 Page ${page}: ${pageRuns.length} runs found`);
+      }
+
       allRuns = allRuns.concat(pageRuns);
-      
+      pagesFetched++;
+
       // Check if we need to fetch more pages
       hasMorePages = pageRuns.length === 100; // If we got 100 results, there might be more
       page++;
-      
-      console.log(`Page ${page - 1}: ${pageRuns.length} runs, Total so far: ${allRuns.length}`);
-      
+
       // Safety break to avoid infinite loops
       if (page > 10) {
         console.warn('Breaking pagination after 10 pages to avoid infinite loop');
@@ -190,13 +244,28 @@ export async function getWorkflowRunsForDate(date: Date): Promise<WorkflowRun[]>
       }
     }
 
-    console.log(`GitHub API returned ${allRuns.length} total runs for ${dateStr}`);
+    // Filter to only include workflows that are configured in workflows.json
+    const filteredRuns = filterWorkflowsByCategories(allRuns);
 
-    // Return only the latest run of each workflow to avoid duplicates
-    // when workflows are triggered multiple times throughout the day
-    const latestRuns = getLatestWorkflowRuns(allRuns);
+    // Group by workflow and collect all run data for the UI
+    // This shows one card per workflow but includes run_count and all_runs data
+    const latestRuns = getLatestWorkflowRuns(filteredRuns);
 
-    console.log(`After deduplication: ${latestRuns.length} unique workflows`);
+    console.log(`\n🔍 === WORKFLOW RUN ANALYSIS FOR ${dateStr} ===`);
+    console.log(`📊 GitHub API returned ${allRuns.length} total runs`);
+    console.log(`✅ After filtering by configured workflows: ${filteredRuns.length} runs`);
+    console.log(`🎯 Final result: ${latestRuns.length} cards (representing ${filteredRuns.length} total runs)`);
+
+    // Log final card data with run counts
+    console.log('\n🃏 Cards created with run counts:');
+    latestRuns.forEach((run, index) => {
+      console.log(`  ${index + 1}. Card: "${run.name}", Run Count: ${run.run_count || 1}, All Runs: ${run.all_runs?.length || 0}`);
+    });
+
+    // Add closing separator
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`✅ API CALL COMPLETED - ${new Date().toISOString()}`);
+    console.log(`${'='.repeat(80)}\n`);
 
     return latestRuns;
 

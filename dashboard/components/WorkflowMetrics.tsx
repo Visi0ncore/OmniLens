@@ -79,11 +79,11 @@ export default function WorkflowMetrics({ todayRuns, yesterdayRuns, onMetricHove
       onMouseEnter={() => onMetricHover?.(metricType, workflows.map(w => w.id))}
       onMouseLeave={() => onMetricLeave?.()}
     >
-      <div className="flex items-center gap-2 min-w-[8rem] sm:w-32">
-        <div className={`${color}`}>{icon}</div>
-        <span className="text-sm">{label}</span>
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className={`${color} flex-shrink-0`}>{icon}</div>
+        <span className="text-sm truncate">{label}</span>
       </div>
-      <div className={`font-semibold ${count === 0 ? 'text-muted-foreground' : color}`}>
+      <div className={`font-semibold flex-shrink-0 ${count === 0 ? 'text-muted-foreground' : color}`}>
         {count}
       </div>
     </div>
@@ -91,35 +91,15 @@ export default function WorkflowMetrics({ todayRuns, yesterdayRuns, onMetricHove
 
   // Pie chart component
   const MetricsPieChart = () => {
-    if (totalWorkflows === 0) {
-      return (
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <svg width="60" height="60" className="transform -rotate-90">
-              <circle
-                cx="30"
-                cy="30"
-                r="25"
-                fill="none"
-                stroke="hsl(var(--muted))"
-                strokeWidth="6"
-              />
-            </svg>
-          </div>
-          <p className="text-xs text-muted-foreground">No workflow data</p>
-        </div>
-      );
-    }
-
     const radius = 25;
     const circumference = 2 * Math.PI * radius;
     let currentOffset = 0;
 
     // Calculate percentages and offsets for each metric
-    const consistentPercent = (metrics.consistent.length / totalWorkflows) * 100;
-    const improvedPercent = (metrics.improved.length / totalWorkflows) * 100;
-    const regressedPercent = (metrics.regressed.length / totalWorkflows) * 100;
-    const regressingPercent = (metrics.regressing.length / totalWorkflows) * 100;
+    const consistentPercent = totalWorkflows > 0 ? (metrics.consistent.length / totalWorkflows) * 100 : 0;
+    const improvedPercent = totalWorkflows > 0 ? (metrics.improved.length / totalWorkflows) * 100 : 0;
+    const regressedPercent = totalWorkflows > 0 ? (metrics.regressed.length / totalWorkflows) * 100 : 0;
+    const regressingPercent = totalWorkflows > 0 ? (metrics.regressing.length / totalWorkflows) * 100 : 0;
 
     return (
       <div className="flex items-center gap-3">
@@ -239,53 +219,53 @@ export default function WorkflowMetrics({ todayRuns, yesterdayRuns, onMetricHove
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-6 lg:gap-12">
-          {/* Pie Chart - Left Side */}
-          <div className="flex-shrink-0">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Pie Chart - Top/Left Side */}
+          <div className="flex-shrink-0 flex justify-center lg:justify-start">
             <MetricsPieChart />
           </div>
 
-          {/* Metrics Grid - Right Side */}
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Left Column: Consistent and Regressing Consistently */}
-            <div className="space-y-3">
-              <MetricRow
-                icon={<Circle className="h-4 w-4 fill-current" />}
-                label="Consistent"
-                count={metrics.consistent.length}
-                color="text-green-600"
-                workflows={metrics.consistent}
-                metricType="consistent"
-              />
-              <MetricRow
-                icon={<ArrowDown className="h-4 w-4" />}
-                label="Still Failing"
-                count={metrics.regressing.length}
-                color="text-red-600"
-                workflows={metrics.regressing}
-                metricType="regressing"
-              />
-            </div>
+          {/* Metrics Grid - Bottom/Right Side */}
+          <div className="flex-1 grid grid-cols-2 gap-4">
+            {/* Consistent */}
+            <MetricRow
+              icon={<Circle className="h-4 w-4 fill-current" />}
+              label="Consistent"
+              count={metrics.consistent.length}
+              color="text-green-600"
+              workflows={metrics.consistent}
+              metricType="consistent"
+            />
 
-            {/* Right Column: Improved and Regressed since yesterday */}
-            <div className="space-y-3">
-              <MetricRow
-                icon={<TrendingUp className="h-4 w-4" />}
-                label="Improved"
-                count={metrics.improved.length}
-                color="text-blue-600"
-                workflows={metrics.improved}
-                metricType="improved"
-              />
-              <MetricRow
-                icon={<TrendingDown className="h-4 w-4" />}
-                label="Regressed"
-                count={metrics.regressed.length}
-                color="text-orange-600"
-                workflows={metrics.regressed}
-                metricType="regressed"
-              />
-            </div>
+            {/* Improved */}
+            <MetricRow
+              icon={<TrendingUp className="h-4 w-4" />}
+              label="Improved"
+              count={metrics.improved.length}
+              color="text-blue-600"
+              workflows={metrics.improved}
+              metricType="improved"
+            />
+
+            {/* Still Failing */}
+            <MetricRow
+              icon={<ArrowDown className="h-4 w-4" />}
+              label="Still Failing"
+              count={metrics.regressing.length}
+              color="text-red-600"
+              workflows={metrics.regressing}
+              metricType="regressing"
+            />
+
+            {/* Regressed */}
+            <MetricRow
+              icon={<TrendingDown className="h-4 w-4" />}
+              label="Regressed"
+              count={metrics.regressed.length}
+              color="text-orange-600"
+              workflows={metrics.regressed}
+              metricType="regressed"
+            />
           </div>
         </div>
       </CardContent>
