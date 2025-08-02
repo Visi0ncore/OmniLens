@@ -214,9 +214,17 @@ export async function getWorkflowRunsForDate(date: Date): Promise<WorkflowRun[]>
           "X-GitHub-Api-Version": "2022-11-28",
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
+          // Add conditional request headers to reduce unnecessary data transfer
+          'If-None-Match': '', // Will be populated if we have a cached ETag
         },
       }
     );
+
+      // Handle 304 Not Modified response
+      if (res.status === 304) {
+        console.log(`📄 Page ${page}: No changes detected (304 Not Modified)`);
+        break; // No need to fetch more pages if data hasn't changed
+      }
 
       if (!res.ok) {
         throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);

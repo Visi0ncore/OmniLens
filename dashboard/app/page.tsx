@@ -208,18 +208,23 @@ export default function DashboardPage() {
     setReviewedTestingWorkflows(storedTestingWorkflows);
   }, [selectedDate, loadReviewedWorkflows, loadCollapsedCategories, loadReviewedTestingWorkflows]);
 
-  // Single query for today's data with more aggressive real-time updates
+  const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
+  const isSelectedDateToday = isToday(selectedDate);
+
+  // Single query for today's data with optimized real-time updates
   const { data: todayData, isLoading: todayLoading, isError: todayError, refetch: refetchToday } = useQuery({
     queryKey: ["workflowData", format(selectedDate, "yyyy-MM-dd")],
     queryFn: async () => {
       return await fetchWorkflowData(selectedDate);
     },
-    staleTime: 0, // Data is immediately stale (always refetch)
-    cacheTime: 30 * 1000, // Keep in cache for only 30 seconds
-    refetchInterval: 5000, // Auto-refetch every 5 seconds
-    refetchIntervalInBackground: true, // Continue refetching even when tab is not active
-    refetchOnWindowFocus: true, // Refetch when window regains focus
-    refetchOnMount: true, // Refetch when component mounts
+    staleTime: isSelectedDateToday ? 0 : 5 * 60 * 1000, // Historical data stays fresh longer
+    cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchInterval: isSelectedDateToday ? 10000 : false, // Poll every 10s for today, no polling for historical
+    refetchIntervalInBackground: isSelectedDateToday, // Only poll in background for today
+    refetchOnWindowFocus: isSelectedDateToday, // Only refetch on focus for today
+    refetchOnMount: true, // Always refetch when component mounts
+    retry: 3, // Retry failed requests up to 3 times
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
   // Query for yesterday's data for Daily Metrics comparison
@@ -276,9 +281,6 @@ export default function DashboardPage() {
       console.log(`   📊 Daily Metrics comparison data available`);
     }
   }, [workflowData, yesterdayWorkflowData, selectedDate]);
-
-  const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
-  const isSelectedDateToday = isToday(selectedDate);
 
   const missingWorkflows = workflowData ? calculateMissingWorkflows(workflowData) : [];
   const categories = workflowData ? categorizeWorkflows(workflowData, missingWorkflows) : null;
