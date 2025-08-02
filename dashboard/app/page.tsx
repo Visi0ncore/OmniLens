@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar } from "lucide-react";
+import { Zap, Target, TestTube, Calendar, Hammer } from "lucide-react";
 import workflowConfig from "@/config/workflows.json";
 import { removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows } from "@/lib/utils";
 
@@ -413,6 +413,7 @@ export default function DashboardPage() {
                 case 'utility': return <Zap className="h-6 w-6" />;
                 case 'trigger': return <Target className="h-6 w-6" />;
                 case 'testing': return <TestTube className="h-6 w-6" />;
+                case 'build': return <Hammer className="h-6 w-6" />;
                 default: return null;
               }
             };

@@ -1,5 +1,9 @@
 {
   "categories": {
+    "build": {
+      "name": "Build Workflows",
+      "workflows": ["build.yml"]
+    },
     "trigger": {
       "name": "Trigger Workflows", 
       "workflows": ["trigger.yml"]
