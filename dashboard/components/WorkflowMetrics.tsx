@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, Circle, TrendingUp, TrendingDown, ArrowDown } from "lucide-react";
 import type { WorkflowRun } from "@/lib/github";
-import workflowConfig from "@/config/workflows.json";
 
 type MetricType = 'consistent' | 'improved' | 'regressed' | 'regressing';
 
