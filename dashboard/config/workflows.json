@@ -1,23 +1,130 @@
 {
-  "categories": {
-    "build": {
-      "name": "Build Workflows", 
-      "workflows": ["build-workflow.yml"]
+  "repositories": {
+    "repo1": {
+      "slug": "repo1",
+      "categories": {
+        "build": {
+          "name": "Build Workflows",
+          "workflows": [
+            "build-workflow.yml"
+          ]
+        },
+        "trigger": {
+          "name": "Trigger Workflows",
+          "workflows": [
+            "trigger.yml"
+          ]
+        },
+        "testing": {
+          "name": "Testing Workflows",
+          "workflows": [
+            "single-workflow.yml"
+          ]
+        },
+        "utility": {
+          "name": "Utility Workflows",
+          "workflows": []
+        }
+      },
+      "trigger_mappings": {
+        "trigger.yml": [
+          "positive-workflow.yml",
+          "negative-workflow.yml"
+        ]
+      }
     },
-    "trigger": {
-      "name": "Trigger Workflows", 
-      "workflows": ["trigger.yml"]
+    "repo2": {
+      "slug": "repo2",
+      "categories": {
+        "build": {
+          "name": "Build Workflows",
+          "workflows": []
+        },
+        "trigger": {
+          "name": "Trigger Workflows",
+          "workflows": []
+        },
+        "testing": {
+          "name": "Testing Workflows",
+          "workflows": []
+        },
+        "utility": {
+          "name": "Utility Workflows",
+          "workflows": []
+        }
+      },
+      "trigger_mappings": {}
     },
-    "testing": {
-      "name": "Testing Workflows",
-      "workflows": ["single-workflow.yml"]
-    },
-    "utility": {
-      "name": "Utility Workflows",
-      "workflows": []
+    "repo3": {
+      "slug": "repo3",
+      "categories": {
+        "trigger": {
+          "name": "Trigger Workflows",
+          "workflows": [
+            "trigger-fees.yml",
+            "trigger-capitec-vrp.yml",
+            "trigger-cybersource-simulator.yml",
+            "trigger-cybersource-live.yml",
+            "trigger-e2e-transactions.yml",
+            "trigger-mandates.yml"
+          ]
+        },
+        "testing": {
+          "name": "Testing Workflows",
+          "workflows": [
+            "merchant-api.yml",
+            "transaction-api.yml",
+            "payat-simulator.yml",
+            "recon-settlement.yml",
+            "precium-checkout-live.yml",
+            "precium-checkout-simulator.yml",
+            "precium-dashboard.yml",
+            "thresholds.yml"
+          ]
+        },
+        "utility": {
+          "name": "Utility Workflows",
+          "workflows": [
+            "workflow-results-aggregator.yml"
+          ]
+        }
+      },
+      "trigger_mappings": {
+        "trigger-fees.yml": [
+          "fees-api.yml",
+          "fees-e2e.yml"
+        ],
+        "trigger-capitec-vrp.yml": [
+          "capitec-vrp-api.yml",
+          "capitec-vrp-payments.yml"
+        ],
+        "trigger-cybersource-simulator.yml": [
+          "cybs-simulator-cypress.yml",
+          "cybs-simulator-postman.yml"
+        ],
+        "trigger-cybersource-live.yml": [
+          "cybs-live-cypress.yml",
+          "cybs-live-postman.yml"
+        ],
+        "trigger-e2e-transactions.yml": [
+          "transactions-capitec-pay.yml",
+          "transactions-card.yml",
+          "transactions-debicheck.yml",
+          "transactions-eft.yml",
+          "transactions-ozow.yml"
+        ],
+        "trigger-mandates.yml": [
+          "mandate-absa-debicheck.yml",
+          "mandate-eft-collections.yml",
+          "mandate-eft-payments.yml",
+          "mandate-eft-settlements.yml",
+          "mandate-eft-statements.yml",
+          "mandate-misc.yml",
+          "mandate-sbsa-debicheck-collections.yml",
+          "mandate-sbsa-debicheck-mandates.yml",
+          "mandate-sbsa-debicheck-other.yml"
+        ]
+      }
     }
-  },
-  "trigger_mappings": {
-    "trigger.yml": ["positive-workflow.yml", "negative-workflow.yml"]
   }
-} 
+}

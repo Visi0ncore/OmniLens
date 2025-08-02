@@ -34,6 +34,7 @@ interface WorkflowCardProps {
   run: WorkflowRun;
   isReviewed: boolean;
   onToggleReviewed: () => void;
+  repoSlug: string; // Repository slug for config context
   isHighlighted?: boolean;
   highlightColor?: string;
   allWorkflowRuns?: WorkflowRun[]; // All workflow runs to find testing workflows
@@ -45,6 +46,7 @@ export default function WorkflowCard({
   run,
   isReviewed,
   onToggleReviewed,
+  repoSlug,
   isHighlighted = false,
   highlightColor = '',
   allWorkflowRuns = [],
@@ -56,11 +58,11 @@ export default function WorkflowCard({
   const isDidntRun = status === "didnt_run" || run.isMissing;
 
   // Check if this is a trigger workflow - try both name and workflow_name
-  const isTrigger = isTriggerWorkflow(run.name) || isTriggerWorkflow(run.workflow_name || '');
+  const isTrigger = isTriggerWorkflow(run.name, repoSlug) || isTriggerWorkflow(run.workflow_name || '', repoSlug);
 
   // Get testing workflows for this trigger workflow - try both name and workflow_name
   const testingWorkflowFiles = isTrigger ?
-    (getTestingWorkflowsForTrigger(run.name) || getTestingWorkflowsForTrigger(run.workflow_name || '')) : [];
+    (getTestingWorkflowsForTrigger(run.name, repoSlug) || getTestingWorkflowsForTrigger(run.workflow_name || '', repoSlug)) : [];
   const testingWorkflows = testingWorkflowFiles.map(file => {
     const workflowName = file.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     // Try to find the workflow run by matching the file name in the workflow name

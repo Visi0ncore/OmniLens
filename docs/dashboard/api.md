@@ -4,11 +4,103 @@
 
 **Backend (.env.local):**
 - `GITHUB_TOKEN` - GitHub Personal Access Token with `actions:read` permission
-- `GITHUB_REPO` - Repository in format `owner/repo` (e.g., `microsoft/vscode`)
+- `GITHUB_REPO_1` - Primary repository in format `owner/repo` (e.g., `microsoft/vscode`)
+- `GITHUB_REPO_2` - Secondary repository in format `owner/repo` (optional)
+- `GITHUB_REPO_3` - Tertiary repository in format `owner/repo` (optional)
 
 ## Frontend to Backend APIs
 
-### 1. Get Workflow Data
+### 1. Get Available Repositories
+**Endpoint:** 
+```
+GET /api/repositories
+```
+
+**Required Values:**
+- None
+
+**Request Body:**
+- None (GET request)
+
+**Response Body:**
+```json
+{
+  "repositories": [
+    {
+      "slug": "repo1",
+      "repoPath": "owner/repo",
+      "envKey": "GITHUB_REPO_1",
+      "displayName": "Owner/Repo",
+      "hasConfig": true
+    }
+  ]
+}
+```
+
+**Note:** The `displayName` field contains the repository name extracted from the corresponding environment variable (e.g., `GITHUB_REPO_1` value).
+
+**Expected Result Code:** 
+- `200` - Success
+- `500` - Server error (missing env vars, config issues, etc.)
+
+**Example Request:**
+```http
+GET /api/repositories
+```
+
+### 2. Get Repositories with Metrics
+**Endpoint:** 
+```
+GET /api/repositories/metrics
+```
+
+**Required Values:**
+- None
+
+**Request Body:**
+- None (GET request)
+
+**Response Body:**
+```json
+{
+  "repositories": [
+    {
+      "slug": "repo1",
+      "repoPath": "owner/repo",
+      "envKey": "GITHUB_REPO_1",
+      "displayName": "Owner/Repo",
+      "hasConfig": true,
+      "hasWorkflows": true,
+      "metrics": {
+        "totalWorkflows": 5,
+        "passedRuns": 3,
+        "failedRuns": 1,
+        "inProgressRuns": 1,
+        "successRate": 75,
+        "hasActivity": true
+      }
+    }
+  ]
+}
+```
+
+**Note:** 
+- The `displayName` field contains the repository name extracted from the corresponding environment variable
+- The `metrics` field contains today's workflow summary data for the home page display
+- `metrics` will be `null` if the repository has no workflows configured or if there was an error fetching data
+- `successRate` is calculated as `(passedRuns / (passedRuns + failedRuns)) * 100`, rounded to nearest integer
+- `hasActivity` indicates if there were any completed runs or runs in progress today
+
+**Expected Result Code:** 
+- `200` - Success (individual repository errors don't fail the entire request)
+- `500` - Server error (missing env vars, config issues, etc.)
+
+**Example Request:**
+```http
+GET /api/repositories/metrics
+```
+
+### 3. Get Workflow Data
 **Endpoint:** 
 ```
 GET /api/workflows
@@ -16,9 +108,10 @@ GET /api/workflows
 
 **Required Values:**
 - `date` (query parameter) - Date in YYYY-MM-DD format
+- `repo` (query parameter) - Repository slug (e.g., `repo1`, `repo2`, `repo3`)
 
 ```
-GET /api/workflows?date=2025-08-01
+GET /api/workflows?date=2025-08-01&repo=repo1
 ```
 
 **Request Body:**
@@ -67,12 +160,12 @@ GET /api/workflows?date=2025-08-01
 
 **Expected Result Code:** 
 - `200` - Success
-- `400` - Missing or invalid date parameter
+- `400` - Missing or invalid date/repo parameter
 - `500` - Server error (GitHub API failure, missing env vars, etc.)
 
 **Example Request:**
 ```http
-GET /api/workflows?date=2025-08-01
+GET /api/workflows?date=2025-08-01&repo=repo1
 ```
 
 ## Backend to External APIs
@@ -89,6 +182,8 @@ GET https://api.github.com/repos/{owner}/{repo}/actions/runs
 - `created` (query parameter) - Date range filter in ISO format
 - `per_page` (query parameter) - Results per page (max 100)
 - `page` (query parameter) - Page number (starts at 1)
+
+**Note:** The `{owner}` and `{repo}` values are extracted from the corresponding `GITHUB_REPO_X` environment variable for the requested repository slug.
 
 ```
 GET https://api.github.com/repos/owner/repo/actions/runs?created=2025-08-01T00:00:00Z..2025-08-01T23:59:59Z&per_page=100&page=1
@@ -145,12 +240,15 @@ X-GitHub-Api-Version: 2022-11-28
 - **Network errors** - Displays error state component
 - **400/500 responses** - Shows error message to user
 - **Missing data** - Falls back to skeleton loading state
+- **No repositories found** - Displays "No repositories found" message with configuration instructions
 
 ### Backend Errors
 - **GitHub API rate limits** - Returns 500 with descriptive error
 - **Invalid GitHub token** - Returns 500 with auth error
 - **Missing environment variables** - Returns 500 with configuration error
 - **Date parsing errors** - Returns 400 with validation error
+- **Invalid repository slug** - Returns 400 with validation error
+- **Repository not found in config** - Returns 400 with configuration error
 
 ## Pagination
 
@@ -159,3 +257,23 @@ The GitHub API automatically handles pagination:
 - **Page tracking:** Automatically fetches all pages until no more results
 - **Logging:** Reports total pages fetched for debugging
 - **Safety limit:** Maximum 10 pages to prevent infinite loops
+
+## Multi-Repository Support
+
+The dashboard now supports up to 3 repositories:
+
+### Repository Configuration
+- **Environment Variables:** `GITHUB_REPO_1`, `GITHUB_REPO_2`, `GITHUB_REPO_3` (source of truth for repository names)
+- **Repository Slugs:** `repo1`, `repo2`, `repo3` (used in API calls and URLs)
+- **Configuration:** Each repository has its own categories and trigger mappings in `workflows.json`
+- **Repository Names:** Extracted from environment variables, not stored in JSON config
+
+### URL Structure
+- **Home Page:** `/` - Repository selection page
+- **Repository Dashboard:** `/dashboard/[slug]` - Where `[slug]` is `repo1`, `repo2`, or `repo3`
+
+### Data Isolation
+- **Local Storage:** Repository-specific keys (e.g., `reviewedWorkflows-repo1-2025-01-15`)
+- **API Calls:** All workflow data is scoped to the specific repository
+- **Configuration:** Each repository maintains its own workflow categories and mappings
+- **Repository Names:** Single source of truth from environment variables, eliminating data duplication

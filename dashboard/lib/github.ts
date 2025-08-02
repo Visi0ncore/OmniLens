@@ -36,21 +36,76 @@ interface OverviewData {
 
 const API_BASE = "https://api.github.com";
 
-// Helper function to get environment variables
-function getEnvVars() {
+// Helper function to get environment variables for a specific repo
+function getEnvVars(repoSlug: string) {
   const token = process.env.GITHUB_TOKEN;
-  const repo = process.env.GITHUB_REPO;
+  
+  if (!token) {
+    throw new Error("Missing GITHUB_TOKEN environment variable");
+  }
 
-  if (!token || !repo) {
-    throw new Error("Missing GITHUB_TOKEN or GITHUB_REPO env variables");
+  // Map repo slug to environment variable
+  const repoEnvMap: Record<string, string> = {
+    'repo1': 'GITHUB_REPO_1',
+    'repo2': 'GITHUB_REPO_2', 
+    'repo3': 'GITHUB_REPO_3'
+  };
+  
+  const repoEnvKey = repoEnvMap[repoSlug];
+  if (!repoEnvKey) {
+    throw new Error(`Invalid repo slug: ${repoSlug}. Must be one of: ${Object.keys(repoEnvMap).join(', ')}`);
+  }
+  
+  const repo = process.env[repoEnvKey];
+  if (!repo) {
+    throw new Error(`Missing ${repoEnvKey} environment variable for repo: ${repoSlug}`);
   }
 
   return { token, repo };
 }
 
+// Helper function to get all available repositories from environment variables
+export function getAvailableRepositories(): Array<{
+  slug: string;
+  repoPath: string;
+  envKey: string;
+}> {
+  const repos = [];
+  
+  for (let i = 1; i <= 3; i++) {
+    const envKey = `GITHUB_REPO_${i}`;
+    const repo = process.env[envKey];
+    if (repo) {
+      repos.push({
+        slug: `repo${i}`,
+        repoPath: repo,
+        envKey
+      });
+    }
+  }
+  
+  return repos;
+}
+
+// Helper function to validate if a repo slug is available
+export function isValidRepoSlug(repoSlug: string): boolean {
+  const availableRepos = getAvailableRepositories();
+  return availableRepos.some(repo => repo.slug === repoSlug);
+}
+
+// Helper function to get repository name from environment variables
+export function getRepoNameFromEnv(repoSlug: string): string {
+  const envMap: Record<string, string> = {
+    'repo1': 'GITHUB_REPO_1',
+    'repo2': 'GITHUB_REPO_2',
+    'repo3': 'GITHUB_REPO_3'
+  };
+  return process.env[envMap[repoSlug]] || repoSlug;
+}
+
 // Helper function to find which configured workflow file a run corresponds to
-function getConfiguredWorkflowFile(run: WorkflowRun): string | null {
-  const configuredWorkflows = getAllConfiguredWorkflows();
+function getConfiguredWorkflowFile(run: WorkflowRun, repoSlug: string): string | null {
+  const configuredWorkflows = getAllConfiguredWorkflows(repoSlug);
 
   // Extract just the filename from the run path (e.g., ".github/workflows/build-workflow.yml" -> "build-workflow.yml")
   const workflowPath = run.path || run.workflow_name;
@@ -66,7 +121,7 @@ function getConfiguredWorkflowFile(run: WorkflowRun): string | null {
 // Helper function to get one card per workflow but collect all run data
 // This shows one card per workflow (latest run) but the card displays total run count
 // and clicking the count shows all individual runs
-function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
+function getLatestWorkflowRuns(workflowRuns: WorkflowRun[], repoSlug: string): WorkflowRun[] {
   const latestRuns = new Map<string, WorkflowRun>();
   const duplicateCount = new Map<string, number>();
   const allRunsForWorkflow = new Map<string, Array<{
@@ -84,7 +139,7 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
 
   // Use configured workflow file name as the key (from workflows.json)
   sortedRuns.forEach(run => {
-    const configuredWorkflowFile = getConfiguredWorkflowFile(run);
+    const configuredWorkflowFile = getConfiguredWorkflowFile(run, repoSlug);
 
     // Skip runs that don't match any configured workflow (should not happen after filtering)
     if (!configuredWorkflowFile) {
@@ -128,7 +183,7 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
 
   // Add run count and all runs to each workflow run for the UI
   const result = Array.from(latestRuns.values()).map(run => {
-    const configuredWorkflowFile = getConfiguredWorkflowFile(run);
+    const configuredWorkflowFile = getConfiguredWorkflowFile(run, repoSlug);
     return {
       ...run,
       run_count: duplicateCount.get(configuredWorkflowFile!) || 1,
@@ -139,32 +194,12 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
   return result;
 }
 
-// Comprehensive logging function to analyze workflow runs by category
-async function logWorkflowAnalysis(runs: WorkflowRun[], dateStr: string) {
-  const config = await import('../config/workflows.json');
 
-  // Summary
-  const totalConfiguredWorkflows = Object.values(config.categories).reduce((sum, cat) => sum + cat.workflows.length, 0);
-  const uniqueWorkflowsWithRuns = new Set();
 
-  runs.forEach(run => {
-    const runPath = run.path || run.workflow_name || '';
-    Object.values(config.categories).forEach(categoryConfig => {
-      categoryConfig.workflows.forEach(workflowFile => {
-        if (runPath.includes(workflowFile) || runPath.endsWith(workflowFile)) {
-          uniqueWorkflowsWithRuns.add(workflowFile);
-        }
-      });
-    });
-  });
-
-  console.log(`📊 Summary: ${uniqueWorkflowsWithRuns.size}/${totalConfiguredWorkflows} workflows had runs`);
-}
-
-// Get workflow runs for a specific date
-export async function getWorkflowRunsForDate(date: Date): Promise<WorkflowRun[]> {
+// Get workflow runs for a specific date and repository
+export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Promise<WorkflowRun[]> {
   try {
-    const { token, repo } = getEnvVars();
+    const { token, repo } = getEnvVars(repoSlug);
 
     // Format date to ISO string for GitHub API
     const dateStr = format(date, "yyyy-MM-dd");
@@ -227,6 +262,14 @@ export async function getWorkflowRunsForDate(date: Date): Promise<WorkflowRun[]>
       }
 
       if (!res.ok) {
+        // Handle specific GitHub API errors gracefully
+        if (res.status === 404) {
+          console.log(`📄 Repository not found or no workflows exist: ${repo}`);
+          return []; // Return empty array for repositories with no workflows
+        }
+        if (res.status === 403) {
+          throw new Error(`GitHub API error: ${res.status} ${res.statusText} - Repository access denied`);
+        }
         throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
       }
 
@@ -253,11 +296,11 @@ export async function getWorkflowRunsForDate(date: Date): Promise<WorkflowRun[]>
     }
 
     // Filter to only include workflows that are configured in workflows.json
-    const filteredRuns = filterWorkflowsByCategories(allRuns);
+    const filteredRuns = filterWorkflowsByCategories(allRuns, repoSlug);
 
     // Group by workflow and collect all run data for the UI
     // This shows one card per workflow but includes run_count and all_runs data
-    const latestRuns = getLatestWorkflowRuns(filteredRuns);
+    const latestRuns = getLatestWorkflowRuns(filteredRuns, repoSlug);
 
     console.log(`\n🔍 === WORKFLOW RUN ANALYSIS FOR ${dateStr} ===`);
     console.log(`📊 GitHub API returned ${allRuns.length} total runs`);
@@ -284,9 +327,9 @@ export async function getWorkflowRunsForDate(date: Date): Promise<WorkflowRun[]>
 }
 
 // Calculate overview data from workflow runs
-export function calculateOverviewData(workflowRuns: WorkflowRun[]): OverviewData {
+export function calculateOverviewData(workflowRuns: WorkflowRun[], repoSlug: string): OverviewData {
   // Filter to only include workflows that are configured in categories
-  const filteredRuns = filterWorkflowsByCategories(workflowRuns);
+  const filteredRuns = filterWorkflowsByCategories(workflowRuns, repoSlug);
 
   const completedRuns = filteredRuns.filter(run => run.status === 'completed').length;
   const inProgressRuns = filteredRuns.filter(run =>
@@ -307,7 +350,7 @@ export function calculateOverviewData(workflowRuns: WorkflowRun[]): OverviewData
   }, 0);
 
   // Calculate how many configured workflows didn't run (using original workflowRuns, not filtered)
-  const missingWorkflows = calculateMissingWorkflows(workflowRuns);
+  const missingWorkflows = calculateMissingWorkflows(workflowRuns, repoSlug);
   const didntRunCount = missingWorkflows.length;
   const totalWorkflows = filteredRuns.length;
 
@@ -323,29 +366,29 @@ export function calculateOverviewData(workflowRuns: WorkflowRun[]): OverviewData
   };
 }
 
-// Get overview data for a specific date
-export async function getOverviewDataForDate(date: Date): Promise<OverviewData> {
-  const workflowRuns = await getWorkflowRunsForDate(date);
-  return calculateOverviewData(workflowRuns);
+// Get overview data for a specific date and repository
+export async function getOverviewDataForDate(date: Date, repoSlug: string): Promise<OverviewData> {
+  const workflowRuns = await getWorkflowRunsForDate(date, repoSlug);
+  return calculateOverviewData(workflowRuns, repoSlug);
 }
 
-// Legacy functions for backward compatibility
-export async function getTodayWorkflowRuns(): Promise<WorkflowRun[]> {
-  return getWorkflowRunsForDate(new Date());
+// Legacy functions for backward compatibility - now require repo parameter
+export async function getTodayWorkflowRuns(repoSlug: string): Promise<WorkflowRun[]> {
+  return getWorkflowRunsForDate(new Date(), repoSlug);
 }
 
-export async function getYesterdayWorkflowRuns(): Promise<WorkflowRun[]> {
+export async function getYesterdayWorkflowRuns(repoSlug: string): Promise<WorkflowRun[]> {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  return getWorkflowRunsForDate(yesterday);
+  return getWorkflowRunsForDate(yesterday, repoSlug);
 }
 
-export async function getTodayOverviewData(): Promise<OverviewData> {
-  return getOverviewDataForDate(new Date());
+export async function getTodayOverviewData(repoSlug: string): Promise<OverviewData> {
+  return getOverviewDataForDate(new Date(), repoSlug);
 }
 
-export async function getYesterdayOverviewData(): Promise<OverviewData> {
+export async function getYesterdayOverviewData(repoSlug: string): Promise<OverviewData> {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  return getOverviewDataForDate(yesterday);
+  return getOverviewDataForDate(yesterday, repoSlug);
 } 
