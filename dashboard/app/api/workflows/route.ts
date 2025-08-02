@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getWorkflowRunsForDate, calculateOverviewData } from '@/lib/github';
 
+// Force this route to be dynamic since it uses search parameters
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);

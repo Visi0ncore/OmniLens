@@ -1,4 +1,4 @@
-name: 🏗️ Validate Application
+name: 🏗️ Build Validation
 
 on:
   push:
@@ -66,10 +66,12 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run linting
+        if: always()
         working-directory: ./dashboard
         run: bun run lint
 
       - name: Run tests
+        if: always()
         working-directory: ./dashboard
         run: bun run test
 

@@ -10,7 +10,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${secs}s`;
   } else if (minutes > 0) {
@@ -25,14 +25,14 @@ export default function CompactMetricsOverview({ runs }: CompactMetricsOverviewP
   const inProgressRuns = runs.filter(run => !run.conclusion && run.status === 'in_progress');
   const passedRuns = completedRuns.filter(run => run.conclusion === 'success');
   const failedRuns = completedRuns.filter(run => run.conclusion === 'failure');
-  
+
   // Calculate total runtime for completed workflows
   const totalRuntime = completedRuns.reduce((total, run) => {
     const start = new Date(run.run_started_at).getTime();
     const end = new Date(run.updated_at).getTime();
     return total + Math.floor((end - start) / 1000);
   }, 0);
-  
+
   const didntRunCount = 0; // Placeholder
 
   const passedPercentage = completedRuns.length > 0 ? Math.round((passedRuns.length / completedRuns.length) * 100) : 0;
@@ -62,7 +62,7 @@ export default function CompactMetricsOverview({ runs }: CompactMetricsOverviewP
                       stroke="hsl(var(--muted))"
                       strokeWidth="6"
                     />
-                    
+
                     {/* Passed (Green) */}
                     {passedRuns.length > 0 && (
                       <circle
@@ -77,7 +77,7 @@ export default function CompactMetricsOverview({ runs }: CompactMetricsOverviewP
                         strokeLinecap="round"
                       />
                     )}
-                    
+
                     {/* Failed (Red) */}
                     {failedRuns.length > 0 && (
                       <circle
@@ -147,6 +147,7 @@ export default function CompactMetricsOverview({ runs }: CompactMetricsOverviewP
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 min-w-[8rem] sm:w-32">
                   <XCircle className="h-4 w-4 text-red-500" />
+                  {/* eslint-disable-next-line react/no-unescaped-entities */}
                   <span className="text-sm">Didn't Run</span>
                 </div>
                 <div className={`font-semibold ${didntRunCount === 0 ? 'text-green-500' : 'text-red-500'}`}>
