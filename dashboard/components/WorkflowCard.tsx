@@ -191,7 +191,7 @@ export default function WorkflowCard({
 
         {/* Show testing workflows for trigger workflows only when not reviewed */}
         {isTrigger && testingWorkflows.length > 0 && !isReviewed && (
-          <div className="mb-3 p-2 bg-muted/50 rounded-md">
+          <div className="mb-3 p-2 rounded-md">
             <div className="text-xs font-medium text-muted-foreground mb-1">Testing Workflows:</div>
             <div className="space-y-1">
               {testingWorkflows.map((testingWorkflow, index) => {

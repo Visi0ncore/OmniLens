@@ -159,7 +159,7 @@ export default function HomePage() {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-[#0D0D0D]">
         <div className="container mx-auto p-6">
           <header className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight">👁️ OmniLens</h1>
@@ -175,7 +175,7 @@ export default function HomePage() {
   // Show error state
   if (error) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-[#0D0D0D]">
         <div className="container mx-auto p-6">
           <header className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight">👁️ OmniLens</h1>
@@ -190,7 +190,7 @@ export default function HomePage() {
   
   if (availableRepos.length === 0) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-[#0D0D0D]">
         <div className="container mx-auto p-6">
           <header className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight">👁️ OmniLens</h1>
@@ -227,7 +227,7 @@ export default function HomePage() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#0D0D0D]">
       <div className="container mx-auto p-6 space-y-8">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">👁️ OmniLens</h1>
