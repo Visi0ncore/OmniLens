@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roadmap - OmniLens</title>
+    <meta name="description" content="OmniLens product roadmap - Our journey from early development to general availability">
+    <link rel="icon" type="image/jpeg" href="/logo.jpeg">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://omni-lens.vercel.app/roadmap.html">
+    <meta property="og:title" content="Roadmap - OmniLens">
+    <meta property="og:description" content="OmniLens product roadmap - Our journey from early development to general availability">
+    <meta property="og:image" content="https://omni-lens.vercel.app/logo.jpeg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="OmniLens Roadmap">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://omni-lens.vercel.app/roadmap.html">
+    <meta property="twitter:title" content="Roadmap - OmniLens">
+    <meta property="twitter:description" content="OmniLens product roadmap - Our journey from early development to general availability">
+    <meta property="twitter:image" content="https://omni-lens.vercel.app/logo.jpeg">
+    <meta property="twitter:image:alt" content="OmniLens Roadmap">
+    <meta name="twitter:creator" content="@Omni_Lens">
+    <meta name="twitter:site" content="@Omni_Lens">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: 'hsl(0 0% 3.9%)',
+                        foreground: 'hsl(0 0% 98%)',
+                        card: 'hsl(0 0% 3.9%)',
+                        'card-foreground': 'hsl(0 0% 98%)',
+                        primary: 'hsl(0 0% 98%)',
+                        'primary-foreground': 'hsl(0 0% 9%)',
+                        secondary: 'hsl(0 0% 14.9%)',
+                        'secondary-foreground': 'hsl(0 0% 98%)',
+                        muted: 'hsl(0 0% 14.9%)',
+                        'muted-foreground': 'hsl(0 0% 63.9%)',
+                        accent: 'hsl(0 0% 14.9%)',
+                        'accent-foreground': 'hsl(0 0% 98%)',
+                        border: 'hsl(0 0% 14.9%)',
+                        input: 'hsl(0 0% 14.9%)',
+                        ring: 'hsl(0 0% 83.1%)'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <script
+        src="https://cdn.databuddy.cc/databuddy.js"
+        data-client-id="JBDsKSRAniGucYP5aEGmt"
+        data-enable-batching="true"
+        crossOrigin="anonymous"
+        async
+      ></script>
+    
+    <style>
+        * {
+            border-color: hsl(0 0% 14.9%);
+        }
+        
+        body {
+            background-color: hsl(0 0% 3.9%);
+            color: hsl(0 0% 98%);
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+        }
+        
+        .btn-primary {
+            background-color: hsl(0 0% 98%);
+            color: hsl(0 0% 9%);
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .btn-primary:hover {
+            background-color: hsl(0 0% 90%);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        .slide-up {
+            animation: slideUp 0.8s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, hsl(0 0% 3.9%) 0%, hsl(0 0% 6%) 50%, hsl(0 0% 3.9%) 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-background font-sans antialiased">
+    <div class="hero-gradient min-h-screen">
+        <!-- Header -->
+        <header class="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+            <div class="container mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" id="logoLink">
+                        <span class="text-2xl">👁️</span>
+                        <h1 class="text-xl font-bold tracking-tight text-foreground">OmniLens</h1>
+                    </div>
+                <nav class="hidden md:flex items-center gap-6">
+                    <a href="/#features" class="text-muted-foreground hover:text-foreground transition-colors">Features</a>
+                    <a href="/roadmap.html" class="text-foreground font-medium">Roadmap</a>
+                    <a href="https://x.com/Omni_Lens" target="_blank" rel="noopener noreferrer" class="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                        </svg>
+                        
+                    </a>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Hero Section -->
+        <main class="container mx-auto px-6 py-12 pt-32">
+            <div class="max-w-4xl mx-auto text-center space-y-6">
+                <div class="fade-in">
+                    <h1 class="text-4xl md:text-6xl font-bold tracking-tight text-foreground mb-4">
+                        Product Roadmap
+                    </h1>
+                    <p class="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                        Our journey from early development to general availability
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Roadmap Section -->
+        <section class="container mx-auto px-6 py-12">
+            <div class="max-w-6xl mx-auto">
+                <div class="space-y-12">
+                    <!-- Early Stage -->
+                    <div class="card-hover bg-card border border-border rounded-lg p-8">
+                        <div class="flex items-start gap-4">
+                            <div class="w-16 h-16 bg-blue-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <span class="text-2xl">🚀</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <h3 class="text-2xl font-semibold text-card-foreground">Early Stage</h3>
+                                    <span class="px-3 py-1 bg-blue-500/20 text-blue-400 text-sm font-medium rounded-full">Current</span>
+                                </div>
+                                <p class="text-muted-foreground mb-6">
+                                    Building the foundation with core workflow monitoring capabilities
+                                </p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-card-foreground">Core Features</h4>
+                                        <ul class="space-y-2 text-sm text-muted-foreground">
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-green-400 mt-1">✓</span>
+                                                <span>Basic workflow monitoring dashboard</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-green-400 mt-1">✓</span>
+                                                <span>GitHub integration setup</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-green-400 mt-1">✓</span>
+                                                <span>Workflow categorization system</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-green-400 mt-1">✓</span>
+                                                <span>Multi-repo support</span>
+                                        </ul>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-card-foreground">Infrastructure</h4>
+                                        <ul class="space-y-2 text-sm text-muted-foreground">
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-green-400 mt-1">✓</span>
+                                                <span>API foundation</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-green-400 mt-1">🔄</span>
+                                                <span>Database schema design</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-yellow-400 mt-1">🔄</span>
+                                                <span>Data persistence</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-yellow-400 mt-1">🔄</span>
+                                                <span>Authentication system</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alpha -->
+                    <div class="card-hover bg-card border border-border rounded-lg p-8">
+                        <div class="flex items-start gap-4">
+                            <div class="w-16 h-16 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <span class="text-2xl">🔬</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <h3 class="text-2xl font-semibold text-card-foreground">Alpha</h3>
+                                    <span class="px-3 py-1 bg-purple-500/20 text-purple-400 text-sm font-medium rounded-full">TBD</span>
+                                </div>
+                                <p class="text-muted-foreground mb-6">
+                                    Internal testing and refinement with select early adopters
+                                </p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 blur-sm opacity-60">
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-card-foreground">Enhanced Monitoring</h4>
+                                        <ul class="space-y-2 text-sm text-muted-foreground">
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Real-time workflow status updates</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Advanced filtering and search</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Custom dashboard widgets</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Workflow performance alerts</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-card-foreground">User Experience</h4>
+                                        <ul class="space-y-2 text-sm text-muted-foreground">
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Improved UI/UX design</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Mobile responsive interface</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Dark/light theme support</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Closed Beta -->
+                    <div class="card-hover bg-card border border-border rounded-lg p-8">
+                        <div class="flex items-start gap-4">
+                            <div class="w-16 h-16 bg-yellow-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <span class="text-2xl">🔒</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <h3 class="text-2xl font-semibold text-card-foreground">Closed Beta</h3>
+                                    <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 text-sm font-medium rounded-full">TBD</span>
+                                </div>
+                                <p class="text-muted-foreground mb-6">
+                                    Limited release with invited teams for feedback and optimization
+                                </p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 blur-sm opacity-60">
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-card-foreground">Analytics & Insights</h4>
+                                        <ul class="space-y-2 text-sm text-muted-foreground">
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Historical trend analysis</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Performance benchmarking</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Cost optimization insights</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Custom reporting</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-card-foreground">Team Features</h4>
+                                        <ul class="space-y-2 text-sm text-muted-foreground">
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Team collaboration tools</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Role-based access control</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Shared dashboards</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Open Beta -->
+                    <div class="card-hover bg-card border border-border rounded-lg p-8">
+                        <div class="flex items-start gap-4">
+                            <div class="w-16 h-16 bg-orange-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <span class="text-2xl">🌐</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <h3 class="text-2xl font-semibold text-card-foreground">Open Beta</h3>
+                                    <span class="px-3 py-1 bg-orange-500/20 text-orange-400 text-sm font-medium rounded-full">TBD</span>
+                                </div>
+                                <p class="text-muted-foreground mb-6">
+                                    Public beta with advanced features and integrations
+                                </p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 blur-sm opacity-60">
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-card-foreground">Advanced Integrations</h4>
+                                        <ul class="space-y-2 text-sm text-muted-foreground">
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Slack/Teams notifications</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Jira integration</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Webhook support</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>API for custom integrations</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-card-foreground">Enterprise Features</h4>
+                                        <ul class="space-y-2 text-sm text-muted-foreground">
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>SAML/SSO authentication</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Audit logging</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Data retention policies</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- General Availability -->
+                    <div class="card-hover bg-card border border-border rounded-lg p-8">
+                        <div class="flex items-start gap-4">
+                            <div class="w-16 h-16 bg-emerald-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <span class="text-2xl">🚢</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <h3 class="text-2xl font-semibold text-card-foreground">General Availability</h3>
+                                    <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-sm font-medium rounded-full">TBD</span>
+                                </div>
+                                <p class="text-muted-foreground mb-6">
+                                    Full production release with comprehensive workflow intelligence platform
+                                </p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 blur-sm opacity-60">
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-card-foreground">AI-Powered Features</h4>
+                                        <ul class="space-y-2 text-sm text-muted-foreground">
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Predictive failure analysis</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Automated optimization suggestions</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Smart workflow recommendations</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Anomaly detection</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <h4 class="font-medium text-card-foreground">Platform Maturity</h4>
+                                        <ul class="space-y-2 text-sm text-muted-foreground">
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>99.9% uptime SLA</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>24/7 support</span>
+                                            </li>
+                                            <li class="flex items-start gap-2">
+                                                <span class="text-blue-400 mt-1">📋</span>
+                                                <span>Comprehensive documentation</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="container mx-auto px-6 py-12 border-t border-border">
+            <div class="max-w-4xl mx-auto text-center">
+                <div class="flex items-center justify-center gap-2 mb-4">
+                    <span class="text-lg font-semibold text-foreground">Built with ❤️ for better CI/CD visibility</span>
+                </div>
+                <p class="text-muted-foreground">
+                    © 2025 OmniLens. All rights reserved.
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Add click handler for logo to go back to home
+        document.getElementById('logoLink').addEventListener('click', function() {
+            window.location.href = '/';
+        });
+
+        // Add intersection observer for animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // Observe all cards for animation
+        document.querySelectorAll('.card-hover').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(card);
+        });
+    </script>
+</body>
+</html> 
