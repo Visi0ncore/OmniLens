@@ -822,10 +822,12 @@ export default function DashboardPage({ params }: PageProps) {
                 <RefreshCw className={`h-4 w-4 ${(todayLoading || yesterdayLoading) ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <Button variant="default" size="sm" onClick={openConfigureModal}>
-                <Settings className="h-4 w-4" />
-                Configure Workflows
-              </Button>
+              {localConfig && Object.values(localConfig.categories).some((c: any) => c.workflows.length > 0) && (
+                <Button variant="default" size="sm" onClick={openConfigureModal} className="gap-2">
+                  <Settings className="h-4 w-4" />
+                  Configure Workflows
+                </Button>
+              )}
             </div>
           </div>
         </header>
@@ -899,8 +901,8 @@ export default function DashboardPage({ params }: PageProps) {
                           <div key={run.id} className="relative">
                             <WorkflowCard
                               run={run}
-                              isReviewed={false}
-                              onToggleReviewed={() => {}}
+                              isReviewed={reviewedWorkflows[run.id] || false}
+                              onToggleReviewed={() => toggleReviewed(run.id)}
                               repoSlug={repoSlug}
                               rightAction={(
                                 <Button
@@ -1105,6 +1107,17 @@ export default function DashboardPage({ params }: PageProps) {
               <RefreshCw className={`h-4 w-4 ${(todayLoading || yesterdayLoading) ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
+            {(() => {
+              const hasConfiguredLocal = !!localConfig && Object.values(localConfig.categories).some((c: any) => c.workflows.length > 0);
+              const hasConfiguredEnv = !!repoConfig && Object.values(repoConfig.categories).some((c: any) => (c as any).workflows?.length > 0);
+              const showHeaderConfigure = hasConfiguredLocal || hasConfiguredEnv;
+              return showHeaderConfigure ? (
+                <Button variant="default" size="sm" onClick={openConfigureModal} className="gap-2">
+                  <Settings className="h-4 w-4" />
+                  Configure Workflows
+                </Button>
+              ) : null;
+            })()}
           </div>
         </div>
       </header>
