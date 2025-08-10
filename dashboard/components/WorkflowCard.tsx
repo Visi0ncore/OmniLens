@@ -56,8 +56,9 @@ export default function WorkflowCard({
   rightAction
 }: WorkflowCardProps) {
   const status = run.conclusion ?? run.status;
-  const isSuccess = status === "success";
-  const isInProgress = status === "in_progress" || status === 'queued';
+  const isMissing = (run as any).isMissing === true || status === 'missing';
+  const isSuccess = !isMissing && status === "success";
+  const isInProgress = !isMissing && (status === "in_progress" || status === 'queued');
 
   // Check if this is a trigger workflow - try both name and workflow_name
   const isTrigger = isTriggerWorkflow(run.name, repoSlug) || isTriggerWorkflow(run.workflow_name || '', repoSlug);
@@ -127,7 +128,7 @@ export default function WorkflowCard({
           </h3>
           <div className="flex items-center gap-2">
             {/* Show run count badge if workflow was run multiple times */}
-            {run.run_count && run.run_count > 1 && (
+            {!isMissing && run.run_count && run.run_count > 1 && (
               <Popover>
                 <PopoverTrigger asChild>
                   <Badge variant="secondary" className="shrink-0 text-xs cursor-pointer hover:opacity-80">
@@ -175,10 +176,10 @@ export default function WorkflowCard({
               </Popover>
             )}
             <Badge
-              variant={isSuccess ? "success" : isInProgress ? "destructive" : "destructive"}
+              variant={isMissing ? "secondary" : isSuccess ? "success" : isInProgress ? "destructive" : "destructive"}
               className={`shrink-0 ${isInProgress ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
             >
-              {isSuccess ? "Pass" : isInProgress ? "Running" : "Fail"}
+              {isMissing ? "Didn't Run" : isSuccess ? "Pass" : isInProgress ? "Running" : "Fail"}
             </Badge>
             {rightAction}
           </div>
@@ -188,7 +189,7 @@ export default function WorkflowCard({
 
 
         {/* Show testing workflows for trigger workflows only when not reviewed */}
-        {isTrigger && testingWorkflows.length > 0 && !isReviewed && (
+        {isTrigger && !isMissing && testingWorkflows.length > 0 && !isReviewed && (
           <div className="mb-3 p-2 rounded-md">
             <div className="text-xs font-medium text-muted-foreground mb-1">Testing Workflows:</div>
             <div className="space-y-1">
@@ -223,10 +224,10 @@ export default function WorkflowCard({
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
-              <span>{isInProgress ? "Running" : (run.run_started_at && run.updated_at ? duration(run.run_started_at, run.updated_at) : "")}</span>
+              <span>{isMissing ? "No runs" : isInProgress ? "Running" : (run.run_started_at && run.updated_at ? duration(run.run_started_at, run.updated_at) : "")}</span>
             </div>
           <div className="flex items-center gap-2">
-            {!isInProgress ? (
+            {!isInProgress && !isMissing ? (
               <Button variant="outline" size="sm" asChild>
                 <Link href={run.html_url} target="_blank">
                   <Eye className="h-3 w-3 mr-1" />
@@ -243,7 +244,7 @@ export default function WorkflowCard({
               variant={isReviewed ? "default" : "outline"}
               size="sm"
               onClick={onToggleReviewed}
-              disabled={isTrigger && testingWorkflows.length > 0 && !allTestingWorkflowsReviewed}
+              disabled={(!isMissing) && isTrigger && testingWorkflows.length > 0 && !allTestingWorkflowsReviewed}
               className={isReviewed ? "bg-green-600 hover:bg-green-700" : ""}
             >
               <Check className={`h-3 w-3 ${!isReviewed ? "mr-1" : ""}`} />

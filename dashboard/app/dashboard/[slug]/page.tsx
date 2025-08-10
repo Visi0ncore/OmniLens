@@ -1097,11 +1097,43 @@ export default function DashboardPage({ params }: PageProps) {
                 categoryConfig.workflows.length > 0 && (
                   <div key={key} className="space-y-4">
                     {(() => {
-                      // Build runs for this category from today's data matching configured files
-                      const configuredFiles = new Set<string>(categoryConfig.workflows || []);
-                      const runsInCategory = (workflowData || []).filter((r: any) => {
+                      // Build one item per configured workflow: latest run if present, otherwise a "didn't run" placeholder
+                      const configuredFilesArr: string[] = categoryConfig.workflows || [];
+                      const configuredFiles = new Set<string>(configuredFilesArr);
+                      const todaysRuns = (workflowData || []).filter((r: any) => {
                         const wf = (r.path || r.workflow_path || r.workflow_name || '').toLowerCase();
                         return Array.from(configuredFiles).some(f => wf.includes(f.toLowerCase()));
+                      });
+
+                      // Map latest run per configured file
+                      const latestByFile = new Map<string, any>();
+                      for (const run of todaysRuns) {
+                        const wf = (run.path || run.workflow_path || run.workflow_name || '').toLowerCase();
+                        const match = configuredFilesArr.find(f => wf.includes(f.toLowerCase()));
+                        if (!match) continue;
+                        const prev = latestByFile.get(match);
+                        if (!prev || new Date(run.run_started_at).getTime() > new Date(prev.run_started_at).getTime()) {
+                          latestByFile.set(match, run);
+                        }
+                      }
+
+                      // Build final list including placeholders for those that didn't run today
+                      const runsInCategory = configuredFilesArr.map((file, idx) => {
+                        const found = latestByFile.get(file);
+                        if (found) return found;
+                        // Create a placeholder run for UI rendering
+                        return {
+                          id: -(idx + 1),
+                          name: file.replace(/\.ya?ml$/i, '').replace(/[-_]/g, ' '),
+                          workflow_name: file,
+                          path: `.github/workflows/${file}`,
+                          conclusion: null,
+                          status: 'missing',
+                          html_url: '#',
+                          run_started_at: selectedDate.toISOString(),
+                          updated_at: selectedDate.toISOString(),
+                          isMissing: true,
+                        } as any;
                       }).sort((a: any, b: any) => new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime());
 
                       const isCollapsed = collapsedCategories[key];
