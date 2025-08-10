@@ -147,21 +147,18 @@ export default function WorkflowCard({
                             <span className="font-mono w-24">
                               #{runDetail.id}
                             </span>
-                            <Badge
-                              variant={
-                                runDetail.conclusion === 'success' ? "success" :
-                                  runDetail.conclusion === null && runDetail.status === 'in_progress' ? "destructive" :
-                                    "destructive"
-                              }
-                              className={`text-xs justify-self-start ${runDetail.conclusion === null && runDetail.status === 'in_progress'
-                                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                                  : ''
-                                }`}
-                            >
-                              {runDetail.conclusion === 'success' ? "Pass" :
-                                runDetail.conclusion === null && runDetail.status === 'in_progress' ? "Running" :
-                                  "Fail"}
-                            </Badge>
+                            {(() => {
+                              const isDetailRunning = (runDetail.status === 'in_progress' || runDetail.status === 'queued') && (runDetail.conclusion === null || runDetail.conclusion === undefined);
+                              const isDetailSuccess = runDetail.conclusion === 'success';
+                              const label = isDetailSuccess ? 'Pass' : isDetailRunning ? 'Running' : 'Fail';
+                              const variant = isDetailSuccess ? 'success' : 'destructive';
+                              const runningClass = isDetailRunning ? 'bg-orange-500 hover:bg-orange-600 text-white' : '';
+                              return (
+                                <Badge variant={variant} className={`text-xs justify-self-start ${runningClass}`}>
+                                  {label}
+                                </Badge>
+                              );
+                            })()}
                             <Button variant="ghost" size="sm" asChild className="h-6 px-1">
                               <Link href={runDetail.html_url} target="_blank">
                                 <Eye className="h-3 w-3" />
