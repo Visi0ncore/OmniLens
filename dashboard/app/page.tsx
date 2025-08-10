@@ -303,12 +303,12 @@ export default function HomePage() {
 
             const hasLocalWorkflows = configuredFiles.length > 0;
             if (!hasLocalWorkflows || !repo.repoPath) {
-              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: hasLocalWorkflows ? { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } : null };
+              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: hasLocalWorkflows ? { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } : { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
             }
 
             const resRuns = await fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repo.repoPath)}&date=${encodeURIComponent(todayStr)}`, { cache: 'no-store' });
             if (!resRuns.ok) {
-              return { ...repo, hasWorkflows: true, metrics: { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
+              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
             }
             const json = await resRuns.json();
             const runs = (json.workflow_runs || []).filter((r: any) => {

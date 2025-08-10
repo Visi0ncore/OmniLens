@@ -737,7 +737,7 @@ export default function DashboardPage({ params }: PageProps) {
             const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
             return file && configuredFiles.some(cfg => file.includes(cfg));
           });
-          const computeOverview = (runs: any[]) => {
+            const computeOverview = (runs: any[]) => {
             const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
             const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
             const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
@@ -750,14 +750,16 @@ export default function DashboardPage({ params }: PageProps) {
               }
               return total;
             }, 0);
-            const ran = new Set<string>();
-            runs.forEach((r: any) => {
-              const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
-              if (!file) return;
-              configuredFiles.forEach(cfg => { if (file.includes(cfg)) ran.add(cfg); });
-            });
-            const missingWorkflows = configuredFiles.filter(f => !ran.has(f));
-            return { completedRuns, inProgressRuns, passedRuns, failedRuns, totalRuntime, didntRunCount: missingWorkflows.length, totalWorkflows: runs.length, missingWorkflows };
+              // Total configured workflows should reflect user configuration, not runs-length
+              const totalWorkflows = configuredFiles.length;
+              const ran = new Set<string>();
+              runs.forEach((r: any) => {
+                const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
+                if (!file) return;
+                configuredFiles.forEach(cfg => { if (file.includes(cfg)) ran.add(cfg); });
+              });
+              const missingWorkflows = Array.from(configuredFiles).filter(f => !ran.has(f));
+              return { completedRuns, inProgressRuns, passedRuns, failedRuns, totalRuntime, didntRunCount: missingWorkflows.length, totalWorkflows, missingWorkflows };
           };
           const [tRes2, yRes2] = await Promise.all([
             fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repoPath)}&date=${encodeURIComponent(selectedStr)}`, { cache: 'no-store' }),
@@ -926,7 +928,52 @@ export default function DashboardPage({ params }: PageProps) {
             {workflowData && overviewData && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-8">
                 <OverviewMetrics
-                  data={overviewData}
+                  data={(() => {
+                    if (!repoConfig && isLocalRepo && localConfig) {
+                      // Build configured set and filter today's runs to configured
+                      const configuredFiles: string[] = Object.values(localConfig.categories).flatMap((c: any) => c.workflows);
+                      const configuredSet = new Set<string>(configuredFiles);
+                      const runs = (workflowData || []).filter((r: any) => {
+                        const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
+                        return file && Array.from(configuredSet).some((cfg) => (file as string).includes(cfg));
+                      });
+
+                      // Compute overview strictly from configured runs
+                      const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
+                      const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
+                      const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
+                      const failedRuns = runs.filter((r: any) => r.conclusion === 'failure').length;
+                      const totalRuntime = runs.reduce((total: number, r: any) => {
+                        if (r.status === 'completed') {
+                          const start = new Date(r.run_started_at).getTime();
+                          const end = new Date(r.updated_at).getTime();
+                          return total + Math.max(0, Math.floor((end - start) / 1000));
+                        }
+                        return total;
+                      }, 0);
+
+                      // Determine configured-but-did-not-run
+                      const ran = new Set<string>();
+                      runs.forEach((r: any) => {
+                        const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
+                        if (!file) return;
+                        configuredFiles.forEach(cfg => { if ((file as string).includes(cfg)) ran.add(cfg); });
+                      });
+                      const missingWorkflows = configuredFiles.filter(f => !ran.has(f));
+
+                      return {
+                        completedRuns,
+                        inProgressRuns,
+                        passedRuns,
+                        failedRuns,
+                        totalRuntime,
+                        didntRunCount: missingWorkflows.length,
+                        totalWorkflows: configuredFiles.length,
+                        missingWorkflows,
+                      } as any;
+                    }
+                    return overviewData;
+                  })()}
                   onMetricHover={handleMetricHover}
                   onMetricLeave={handleMetricLeave}
                 />
@@ -938,10 +985,13 @@ export default function DashboardPage({ params }: PageProps) {
                     const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
                     return file && Array.from(configured).some(cfg => file.includes(cfg));
                   });
+                  // Use only configured runs for Daily Metrics as well
+                  const todayConfigured = filterToConfigured(workflowData || []);
+                  const yConfigured = filterToConfigured(yesterdayWorkflowData || []);
                   return (
                     <WorkflowMetrics
-                      todayRuns={filterToConfigured(workflowData || [])}
-                      yesterdayRuns={filterToConfigured(yesterdayWorkflowData || [])}
+                      todayRuns={todayConfigured}
+                      yesterdayRuns={yConfigured}
                       onMetricHover={handleMetricHover}
                       onMetricLeave={handleMetricLeave}
                     />
@@ -1028,14 +1078,21 @@ export default function DashboardPage({ params }: PageProps) {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
             <div className="w-full max-w-3xl rounded-lg border border-border bg-background shadow-lg">
               <div className="p-4 border-b border-border flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Configure Workflows</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold">Configure Workflows</h2>
+                  {(() => {
+                    const configuredCount = localConfig ? Object.values(localConfig.categories).flatMap((c: any) => c.workflows).length : 0;
+                    const totalAvailable = availableWorkflows.length;
+                    return (
+                      <Badge variant="secondary" className="text-xs">{configuredCount} / {totalAvailable} configured</Badge>
+                    );
+                  })()}
+                </div>
                 <Button variant="ghost" size="sm" onClick={() => setShowConfigModal(false)}>Close</Button>
               </div>
               <div className="p-4 space-y-3">
                 {configError && <p className="text-sm text-red-500">{configError}</p>}
-                {isLoadingWorkflows ? (
-                  <p className="text-sm text-muted-foreground">Loading workflows…</p>
-                ) : availableWorkflows.length === 0 ? (
+                {availableWorkflows.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No workflows found in the repository.</p>
                 ) : (
                   <div
@@ -1049,41 +1106,7 @@ export default function DashboardPage({ params }: PageProps) {
                         : undefined
                     }
                   >
-                    {(() => {
-                      const combined = ((): 'idle' | 'loading' | 'success' | 'error' => {
-                        if (fetchStatus.today === 'error' || fetchStatus.yesterday === 'error') return 'error';
-                        if (fetchStatus.today === 'loading' || fetchStatus.yesterday === 'loading') return 'loading';
-                        if (fetchStatus.today === 'success' && fetchStatus.yesterday === 'success') return 'success';
-                        return 'idle';
-                      })();
-                      return (
-                        <div className="flex items-center gap-2 text-xs">
-                          {combined === 'loading' && (
-                            <span className="inline-flex items-center gap-2 text-yellow-500">
-                              <RefreshCw className="h-3 w-3 animate-spin" />
-                              Fetching data…
-                            </span>
-                          )}
-                          {combined === 'success' && (
-                            <span className="inline-flex items-center gap-2 text-green-500">
-                              <CheckCircle className="h-3 w-3" />
-                              Data loaded
-                            </span>
-                          )}
-                          {combined === 'error' && (
-                            <span className="inline-flex items-center gap-2 text-red-500">
-                              <AlertCircle className="h-3 w-3" />
-                              Failed to fetch data
-                            </span>
-                          )}
-                          {combined === 'idle' && (
-                            <span className="inline-flex items-center gap-2 text-muted-foreground">
-                              Waiting to fetch…
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    {/* Removed fetch-status row; replaced by header badge */}
                     {availableWorkflows
                       .slice()
                       .sort((a, b) => {
