@@ -220,72 +220,82 @@ export default function HomePage() {
   }, []);
 
   // Build repositories list from user-added repos only (no env-configured repos on this branch)
-  React.useEffect(() => {
-    const hydrateUserRepos = async () => {
-      try {
-        const userRepos = loadUserAddedRepos();
-        const mappedUserRepos = userRepos.map((r: any) => ({
-          slug: r.slug,
-          repoPath: r.repoPath,
-          envKey: 'LOCAL',
-          displayName: r.displayName || r.repoPath,
-          hasConfig: false,
-          hasWorkflows: false,
-          metrics: null,
-        }));
+  const hydrateUserRepos = React.useCallback(async () => {
+    try {
+      const userRepos = loadUserAddedRepos();
+      const mappedUserRepos = userRepos.map((r: any) => ({
+        slug: r.slug,
+        repoPath: r.repoPath,
+        envKey: 'LOCAL',
+        displayName: r.displayName || r.repoPath,
+        hasConfig: false,
+        hasWorkflows: false,
+        metrics: null,
+      }));
 
-        // Helper to compute overview metrics (aligned with UI needs)
-        const computeOverview = (runs: any[]) => {
-          const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
-          const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
-          const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
-          const failedRuns = runs.filter((r: any) => r.conclusion === 'failure').length;
-          const successRate = completedRuns > 0 ? Math.round((passedRuns / completedRuns) * 100) : 0;
-          const hasActivity = completedRuns > 0 || inProgressRuns > 0;
-          const totalWorkflows = runs.length;
-          return { totalWorkflows, passedRuns, failedRuns, inProgressRuns, successRate, hasActivity };
-        };
+      // Helper to compute overview metrics (aligned with UI needs)
+      const computeOverview = (runs: any[]) => {
+        const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
+        const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
+        const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
+        const failedRuns = runs.filter((r: any) => r.conclusion === 'failure').length;
+        const successRate = completedRuns > 0 ? Math.round((passedRuns / completedRuns) * 100) : 0;
+        const hasActivity = completedRuns > 0 || inProgressRuns > 0;
+        const totalWorkflows = runs.length;
+        return { totalWorkflows, passedRuns, failedRuns, inProgressRuns, successRate, hasActivity };
+      };
 
-        const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = new Date().toISOString().slice(0, 10);
 
-        const enhanced = await Promise.all(
-          mappedUserRepos.map(async (repo: any) => {
-            try {
-              const raw = localStorage.getItem(`localRepoConfig-${repo.slug}`);
-              const localCfg = raw ? JSON.parse(raw) : null;
-              const configuredFiles: string[] = localCfg
-                ? Object.values(localCfg.categories || {}).flatMap((c: any) => c?.workflows || [])
-                : [];
+      const enhanced = await Promise.all(
+        mappedUserRepos.map(async (repo: any) => {
+          try {
+            const raw = localStorage.getItem(`localRepoConfig-${repo.slug}`);
+            const localCfg = raw ? JSON.parse(raw) : null;
+            const configuredFiles: string[] = localCfg
+              ? Object.values(localCfg.categories || {}).flatMap((c: any) => c?.workflows || [])
+              : [];
 
-              const hasLocalWorkflows = configuredFiles.length > 0;
-              if (!hasLocalWorkflows || !repo.repoPath) {
-                return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: hasLocalWorkflows ? { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } : null };
-              }
-
-              const resRuns = await fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repo.repoPath)}&date=${encodeURIComponent(todayStr)}`, { cache: 'no-store' });
-              if (!resRuns.ok) {
-                return { ...repo, hasWorkflows: true, metrics: { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
-              }
-              const json = await resRuns.json();
-              const runs = (json.workflow_runs || []).filter((r: any) => {
-                const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
-                return file && configuredFiles.some((cfg) => file.includes(cfg));
-              });
-              return { ...repo, hasWorkflows: true, metrics: computeOverview(runs) };
-            } catch {
-              return repo;
+            const hasLocalWorkflows = configuredFiles.length > 0;
+            if (!hasLocalWorkflows || !repo.repoPath) {
+              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: hasLocalWorkflows ? { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } : null };
             }
-          })
-        );
 
-        setAvailableRepos(enhanced);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+            const resRuns = await fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repo.repoPath)}&date=${encodeURIComponent(todayStr)}`, { cache: 'no-store' });
+            if (!resRuns.ok) {
+              return { ...repo, hasWorkflows: true, metrics: { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
+            }
+            const json = await resRuns.json();
+            const runs = (json.workflow_runs || []).filter((r: any) => {
+              const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
+              return file && configuredFiles.some((cfg) => file.includes(cfg));
+            });
+            return { ...repo, hasWorkflows: true, metrics: computeOverview(runs) };
+          } catch {
+            return repo;
+          }
+        })
+      );
 
-    hydrateUserRepos();
+      setAvailableRepos(enhanced);
+    } finally {
+      setIsLoading(false);
+    }
   }, [loadUserAddedRepos]);
+
+  React.useEffect(() => {
+    hydrateUserRepos();
+  }, [hydrateUserRepos]);
+
+  // Poll in the background to reflect new runs without manual refresh
+  React.useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        hydrateUserRepos();
+      }
+    }, 10000); // 10s
+    return () => window.clearInterval(intervalId);
+  }, [hydrateUserRepos]);
 
   async function handleAddRepo(e: React.FormEvent) {
     e.preventDefault();
