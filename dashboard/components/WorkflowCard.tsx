@@ -41,6 +41,7 @@ interface WorkflowCardProps {
   reviewedTestingWorkflows?: Set<string>;
   onToggleTestingWorkflowReviewed?: (testingWorkflowName: string) => void;
   neutral?: boolean; // Render in neutral style for not-configured workflows
+  rightAction?: React.ReactNode; // Optional right-side action button (e.g., delete)
 }
 
 export default function WorkflowCard({
@@ -52,7 +53,8 @@ export default function WorkflowCard({
   highlightColor = '',
   allWorkflowRuns = [],
   reviewedTestingWorkflows = new Set(),
-  onToggleTestingWorkflowReviewed
+  onToggleTestingWorkflowReviewed,
+  rightAction
 }: WorkflowCardProps) {
   const neutral = (arguments[0] as any).neutral ?? false;
   const status = run.conclusion ?? run.status;
@@ -186,6 +188,7 @@ export default function WorkflowCard({
                       "Fail"
               )}
             </Badge>
+            {rightAction}
           </div>
         </div>
       </CardHeader>

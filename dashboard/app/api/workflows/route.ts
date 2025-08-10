@@ -27,7 +27,20 @@ export async function GET(request: NextRequest) {
 
     // Validate repo slug
     if (!isValidRepoSlug(repo)) {
-      return NextResponse.json({ error: 'Invalid repo slug or repo not configured' }, { status: 400 });
+      // For unknown/local repos, return an empty response instead of 400 to avoid UI errors
+      return NextResponse.json({
+        workflowRuns: [],
+        overviewData: {
+          completedRuns: 0,
+          inProgressRuns: 0,
+          passedRuns: 0,
+          failedRuns: 0,
+          totalRuntime: 0,
+          didntRunCount: 0,
+          totalWorkflows: 0,
+          missingWorkflows: []
+        }
+      }, { status: 200 });
     }
 
     const workflowRuns = await getWorkflowRunsForDate(targetDate, repo);

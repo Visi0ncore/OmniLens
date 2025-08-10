@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar, Hammer, RefreshCw, ArrowLeft, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { Zap, Target, TestTube, Calendar, Hammer, RefreshCw, ArrowLeft, AlertCircle, Plus, Trash2, Settings } from "lucide-react";
 import Link from "next/link";
 import { getRepoConfig, removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getTestingWorkflowsForTrigger } from "@/lib/utils";
 
@@ -245,12 +245,16 @@ export default function DashboardPage({ params }: PageProps) {
   const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
   const isSelectedDateToday = isToday(selectedDate);
 
+  // Determine repo config early for query enabling
+  const repoConfig = getRepoConfig(repoSlug);
+
   // Single query for today's data with optimized real-time updates
   const { data: todayData, isLoading: todayLoading, isError: todayError, refetch: refetchToday } = useQuery({
     queryKey: ["workflowData", repoSlug, format(selectedDate, "yyyy-MM-dd")],
     queryFn: async () => {
       return await fetchWorkflowData(selectedDate, repoSlug);
     },
+    enabled: !!repoConfig, // disable for local/unconfigured repos to avoid 400s
     staleTime: isSelectedDateToday ? 0 : 5 * 60 * 1000, // Historical data stays fresh longer
     cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     refetchInterval: isSelectedDateToday ? 10000 : false, // Poll every 10s for today, no polling for historical
@@ -269,6 +273,7 @@ export default function DashboardPage({ params }: PageProps) {
       yesterday.setDate(yesterday.getDate() - 1);
       return await fetchWorkflowData(yesterday, repoSlug);
     },
+    enabled: !!repoConfig, // disable for local/unconfigured repos
     staleTime: 5 * 60 * 1000, // Data is stale after 5 minutes
     cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     refetchOnWindowFocus: false, // Don't refetch on window focus for historical data
@@ -486,11 +491,11 @@ export default function DashboardPage({ params }: PageProps) {
     setHoverState({ metricType: null, workflowIds: new Set() });
   };
 
-  // Get repo config for display
-  const repoConfig = getRepoConfig(repoSlug);
+  // Get repo config for display (already computed above)
   const [localConfig, setLocalConfig] = useState<any | null>(null);
-  const [newWorkflowFile, setNewWorkflowFile] = useState("");
-  const [newWorkflowCategory, setNewWorkflowCategory] = useState<string>('testing');
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [availableWorkflows, setAvailableWorkflows] = useState<Array<{ id: number; name: string; path: string; state: string; html_url: string; }>>([]);
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
   
   // Get repository name from API
@@ -561,39 +566,49 @@ export default function DashboardPage({ params }: PageProps) {
     } catch {}
   }, [repoSlug]);
 
-  const handleAddLocalWorkflow = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    setConfigError(null);
-    const file = newWorkflowFile.trim();
-    if (!file) {
-      setConfigError('Enter a workflow file name, e.g. my-workflow.yml');
-      return;
-    }
-    if (!/\.ya?ml$/i.test(file)) {
-      setConfigError('Workflow should be a .yml or .yaml file');
-      return;
-    }
+  const addLocalWorkflowFile = useCallback(async (categoryKey: string, file: string) => {
     if (!localConfig) return;
-    const category = newWorkflowCategory as keyof typeof localConfig.categories;
-    const existing = new Set(localConfig.categories[category].workflows);
-    if (existing.has(file)) {
-      setConfigError('Workflow already added');
-      return;
-    }
+    const existing = new Set(localConfig.categories[categoryKey].workflows);
+    if (existing.has(file)) return;
     const next = {
       ...localConfig,
       categories: {
         ...localConfig.categories,
-        [category]: {
-          ...localConfig.categories[category],
-          workflows: [...localConfig.categories[category].workflows, file],
+        [categoryKey]: {
+          ...localConfig.categories[categoryKey],
+          workflows: [...localConfig.categories[categoryKey].workflows, file],
         }
       }
     };
     setLocalConfig(next);
     saveLocalConfig(next);
-    setNewWorkflowFile("");
-  }, [newWorkflowFile, newWorkflowCategory, localConfig, saveLocalConfig]);
+
+    // After adding, fetch latest runs and refresh dashboard state by reloading page data via existing queries
+    try {
+      // Determine repoPath from local storage entry
+      let repoPath: string | null = null;
+      try {
+        const stored = localStorage.getItem('userAddedRepos');
+        if (stored) {
+          const parsed = JSON.parse(stored) as Array<any>;
+          const found = parsed.find(r => r.slug === repoSlug);
+          repoPath = found?.repoPath || null;
+        }
+      } catch {}
+
+      if (repoPath) {
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        await fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repoPath)}&date=${encodeURIComponent(dateStr)}`, {
+          cache: 'no-store'
+        });
+      }
+
+      // Re-run existing queries to repopulate UI with new cards/metrics
+      await Promise.all([refetchToday(), refetchYesterday()]);
+    } catch (e) {
+      console.error('Failed to fetch runs after configuration', e);
+    }
+  }, [localConfig, saveLocalConfig, repoSlug, selectedDate, refetchToday, refetchYesterday]);
 
   const handleRemoveLocalWorkflow = useCallback((categoryKey: string, file: string) => {
     if (!localConfig) return;
@@ -617,48 +632,58 @@ export default function DashboardPage({ params }: PageProps) {
     return (
       <div className="container mx-auto p-6 space-y-8">
         <header className="space-y-2">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{formatRepoDisplayName(repoDisplayName)}</h1>
-              <p className="text-muted-foreground">Configure workflows to track</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Link href="/" className="text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{formatRepoDisplayName(repoDisplayName)}</h1>
+                <p className="text-muted-foreground">Configure workflows to track</p>
+              </div>
+            </div>
+            <div className="w-full sm:w-auto">
+              <div className="flex justify-end">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={async () => {
+                    setConfigError(null);
+                    setShowConfigModal(true);
+                    setIsLoadingWorkflows(true);
+                    try {
+                      // Determine repoPath from local storage entry
+                      let repoPath: string | null = null;
+                      try {
+                        const stored = localStorage.getItem('userAddedRepos');
+                        if (stored) {
+                          const parsed = JSON.parse(stored) as Array<any>;
+                          const found = parsed.find(r => r.slug === repoSlug);
+                          repoPath = found?.repoPath || null;
+                        }
+                      } catch {}
+                      const res = await fetch(`/api/repositories/workflows?repoPath=${encodeURIComponent(repoPath || '')}`);
+                      const json = await res.json();
+                      if (!res.ok) {
+                        setConfigError(json?.error || 'Failed to fetch workflows');
+                        setAvailableWorkflows([]);
+                      } else {
+                        setAvailableWorkflows(json.workflows || []);
+                      }
+                    } catch (e) {
+                      setConfigError('Failed to fetch workflows');
+                    } finally {
+                      setIsLoadingWorkflows(false);
+                    }
+                  }}
+                >
+                  <Settings className="h-4 w-4" />
+                  Configure Workflows
+                </Button>
+              </div>
             </div>
           </div>
         </header>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Add Workflow</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAddLocalWorkflow} className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <select
-                value={newWorkflowCategory}
-                onChange={(e) => setNewWorkflowCategory(e.target.value)}
-                className="px-3 py-2 rounded-md bg-background border border-input text-sm"
-              >
-                <option value="testing">Testing</option>
-                <option value="trigger">Trigger</option>
-                <option value="build">Build</option>
-                <option value="utility">Utility</option>
-              </select>
-              <input
-                type="text"
-                value={newWorkflowFile}
-                onChange={(e) => setNewWorkflowFile(e.target.value)}
-                placeholder="workflow-file.yml"
-                className="w-full sm:flex-1 px-3 py-2 rounded-md bg-background border border-input text-sm outline-none focus:ring-2 focus:ring-primary"
-              />
-              <Button type="submit" size="sm">
-                <Plus className="h-4 w-4" />
-                Add
-              </Button>
-            </form>
-            {configError && <p className="mt-2 text-sm text-red-500">{configError}</p>}
-          </CardContent>
-        </Card>
 
         <div className="space-y-12">
           {localConfig && Object.entries(localConfig.categories).map(([key, categoryConfig]: any) => (
@@ -690,17 +715,19 @@ export default function DashboardPage({ params }: PageProps) {
                           onToggleReviewed={() => {}}
                           repoSlug={repoSlug}
                           neutral
+                          rightAction={(
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleRemoveLocalWorkflow(key, file)}
+                              title="Remove workflow"
+                              aria-label="Remove workflow"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-2 right-2 h-8 w-8"
-                          onClick={() => handleRemoveLocalWorkflow(key, file)}
-                          title="Remove workflow"
-                          aria-label="Remove workflow"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     );
                   })}
@@ -711,6 +738,85 @@ export default function DashboardPage({ params }: PageProps) {
             </div>
           ))}
         </div>
+
+        {showConfigModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-3xl rounded-lg border border-border bg-background shadow-lg">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Configure Workflows</h2>
+                <Button variant="ghost" size="sm" onClick={() => setShowConfigModal(false)}>Close</Button>
+              </div>
+              <div className="p-4 space-y-3">
+                {configError && <p className="text-sm text-red-500">{configError}</p>}
+                {isLoadingWorkflows ? (
+                  <p className="text-sm text-muted-foreground">Loading workflows…</p>
+                ) : availableWorkflows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No workflows found in the repository.</p>
+                ) : (
+                  <div
+                    className={`space-y-2 ${availableWorkflows.length > 10 ? 'pr-3' : ''}`}
+                    style={
+                      availableWorkflows.length > 10
+                        ? {
+                            maxHeight: 56 * 10 + 8 * 9,
+                            overflowY: 'auto',
+                          }
+                        : undefined
+                    }
+                  >
+                    {availableWorkflows.map((wf) => {
+                      const file = wf.path?.split('/').pop() || wf.name;
+                      const isConfigured = configuredFiles.includes(file);
+                      return (
+                        <div key={wf.id} className="flex items-center justify-between border border-border rounded-md p-3">
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm truncate">{wf.name}</div>
+                            <div className="text-xs text-muted-foreground truncate">{wf.path}</div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isConfigured ? (
+                              <div className="flex items-center gap-2">
+                                <Badge variant="success">Configured</Badge>
+                                <Button size="sm" variant="outline" onClick={() => {
+                                  // remove from whichever category it exists in
+                                  if (!localConfig) return;
+                                  const entry = Object.entries(localConfig.categories).find(([_, c]: any) => c.workflows.includes(file));
+                                  if (entry) {
+                                    const [categoryKey] = entry as [string, any];
+                                    handleRemoveLocalWorkflow(categoryKey, file);
+                                  }
+                                }}>Unconfigure</Button>
+                              </div>
+                            ) : (
+                              <>
+                                {[
+                                  { key: 'build', label: 'Build', icon: <Hammer className="h-3 w-3" /> },
+                                  { key: 'testing', label: 'Testing', icon: <TestTube className="h-3 w-3" /> },
+                                  { key: 'trigger', label: 'Trigger', icon: <Target className="h-3 w-3" /> },
+                                  { key: 'utility', label: 'Utility', icon: <Zap className="h-3 w-3" /> },
+                                ]
+                                  .sort((a, b) => a.label.localeCompare(b.label))
+                                  .map(cat => (
+                                    <Button key={cat.key} size="sm" variant="outline" onClick={() => addLocalWorkflowFile(cat.key, file)} className="flex items-center gap-1">
+                                      {cat.icon}
+                                      {cat.label}
+                                    </Button>
+                                  ))}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="p-4 border-t border-border flex justify-end">
+                <Button variant="default" size="sm" onClick={() => setShowConfigModal(false)}>Done</Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

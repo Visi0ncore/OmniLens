@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Plus, Trash2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CompactMetricsOverview from "@/components/CompactMetricsOverview";
 
@@ -117,21 +117,54 @@ function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessag
   );
 }
 
-function NoRepositoriesFound() {
+function NoRepositoriesFound({
+  newRepoUrl,
+  isValidating,
+  addError,
+  onUrlChange,
+  onSubmit,
+}: {
+  newRepoUrl: string;
+  isValidating: boolean;
+  addError: string | null;
+  onUrlChange: (value: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4">
-      <div className="rounded-full bg-muted p-6">
-        <Calendar className="h-12 w-12 text-muted-foreground" />
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-xl font-semibold">
-          No repositories found
-        </h2>
-        <p className="text-muted-foreground max-w-md">
-          Please configure <code className="bg-muted px-2 py-1 rounded text-sm">GITHUB_REPO_1</code>, 
-          <code className="bg-muted px-2 py-1 rounded text-sm mx-1">GITHUB_REPO_2</code>, or 
-          <code className="bg-muted px-2 py-1 rounded text-sm">GITHUB_REPO_3</code> environment variables.
-        </p>
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-full max-w-xl">
+        <div className="border rounded-lg bg-card/60 backdrop-blur-sm p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+            <Package className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-2xl font-semibold tracking-tight">No repositories yet</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Add a GitHub repository to start tracking workflows and metrics.
+          </p>
+
+          <form onSubmit={onSubmit} className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
+            <input
+              type="text"
+              value={newRepoUrl}
+              onChange={(e) => onUrlChange(e.target.value)}
+              placeholder="owner/repo or GitHub URL"
+              className="w-full sm:w-80 px-3 py-2 rounded-md bg-background border border-input text-sm outline-none focus:ring-2 focus:ring-primary"
+            />
+            <div className="flex gap-2 justify-center">
+              <Button type="submit" size="sm" disabled={isValidating} className="gap-2">
+                <Plus className="h-4 w-4" />
+                {isValidating ? 'Validating…' : 'Add Repo'}
+              </Button>
+            </div>
+          </form>
+
+          {addError && (
+            <p className="mt-2 text-sm text-red-500">{addError}</p>
+          )}
+
+          
+
+        </div>
       </div>
     </div>
   );
@@ -316,42 +349,15 @@ export default function HomePage() {
       <div className="min-h-screen bg-[#0D0D0D]">
         <div className="container mx-auto p-6 space-y-8">
           <header className="space-y-2">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h1 className="text-3xl font-bold tracking-tight">👁️ OmniLens</h1>
-              <div className="w-full sm:w-auto">
-                {!showAddForm ? (
-                  <div className="flex justify-end">
-                    <Button variant="default" size="sm" onClick={() => setShowAddForm(true)}>
-                      <Plus className="h-4 w-4" />
-                      Add Repo
-                    </Button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleAddRepo} className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="text"
-                      value={newRepoUrl}
-                      onChange={(e) => setNewRepoUrl(e.target.value)}
-                      placeholder="owner/repo or GitHub URL"
-                      className="w-full sm:w-80 px-3 py-2 rounded-md bg-background border border-input text-sm outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <div className="flex gap-2">
-                      <Button type="submit" size="sm" disabled={isValidating}>
-                        {isValidating ? 'Validating…' : 'Add'}
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" onClick={() => { setShowAddForm(false); setAddError(null); }}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </form>
-                )}
-                {addError && (
-                  <p className="mt-2 text-sm text-red-500">{addError}</p>
-                )}
-              </div>
-            </div>
+            <h1 className="text-3xl font-bold tracking-tight">👁️ OmniLens</h1>
           </header>
-          <NoRepositoriesFound />
+          <NoRepositoriesFound
+            newRepoUrl={newRepoUrl}
+            isValidating={isValidating}
+            addError={addError}
+            onUrlChange={(v) => setNewRepoUrl(v)}
+            onSubmit={handleAddRepo}
+          />
           {/* Confirmation Modal (hidden when no repo) */}
           {repoToDelete && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">

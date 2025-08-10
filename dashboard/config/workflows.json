@@ -3,35 +3,32 @@
     "repo1": {
       "slug": "repo1",
       "categories": {
-        "build": {
-          "name": "Build Workflows",
-          "workflows": [
-            "build-workflow.yml"
-          ]
-        },
-        "trigger": {
-          "name": "Trigger Workflows",
-          "workflows": [
-            "trigger.yml"
-          ]
-        },
-        "testing": {
-          "name": "Testing Workflows",
-          "workflows": [
-            "single-workflow.yml"
-          ]
-        },
-        "utility": {
-          "name": "Utility Workflows",
-          "workflows": []
-        }
+        "build": { "name": "Build Workflows", "workflows": [] },
+        "trigger": { "name": "Trigger Workflows", "workflows": [] },
+        "testing": { "name": "Testing Workflows", "workflows": [] },
+        "utility": { "name": "Utility Workflows", "workflows": [] }
       },
-      "trigger_mappings": {
-        "trigger.yml": [
-          "positive-workflow.yml",
-          "negative-workflow.yml"
-        ]
-      }
+      "trigger_mappings": {}
+    },
+    "repo2": {
+      "slug": "repo2",
+      "categories": {
+        "build": { "name": "Build Workflows", "workflows": [] },
+        "trigger": { "name": "Trigger Workflows", "workflows": [] },
+        "testing": { "name": "Testing Workflows", "workflows": [] },
+        "utility": { "name": "Utility Workflows", "workflows": [] }
+      },
+      "trigger_mappings": {}
+    },
+    "repo3": {
+      "slug": "repo3",
+      "categories": {
+        "build": { "name": "Build Workflows", "workflows": [] },
+        "trigger": { "name": "Trigger Workflows", "workflows": [] },
+        "testing": { "name": "Testing Workflows", "workflows": [] },
+        "utility": { "name": "Utility Workflows", "workflows": [] }
+      },
+      "trigger_mappings": {}
     }
   }
 }
