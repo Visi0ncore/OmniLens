@@ -102,7 +102,7 @@ function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessag
     </Card>
   );
 
-  if (hasError || !hasWorkflows) {
+  if (hasError) {
     return (
       <div className="opacity-75">
         {cardContent}
@@ -399,24 +399,12 @@ export default function HomePage() {
   }
 
   // Process each repository to check for errors and workflow configuration
-  const repositoryData = availableRepos.map(repo => {
-    let hasError = false;
-    let errorMessage = '';
-
-    if (!repo.hasConfig && repo.envKey !== 'LOCAL') {
-      hasError = true;
-      errorMessage = 'Repository not found in configuration';
-    } else if (!repo.hasWorkflows) {
-      hasError = true;
-      errorMessage = 'No workflows configured';
-    }
-
-    return {
-      ...repo,
-      hasError,
-      errorMessage
-    };
-  }).sort((a, b) => {
+  const repositoryData = availableRepos.map(repo => ({
+    ...repo,
+    // Keep neutral style and allow navigation even when not configured
+    hasError: false,
+    errorMessage: ''
+  })).sort((a, b) => {
     // Sort alphabetically by repository name (not org/user)
     const repoNameA = formatRepoDisplayName(a.displayName);
     const repoNameB = formatRepoDisplayName(b.displayName);

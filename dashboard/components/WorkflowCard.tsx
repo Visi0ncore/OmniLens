@@ -40,6 +40,7 @@ interface WorkflowCardProps {
   allWorkflowRuns?: WorkflowRun[]; // All workflow runs to find testing workflows
   reviewedTestingWorkflows?: Set<string>;
   onToggleTestingWorkflowReviewed?: (testingWorkflowName: string) => void;
+  neutral?: boolean; // Render in neutral style for not-configured workflows
 }
 
 export default function WorkflowCard({
@@ -53,6 +54,7 @@ export default function WorkflowCard({
   reviewedTestingWorkflows = new Set(),
   onToggleTestingWorkflowReviewed
 }: WorkflowCardProps) {
+  const neutral = (arguments[0] as any).neutral ?? false;
   const status = run.conclusion ?? run.status;
   const isSuccess = status === "success";
   const isDidntRun = status === "didnt_run" || run.isMissing;
@@ -166,22 +168,23 @@ export default function WorkflowCard({
               </Popover>
             )}
             <Badge
-              variant={
+              variant={neutral ? "secondary" : (
                 isSuccess ? "success" :
                   isDidntRun ? "warning" :
                     status === "in_progress" ? "destructive" :
                       "destructive"
-              }
-              className={`shrink-0 ${status === "in_progress"
+              )}
+              className={`shrink-0 ${neutral ? '' : (status === "in_progress"
                   ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                  : ''
+                  : '')
                 }`}
             >
-              {/* eslint-disable-next-line react/no-unescaped-entities */}
-              {isSuccess ? "Pass" :
-                isDidntRun ? "Didn't Run" :
-                  status === "in_progress" ? "Running" :
-                    "Fail"}
+              {neutral ? 'Not Configured' : (
+                isSuccess ? "Pass" :
+                  isDidntRun ? "Didn't Run" :
+                    status === "in_progress" ? "Running" :
+                      "Fail"
+              )}
             </Badge>
           </div>
         </div>

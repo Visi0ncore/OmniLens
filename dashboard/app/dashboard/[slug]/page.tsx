@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar, Hammer, RefreshCw, ArrowLeft, AlertCircle } from "lucide-react";
+import { Zap, Target, TestTube, Calendar, Hammer, RefreshCw, ArrowLeft, AlertCircle, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { getRepoConfig, removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getTestingWorkflowsForTrigger } from "@/lib/utils";
 
@@ -137,6 +137,7 @@ interface PageProps {
 
 export default function DashboardPage({ params }: PageProps) {
   const { slug: repoSlug } = params;
+  const isLocalRepo = repoSlug.startsWith('local-');
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [reviewedWorkflows, setReviewedWorkflows] = useState<Record<number, boolean>>({});
   const [reviewedTestingWorkflows, setReviewedTestingWorkflows] = useState<Record<string, Set<string>>>({});
@@ -487,6 +488,10 @@ export default function DashboardPage({ params }: PageProps) {
 
   // Get repo config for display
   const repoConfig = getRepoConfig(repoSlug);
+  const [localConfig, setLocalConfig] = useState<any | null>(null);
+  const [newWorkflowFile, setNewWorkflowFile] = useState("");
+  const [newWorkflowCategory, setNewWorkflowCategory] = useState<string>('testing');
+  const [configError, setConfigError] = useState<string | null>(null);
   
   // Get repository name from API
   const [repoDisplayName, setRepoDisplayName] = React.useState<string>(repoSlug);
@@ -500,7 +505,19 @@ export default function DashboardPage({ params }: PageProps) {
           const repo = data.repositories.find((r: any) => r.slug === repoSlug);
           if (repo) {
             setRepoDisplayName(repo.displayName);
+            return;
           }
+        }
+        // Fallback for local repos: read from localStorage
+        if (isLocalRepo) {
+          try {
+            const stored = localStorage.getItem('userAddedRepos');
+            if (stored) {
+              const parsed = JSON.parse(stored) as Array<any>;
+              const found = parsed.find(r => r.slug === repoSlug);
+              if (found?.displayName) setRepoDisplayName(found.displayName);
+            }
+          } catch {}
         }
       } catch (error) {
         console.error('Failed to fetch repository name:', error);
@@ -510,18 +527,190 @@ export default function DashboardPage({ params }: PageProps) {
     fetchRepoName();
   }, [repoSlug]);
 
-  if (!repoConfig) {
+  // Local configuration helpers
+  useEffect(() => {
+    if (!isLocalRepo) return;
+    try {
+      const key = `localRepoConfig-${repoSlug}`;
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        setLocalConfig(JSON.parse(stored));
+      } else {
+        // Initialize with empty categories
+        const initial = {
+          slug: repoSlug,
+          categories: {
+            build: { name: 'Build Workflows', workflows: [] as string[] },
+            trigger: { name: 'Trigger Workflows', workflows: [] as string[] },
+            testing: { name: 'Testing Workflows', workflows: [] as string[] },
+            utility: { name: 'Utility Workflows', workflows: [] as string[] },
+          },
+          trigger_mappings: {} as Record<string, string[]>,
+        };
+        setLocalConfig(initial);
+        localStorage.setItem(key, JSON.stringify(initial));
+      }
+    } catch (e) {
+      console.error('Failed to load local repo config', e);
+    }
+  }, [isLocalRepo, repoSlug]);
+
+  const saveLocalConfig = useCallback((next: any) => {
+    try {
+      localStorage.setItem(`localRepoConfig-${repoSlug}`, JSON.stringify(next));
+    } catch {}
+  }, [repoSlug]);
+
+  const handleAddLocalWorkflow = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    setConfigError(null);
+    const file = newWorkflowFile.trim();
+    if (!file) {
+      setConfigError('Enter a workflow file name, e.g. my-workflow.yml');
+      return;
+    }
+    if (!/\.ya?ml$/i.test(file)) {
+      setConfigError('Workflow should be a .yml or .yaml file');
+      return;
+    }
+    if (!localConfig) return;
+    const category = newWorkflowCategory as keyof typeof localConfig.categories;
+    const existing = new Set(localConfig.categories[category].workflows);
+    if (existing.has(file)) {
+      setConfigError('Workflow already added');
+      return;
+    }
+    const next = {
+      ...localConfig,
+      categories: {
+        ...localConfig.categories,
+        [category]: {
+          ...localConfig.categories[category],
+          workflows: [...localConfig.categories[category].workflows, file],
+        }
+      }
+    };
+    setLocalConfig(next);
+    saveLocalConfig(next);
+    setNewWorkflowFile("");
+  }, [newWorkflowFile, newWorkflowCategory, localConfig, saveLocalConfig]);
+
+  const handleRemoveLocalWorkflow = useCallback((categoryKey: string, file: string) => {
+    if (!localConfig) return;
+    const next = {
+      ...localConfig,
+      categories: {
+        ...localConfig.categories,
+        [categoryKey]: {
+          ...localConfig.categories[categoryKey],
+          workflows: localConfig.categories[categoryKey].workflows.filter((w: string) => w !== file),
+        }
+      }
+    };
+    setLocalConfig(next);
+    saveLocalConfig(next);
+  }, [localConfig, saveLocalConfig]);
+
+  // Local repo configuration UI
+  if (!repoConfig && isLocalRepo) {
+    const configuredFiles: string[] = localConfig ? Object.values(localConfig.categories).flatMap((c: any) => c.workflows) : [];
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Link href="/" className="text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <h1 className="text-2xl font-bold">Repository Not Found</h1>
+      <div className="container mx-auto p-6 space-y-8">
+        <header className="space-y-2">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{formatRepoDisplayName(repoDisplayName)}</h1>
+              <p className="text-muted-foreground">Configure workflows to track</p>
+            </div>
+          </div>
+        </header>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Add Workflow</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleAddLocalWorkflow} className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <select
+                value={newWorkflowCategory}
+                onChange={(e) => setNewWorkflowCategory(e.target.value)}
+                className="px-3 py-2 rounded-md bg-background border border-input text-sm"
+              >
+                <option value="testing">Testing</option>
+                <option value="trigger">Trigger</option>
+                <option value="build">Build</option>
+                <option value="utility">Utility</option>
+              </select>
+              <input
+                type="text"
+                value={newWorkflowFile}
+                onChange={(e) => setNewWorkflowFile(e.target.value)}
+                placeholder="workflow-file.yml"
+                className="w-full sm:flex-1 px-3 py-2 rounded-md bg-background border border-input text-sm outline-none focus:ring-2 focus:ring-primary"
+              />
+              <Button type="submit" size="sm">
+                <Plus className="h-4 w-4" />
+                Add
+              </Button>
+            </form>
+            {configError && <p className="mt-2 text-sm text-red-500">{configError}</p>}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-12">
+          {localConfig && Object.entries(localConfig.categories).map(([key, categoryConfig]: any) => (
+            <div key={key} className="space-y-4">
+              <div className="flex items-center gap-2">
+                {key === 'utility' ? <Zap className="h-6 w-6" /> : key === 'trigger' ? <Target className="h-6 w-6" /> : key === 'testing' ? <TestTube className="h-6 w-6" /> : key === 'build' ? <Hammer className="h-6 w-6" /> : null}
+                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">{categoryConfig.name}</h2>
+              </div>
+              {categoryConfig.workflows.length > 0 ? (
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {categoryConfig.workflows.map((file: string) => {
+                    const mockRun: any = {
+                      id: `local-${key}-${file}`,
+                      name: file.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+                      workflow_id: `local-${file}`,
+                      workflow_name: file,
+                      conclusion: null,
+                      status: 'didnt_run',
+                      html_url: '#',
+                      run_started_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                      isMissing: true,
+                    };
+                    return (
+                      <div key={file} className="relative">
+                        <WorkflowCard
+                          run={mockRun}
+                          isReviewed={false}
+                          onToggleReviewed={() => {}}
+                          repoSlug={repoSlug}
+                          neutral
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={() => handleRemoveLocalWorkflow(key, file)}
+                          title="Remove workflow"
+                          aria-label="Remove workflow"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">No workflows configured</div>
+              )}
+            </div>
+          ))}
         </div>
-        <p className="text-muted-foreground">
-          Repository &quot;{repoSlug}&quot; is not configured. Please check your configuration.
-        </p>
       </div>
     );
   }
