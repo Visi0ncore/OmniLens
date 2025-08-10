@@ -4,8 +4,8 @@ import { ReactNode } from "react";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "GitHub Workflows Dashboard",
-  description: "View daily GitHub workflow results",
+  title: "OnniLens",
+  description: "Real-time GitHub workflow monitoring and analytics platform",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

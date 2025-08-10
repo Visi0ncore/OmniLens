@@ -1,0 +1,20 @@
+{
+  "name": "playwright",
+  "type": "module",
+  "module": "index.ts",
+  "devDependencies": {
+    "@playwright/test": "^1.54.2",
+    "typescript": "^5.9.2",
+    "@types/node": "^24.2.1",
+    "@types/bun": "latest"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "codegen": "playwright codegen",
+    "show-report": "playwright show-report",
+    "test:live": "E2E_LIVE=1 playwright test",
+    "install:browsers": "playwright install --with-deps"
+  }
+}

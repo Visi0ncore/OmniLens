@@ -1,5 +1,5 @@
 import { format, startOfDay, endOfDay } from "date-fns";
-import { filterWorkflowsByCategories, calculateMissingWorkflows, getAllConfiguredWorkflows } from "./utils";
+import { filterWorkflowsByCategories, calculateMissingWorkflows, getAllConfiguredWorkflows, getAvailableRepoSlugs } from "./utils";
 
 export interface WorkflowRun {
   id: number;
@@ -84,6 +84,18 @@ export function getAvailableRepositories(): Array<{
     }
   }
   
+  // Fallback: if no env-based repos are configured, derive from workflows.json
+  if (repos.length === 0) {
+    const slugs = getAvailableRepoSlugs();
+    return slugs.map((slug) => {
+      // Attempt to infer the env key from the slug format `repo{n}`; may not exist, that's fine
+      const match = slug.match(/^repo(\d+)$/);
+      const envKey = match ? `GITHUB_REPO_${match[1]}` : "";
+      const repoPath = (envKey && process.env[envKey]) || slug;
+      return { slug, repoPath, envKey };
+    });
+  }
+
   return repos;
 }
 

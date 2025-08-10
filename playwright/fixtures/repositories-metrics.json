@@ -1,0 +1,65 @@
+{
+  "repositories": [
+    {
+      "slug": "repo1",
+      "repoPath": "mock/test_repo",
+      "displayName": "mock/test_repo",
+      "hasConfig": true,
+      "hasWorkflows": true,
+      "metrics": {
+        "totalWorkflows": 8,
+        "passedRuns": 7,
+        "failedRuns": 1,
+        "inProgressRuns": 1,
+        "successRate": 88,
+        "hasActivity": true
+      }
+    },
+    {
+      "slug": "repo2",
+      "repoPath": "mock/test_repo2",
+      "displayName": "mock/test_repo2",
+      "hasConfig": true,
+      "hasWorkflows": true,
+      "metrics": {
+        "totalWorkflows": 1,
+        "passedRuns": 1,
+        "failedRuns": 9,
+        "inProgressRuns": 0,
+        "successRate": 10,
+        "hasActivity": true
+      }
+    },
+    {
+      "slug": "repo3",
+      "repoPath": "mock/test_repo3",
+      "displayName": "mock/test_repo3",
+      "hasConfig": true,
+      "hasWorkflows": false,
+      "metrics": {
+        "totalWorkflows": 0,
+        "passedRuns": 0,
+        "failedRuns": 0,
+        "inProgressRuns": 0,
+        "successRate": 0,
+        "hasActivity": false
+      }
+    },
+    {
+      "slug": "repo4",
+      "repoPath": "mock/test_repo4",
+      "displayName": "mock/test_repo4",
+      "hasConfig": false,
+      "hasWorkflows": false,
+      "metrics": {
+        "totalWorkflows": 0,
+        "passedRuns": 0,
+        "failedRuns": 0,
+        "inProgressRuns": 0,
+        "successRate": 0,
+        "hasActivity": false
+      }
+    }
+  ]
+}
+
