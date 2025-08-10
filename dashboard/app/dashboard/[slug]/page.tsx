@@ -784,7 +784,14 @@ export default function DashboardPage({ params }: PageProps) {
                         : undefined
                     }
                   >
-                    {availableWorkflows.map((wf) => {
+                    {availableWorkflows
+                      .slice()
+                      .sort((a, b) => {
+                        const fa = (a.path?.split('/')?.pop() || a.name || '').toLowerCase();
+                        const fb = (b.path?.split('/')?.pop() || b.name || '').toLowerCase();
+                        return fa.localeCompare(fb);
+                      })
+                      .map((wf) => {
                       const file = wf.path?.split('/').pop() || wf.name;
                       const isConfigured = configuredFiles.includes(file);
                       return (
