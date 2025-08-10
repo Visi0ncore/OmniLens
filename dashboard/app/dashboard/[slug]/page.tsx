@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar, Hammer, RefreshCw, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle } from "lucide-react";
+import { Zap, Target, TestTube, Calendar, Hammer, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { getRepoConfig, removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getTestingWorkflowsForTrigger } from "@/lib/utils";
 
@@ -884,15 +884,7 @@ export default function DashboardPage({ params }: PageProps) {
                 }}
                 placeholder="Select Date"
               />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { refetchToday(); refetchYesterday(); }}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className={`h-4 w-4 ${(todayLoading || yesterdayLoading) ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
+              {/* Removed manual refresh; auto-refresh is handled via polling and focus events */}
               {localConfig && Object.values(localConfig.categories).some((c: any) => c.workflows.length > 0) && (
                 <Button variant="default" size="sm" onClick={openConfigureModal} className="gap-2">
                   <Settings className="h-4 w-4" />
@@ -961,6 +953,12 @@ export default function DashboardPage({ params }: PageProps) {
                       });
                       const missingWorkflows = configuredFiles.filter(f => !ran.has(f));
 
+                      const reviewedPct = (() => {
+                        const shownIds = runs.map((r: any) => r.id);
+                        const reviewedCount = shownIds.filter((id: number) => reviewedWorkflows[id]).length;
+                        return shownIds.length > 0 ? Math.round((reviewedCount / shownIds.length) * 100) : 0;
+                      })();
+
                       return {
                         completedRuns,
                         inProgressRuns,
@@ -970,9 +968,24 @@ export default function DashboardPage({ params }: PageProps) {
                         didntRunCount: missingWorkflows.length,
                         totalWorkflows: configuredFiles.length,
                         missingWorkflows,
+                        reviewedPercentage: reviewedPct,
                       } as any;
                     }
                     return overviewData;
+                  })()}
+                  reviewedPercentage={(() => {
+                    if (!repoConfig && isLocalRepo && localConfig) {
+                      const configuredFiles: string[] = Object.values(localConfig.categories).flatMap((c: any) => c.workflows);
+                      const configuredSet = new Set<string>(configuredFiles);
+                      const runs = (workflowData || []).filter((r: any) => {
+                        const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
+                        return file && Array.from(configuredSet).some((cfg) => (file as string).includes(cfg));
+                      });
+                      const shownIds = runs.map((r: any) => r.id);
+                      const reviewedCount = shownIds.filter((id: number) => reviewedWorkflows[id]).length;
+                      return shownIds.length > 0 ? Math.round((reviewedCount / shownIds.length) * 100) : 0;
+                    }
+                    return 0;
                   })()}
                   onMetricHover={handleMetricHover}
                   onMetricLeave={handleMetricLeave}
@@ -1212,20 +1225,7 @@ export default function DashboardPage({ params }: PageProps) {
               }}
               placeholder="Select Date"
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                console.log('🔄 Manual refresh triggered');
-                refetchToday();
-                refetchYesterday();
-              }}
-              disabled={todayLoading || yesterdayLoading}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${(todayLoading || yesterdayLoading) ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+            {/* Removed manual refresh; auto-refresh is handled via polling and focus events */}
             {(() => {
               const hasConfiguredLocal = !!localConfig && Object.values(localConfig.categories).some((c: any) => c.workflows.length > 0);
               const hasConfiguredEnv = !!repoConfig && Object.values(repoConfig.categories).some((c: any) => (c as any).workflows?.length > 0);

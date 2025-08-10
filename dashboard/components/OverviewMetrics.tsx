@@ -16,6 +16,7 @@ type MetricType = 'didnt_run';
 
 interface OverviewMetricsProps {
   data: OverviewData;
+  reviewedPercentage?: number; // percent of displayed workflows reviewed
   onMetricHover?: (metricType: MetricType, workflowIds: string[]) => void;
   onMetricLeave?: () => void;
 }
@@ -34,7 +35,7 @@ function formatDuration(seconds: number): string {
   }
 }
 
-export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: OverviewMetricsProps) {
+export default function OverviewMetrics({ data, reviewedPercentage = 0, onMetricHover, onMetricLeave }: OverviewMetricsProps) {
   const passedPercentage = data.completedRuns > 0 ? Math.round((data.passedRuns / data.completedRuns) * 100) : 0;
 
   // Create missing workflow IDs for hover functionality
@@ -128,24 +129,8 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
               </div>
             </div>
 
-            {/* Total Workflows */}
+            {/* Didn't Run (moved to this position) */}
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <Play className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                <span className="text-sm truncate">Total Workflows</span>
-              </div>
-              <div className={`font-semibold flex-shrink-0 ${data.totalWorkflows === 0 ? 'text-muted-foreground' : 'text-white'}`}>
-                {data.totalWorkflows}
-              </div>
-            </div>
-
-            {/* Didn't Run */}
-            <div
-              className="flex items-center gap-3 cursor-pointer"
-              title={data.missingWorkflows.length > 0 ? `Missing workflows: ${data.missingWorkflows.join(', ')}` : 'All configured workflows ran'}
-              onMouseEnter={() => onMetricHover?.('didnt_run', missingWorkflowIds)}
-              onMouseLeave={() => onMetricLeave?.()}
-            >
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
                 {/* eslint-disable-next-line react/no-unescaped-entities */}
@@ -153,6 +138,17 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
               </div>
               <div className={`font-semibold flex-shrink-0 ${data.didntRunCount === 0 ? 'text-muted-foreground' : 'text-white'}`}>
                 {data.didntRunCount}
+              </div>
+            </div>
+
+            {/* Reviewed % (replaces the earlier Didn't Run tile) */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                <span className="text-sm truncate">Reviewed</span>
+              </div>
+              <div className={`font-semibold flex-shrink-0 ${reviewedPercentage === 0 ? 'text-muted-foreground' : 'text-white'}`}>
+                {reviewedPercentage}%
               </div>
             </div>
 
