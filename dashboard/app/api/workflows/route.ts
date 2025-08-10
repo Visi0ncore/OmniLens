@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         if (page > 10) break;
       }
       // Normalize a subset of fields used by UI
-      workflowRuns = allRuns.map((r: any) => ({
+      const normalized = allRuns.map((r: any) => ({
         id: r.id,
         name: r.name,
         workflow_id: r.workflow_id,
@@ -76,6 +76,37 @@ export async function GET(request: NextRequest) {
         run_started_at: r.run_started_at,
         updated_at: r.updated_at,
       }));
+
+      // Group by workflow file (fallback to name) and keep latest run, counting duplicates
+      const latestByFile = new Map<string, any>();
+      const counts = new Map<string, number>();
+      const allByFile = new Map<string, any[]>();
+      normalized
+        .sort((a, b) => new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime())
+        .forEach((run) => {
+          const keySource = run.path || run.name || '';
+          const key = (keySource.split('/').pop() || keySource).toLowerCase();
+          if (!latestByFile.has(key)) {
+            latestByFile.set(key, run);
+            counts.set(key, 1);
+            allByFile.set(key, [{ id: run.id, conclusion: run.conclusion, status: run.status, html_url: run.html_url, run_started_at: run.run_started_at }]);
+          } else {
+            counts.set(key, (counts.get(key) || 0) + 1);
+            const arr = allByFile.get(key) || [];
+            arr.push({ id: run.id, conclusion: run.conclusion, status: run.status, html_url: run.html_url, run_started_at: run.run_started_at });
+            allByFile.set(key, arr);
+          }
+        });
+
+      workflowRuns = Array.from(latestByFile.values()).map((run) => {
+        const keySource = run.path || run.name || '';
+        const key = (keySource.split('/').pop() || keySource).toLowerCase();
+        return {
+          ...run,
+          run_count: counts.get(key) || 1,
+          all_runs: allByFile.get(key) || [],
+        };
+      });
       // Compute overview without category filtering
       const completedRuns = workflowRuns.filter(r => r.status === 'completed').length;
       const inProgressRuns = workflowRuns.filter(r => r.status === 'in_progress' || r.status === 'queued').length;
@@ -101,11 +132,11 @@ export async function GET(request: NextRequest) {
       };
     } else {
       // Existing slug-based path (env repos)
-      if (!isValidRepoSlug(repo)) {
+      if (!repo || !isValidRepoSlug(repo)) {
         return NextResponse.json({ error: 'Invalid repo slug or repo not configured' }, { status: 400 });
       }
-      workflowRuns = await getWorkflowRunsForDate(targetDate, repo!);
-      overviewData = calculateOverviewData(workflowRuns, repo!);
+      workflowRuns = await getWorkflowRunsForDate(targetDate, repo);
+      overviewData = calculateOverviewData(workflowRuns, repo);
     }
 
     return NextResponse.json({

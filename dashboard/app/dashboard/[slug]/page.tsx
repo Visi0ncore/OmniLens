@@ -57,47 +57,22 @@ interface HoverState {
   workflowIds: Set<string | number>; // Support both string IDs (missing workflows) and number IDs (actual workflows)
 }
 
-function categorizeWorkflows(runs: any[], missingWorkflows: string[] = [], repoSlug: string) {
+function categorizeWorkflows(runs: any[], _missingWorkflowsIgnored: string[] = [], repoSlug: string) {
   const repoConfig = getRepoConfig(repoSlug);
   if (!repoConfig) return {};
 
   const categories: Record<string, any[]> = {};
 
   Object.entries(repoConfig.categories).forEach(([key, categoryConfig]) => {
-    // Get actual workflow runs for this category
+    // Only real runs that match configured files for this category
     const actualRuns = runs.filter(run => {
-      // Try different possible fields that might contain the workflow file name
-      const workflowFile = run.path || run.workflow_path || run.head_commit?.message || run.workflow_name;
-      return categoryConfig.workflows.some(configWorkflow =>
-        workflowFile && workflowFile.includes(configWorkflow)
-      );
+      const workflowFile = run.path || run.workflow_path || run.workflow_name || '';
+      return categoryConfig.workflows.some((cfg: string) => workflowFile.includes(cfg));
     });
 
-    // Create mock workflow runs for missing workflows in this category
-    const missingInCategory = missingWorkflows.filter(workflow =>
-      categoryConfig.workflows.includes(workflow)
-    );
-
-    const mockMissingRuns = missingInCategory.map(workflowFile => ({
-      id: `missing-${workflowFile}`, // Unique ID for missing workflows
-      name: workflowFile.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      workflow_id: `missing-${workflowFile}`,
-      workflow_name: workflowFile.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      conclusion: 'didnt_run', // Special conclusion for missing workflows
-      status: 'didnt_run',
-      html_url: '#',
-      run_started_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      isMissing: true // Flag to identify mock workflows
-    }));
-
-    // Combine actual and missing runs
-    const allRuns = [...actualRuns, ...mockMissingRuns];
-
-    categories[key] = allRuns.sort((a, b) => {
-      // Sort alphabetically by cleaned workflow names (without emojis and trigger prefix)
-      const cleanNameA = cleanWorkflowName(a.name);
-      const cleanNameB = cleanWorkflowName(b.name);
+    categories[key] = actualRuns.sort((a, b) => {
+      const cleanNameA = cleanWorkflowName(a.name || '');
+      const cleanNameB = cleanWorkflowName(b.name || '');
       return cleanNameA.localeCompare(cleanNameB);
     });
   });
@@ -351,7 +326,7 @@ export default function DashboardPage({ params }: PageProps) {
   }, [workflowData, yesterdayWorkflowData, selectedDate]);
 
   const missingWorkflows = workflowData ? calculateMissingWorkflows(workflowData, repoSlug) : [];
-  const categories = workflowData ? categorizeWorkflows(workflowData, missingWorkflows, repoSlug) : null;
+  const categories = workflowData ? categorizeWorkflows(workflowData, [], repoSlug) : null;
 
   const toggleCategory = (categoryKey: string) => {
     setCollapsedCategories(prev => {
@@ -816,16 +791,40 @@ export default function DashboardPage({ params }: PageProps) {
                 <p className="text-muted-foreground">Configure workflows to track</p>
               </div>
             </div>
-            {localConfig && Object.values(localConfig.categories).some((c: any) => c.workflows.length > 0) && (
-              <div className="w-full sm:w-auto">
-                <div className="flex justify-end">
-                  <Button variant="default" size="sm" onClick={openConfigureModal}>
-                    <Settings className="h-4 w-4" />
-                    Configure Workflows
-                  </Button>
-                </div>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              <Button
+                variant={isSelectedDateToday ? "default" : "outline"}
+                size="sm"
+                onClick={handleSetToday}
+                className="flex items-center gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                Today
+              </Button>
+              <DatePicker
+                date={selectedDate}
+                onDateChange={(date) => {
+                  if (date) {
+                    setSelectedDate(date);
+                    setHoverState({ metricType: null, workflowIds: new Set() });
+                  }
+                }}
+                placeholder="Select Date"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { refetchToday(); refetchYesterday(); }}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${(todayLoading || yesterdayLoading) ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Button variant="default" size="sm" onClick={openConfigureModal}>
+                <Settings className="h-4 w-4" />
+                Configure Workflows
+              </Button>
+            </div>
           </div>
         </header>
 
@@ -887,42 +886,26 @@ export default function DashboardPage({ params }: PageProps) {
                       <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">{categoryConfig.name}</h2>
                     </div>
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                      {categoryConfig.workflows.map((file: string) => {
-                        // Try to find the latest actual run for this configured file from today's data
-                        const matchingRuns = (workflowData || []).filter((r: any) => {
-                          const fileName = file.toLowerCase();
-                          const runPath = (r.path || r.workflow_path || r.workflow_name || r.name || '').toLowerCase();
-                          const alt = file.replace('.yml','').replace(/-/g,' ').toLowerCase();
-                          return runPath.includes(fileName) || runPath.includes(alt);
+                      {(() => {
+                        // Build runs for this category from today's data matching configured files
+                        const configuredFiles = new Set<string>(categoryConfig.workflows || []);
+                        const runsInCategory = (workflowData || []).filter((r: any) => {
+                          const wf = (r.path || r.workflow_path || r.workflow_name || '').toLowerCase();
+                          return Array.from(configuredFiles).some(f => wf.includes(f.toLowerCase()));
                         }).sort((a: any, b: any) => new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime());
-
-                        const run = matchingRuns[0] || {
-                          id: `missing-${key}-${file}`,
-                          name: file.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-                          workflow_id: `missing-${file}`,
-                          workflow_name: file,
-                          conclusion: null,
-                          status: 'didnt_run',
-                          html_url: '#',
-                          run_started_at: new Date().toISOString(),
-                          updated_at: new Date().toISOString(),
-                          isMissing: true,
-                        };
-
-                        return (
-                          <div key={file} className="relative">
+                        return runsInCategory.map((run: any) => (
+                          <div key={run.id} className="relative">
                             <WorkflowCard
                               run={run}
                               isReviewed={false}
                               onToggleReviewed={() => {}}
                               repoSlug={repoSlug}
-                              neutral={false}
                               rightAction={(
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8"
-                                  onClick={() => handleRemoveLocalWorkflow(key, file)}
+                                  onClick={() => handleRemoveLocalWorkflow(key, run.workflow_name || run.path?.split('/').pop() || '')}
                                   title="Remove workflow"
                                   aria-label="Remove workflow"
                                 >
@@ -931,8 +914,8 @@ export default function DashboardPage({ params }: PageProps) {
                               )}
                             />
                           </div>
-                        );
-                      })}
+                        ));
+                      })()}
                     </div>
                   </div>
                 )

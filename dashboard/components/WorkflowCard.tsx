@@ -40,7 +40,6 @@ interface WorkflowCardProps {
   allWorkflowRuns?: WorkflowRun[]; // All workflow runs to find testing workflows
   reviewedTestingWorkflows?: Set<string>;
   onToggleTestingWorkflowReviewed?: (testingWorkflowName: string) => void;
-  neutral?: boolean; // Render in neutral style for not-configured workflows
   rightAction?: React.ReactNode; // Optional right-side action button (e.g., delete)
 }
 
@@ -56,10 +55,9 @@ export default function WorkflowCard({
   onToggleTestingWorkflowReviewed,
   rightAction
 }: WorkflowCardProps) {
-  const neutral = (arguments[0] as any).neutral ?? false;
   const status = run.conclusion ?? run.status;
   const isSuccess = status === "success";
-  const isDidntRun = status === "didnt_run" || run.isMissing;
+  const isInProgress = status === "in_progress" || status === 'queued';
 
   // Check if this is a trigger workflow - try both name and workflow_name
   const isTrigger = isTriggerWorkflow(run.name, repoSlug) || isTriggerWorkflow(run.workflow_name || '', repoSlug);
@@ -110,12 +108,22 @@ export default function WorkflowCard({
   const shouldShowTestingWorkflows = isTrigger && testingWorkflows.length > 0 && !isReviewed;
   const cardHeightClass = shouldShowTestingWorkflows ? 'min-h-[200px]' : 'h-full';
 
+  // Prefer workflow file name when available; fall back to API-provided name
+  const getDisplayName = (): string => {
+    const source = (run.workflow_name || run.path || run.name || '').toString();
+    const last = source.split('/').pop() || source;
+    const noExt = last.replace(/\.ya?ml$/i, '');
+    const cleaned = noExt.replace(/[-_]/g, ' ').trim();
+    if (!cleaned) return cleanWorkflowName(run.name || '');
+    return cleaned.replace(/\b\w/g, (l) => l.toUpperCase());
+  };
+
   return (
     <Card className={`${cardHeightClass} transition-all duration-200 ${getBorderClass()}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm leading-tight truncate pr-2">
-            {cleanWorkflowName(run.name)}
+            {getDisplayName()}
           </h3>
           <div className="flex items-center gap-2">
             {/* Show run count badge if workflow was run multiple times */}
@@ -170,23 +178,10 @@ export default function WorkflowCard({
               </Popover>
             )}
             <Badge
-              variant={neutral ? "secondary" : (
-                isSuccess ? "success" :
-                  isDidntRun ? "warning" :
-                    status === "in_progress" ? "destructive" :
-                      "destructive"
-              )}
-              className={`shrink-0 ${neutral ? '' : (status === "in_progress"
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                  : '')
-                }`}
+              variant={isSuccess ? "success" : isInProgress ? "destructive" : "destructive"}
+              className={`shrink-0 ${isInProgress ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
             >
-              {neutral ? 'Not Configured' : (
-                isSuccess ? "Pass" :
-                  isDidntRun ? "Didn't Run" :
-                    status === "in_progress" ? "Running" :
-                      "Fail"
-              )}
+              {isSuccess ? "Pass" : isInProgress ? "Running" : "Fail"}
             </Badge>
             {rightAction}
           </div>
@@ -229,12 +224,12 @@ export default function WorkflowCard({
         )}
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>{isDidntRun ? "Not executed" : duration(run.run_started_at, run.updated_at)}</span>
-          </div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>{isInProgress ? "Running" : (run.run_started_at && run.updated_at ? duration(run.run_started_at, run.updated_at) : "")}</span>
+            </div>
           <div className="flex items-center gap-2">
-            {!isDidntRun ? (
+            {!isInProgress ? (
               <Button variant="outline" size="sm" asChild>
                 <Link href={run.html_url} target="_blank">
                   <Eye className="h-3 w-3 mr-1" />
