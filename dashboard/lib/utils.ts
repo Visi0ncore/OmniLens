@@ -102,22 +102,23 @@ export function calculateMissingWorkflows(runs: any[], repoSlug: string): string
 // Get testing workflows for a given trigger workflow in a specific repo
 export function getTestingWorkflowsForTrigger(triggerWorkflowName: string, repoSlug: string): string[] {
   if (!triggerWorkflowName) return [];
-  
+  // First try dynamic trigger map
+  try {
+    const res = (globalThis as any).__triggerMap as { nameToTesting?: Record<string, string[]> } | undefined;
+    const key = triggerWorkflowName.toLowerCase();
+    const dynamic = res?.nameToTesting?.[key];
+    if (dynamic && dynamic.length > 0) return dynamic;
+  } catch {}
+
+  // Fallback to static config mapping
   const repoConfig = getRepoConfig(repoSlug);
   if (!repoConfig) return [];
-  
-  // Get trigger workflows from the config
   const triggerWorkflows = repoConfig.categories.trigger?.workflows || [];
   const triggerMappings = repoConfig.trigger_mappings || {};
-  
-  // Find which trigger workflow this matches
   const matchingTriggerFile = triggerWorkflows.find(triggerFile => {
-    // Convert trigger file name to workflow name for comparison
     const triggerWorkflowNameFromFile = triggerFile.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     return triggerWorkflowName.toLowerCase().includes(triggerWorkflowNameFromFile.toLowerCase());
   });
-  
-  // Return the testing workflows for this trigger
   return matchingTriggerFile ? (triggerMappings[matchingTriggerFile] || []) : [];
 }
 
@@ -138,16 +139,18 @@ export function getTriggerWorkflowForTesting(testingWorkflowName: string, repoSl
 // Check if a workflow is a trigger workflow in a specific repo
 export function isTriggerWorkflow(workflowName: string, repoSlug: string): boolean {
   if (!workflowName) return false;
-  
+  // Dynamic map first
+  try {
+    const res = (globalThis as any).__triggerMap as { nameToTesting?: Record<string, string[]> } | undefined;
+    const key = workflowName.toLowerCase();
+    if (res?.nameToTesting && res.nameToTesting[key] && res.nameToTesting[key].length > 0) return true;
+  } catch {}
+
+  // Fallback to static config
   const repoConfig = getRepoConfig(repoSlug);
   if (!repoConfig) return false;
-  
-  // Get trigger workflows from the config
   const triggerWorkflows = repoConfig.categories.trigger?.workflows || [];
-  
-  // Check if this workflow name matches any trigger workflow file
   return triggerWorkflows.some(triggerFile => {
-    // Convert trigger file name to workflow name for comparison
     const triggerWorkflowName = triggerFile.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     return workflowName.toLowerCase().includes(triggerWorkflowName.toLowerCase());
   });

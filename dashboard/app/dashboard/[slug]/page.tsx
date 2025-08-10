@@ -340,6 +340,37 @@ export default function DashboardPage({ params }: PageProps) {
     return () => window.clearInterval(id);
   }, [isSelectedDateToday, refetchToday, repoSlug]);
 
+  // Preload trigger map on load (env repos by slug; local repos by repoPath from storage)
+  useEffect(() => {
+    (async () => {
+      try {
+        let url: string | null = null;
+        if (isLocalRepo) {
+          let rp: string | null = addedRepoPath;
+          if (!rp) {
+            try {
+              const stored = localStorage.getItem('userAddedRepos');
+              if (stored) {
+                const parsed = JSON.parse(stored) as Array<any>;
+                const found = parsed.find(r => r.slug === repoSlug);
+                rp = found?.repoPath || null;
+              }
+            } catch {}
+          }
+          if (rp) url = `/api/repositories/trigger-map?repoPath=${encodeURIComponent(rp)}`;
+        } else {
+          url = `/api/repositories/trigger-map?repo=${encodeURIComponent(repoSlug)}`;
+        }
+        if (!url) return;
+        const res = await fetch(url, { cache: 'no-store' });
+        if (res.ok) {
+          const trig = await res.json();
+          (globalThis as any).__triggerMap = trig;
+        }
+      } catch {}
+    })();
+  }, [repoSlug, isLocalRepo, addedRepoPath]);
+
   // (deferred skeleton render placed just before final return to avoid hook order issues)
 
   const toggleCategory = (categoryKey: string) => {
@@ -671,8 +702,15 @@ export default function DashboardPage({ params }: PageProps) {
         setAvailableWorkflows(json.workflows || []);
       }
 
-      // Show the list as soon as we have workflows
+      // Fetch trigger map (dynamic detection) in parallel with showing workflows
       setIsLoadingWorkflows(false);
+      try {
+        const trigRes = await fetch(`/api/repositories/trigger-map?repoPath=${encodeURIComponent(repoPath || '')}`);
+        if (trigRes.ok) {
+          const trig = await trigRes.json();
+          (globalThis as any).__triggerMap = trig;
+        }
+      } catch {}
 
       // Preload today's and yesterday's workflow data into React Query cache (run after list is visible)
       const selectedStr = format(selectedDate, "yyyy-MM-dd");
@@ -1060,6 +1098,11 @@ export default function DashboardPage({ params }: PageProps) {
                                     isReviewed={reviewedWorkflows[run.id] || false}
                                     onToggleReviewed={() => toggleReviewed(run.id)}
                                     repoSlug={repoSlug}
+                                    allWorkflowRuns={workflowData || []}
+                                    reviewedTestingWorkflows={reviewedTestingWorkflows[run.id.toString()] || new Set()}
+                                    onToggleTestingWorkflowReviewed={(testingWorkflowName) =>
+                                      toggleTestingWorkflowReviewed(run.id, testingWorkflowName)
+                                    }
                                     rightAction={(
                                       <Button
                                         variant="ghost"
@@ -1130,6 +1173,13 @@ export default function DashboardPage({ params }: PageProps) {
                       .map((wf) => {
                       const file = wf.path?.split('/').pop() || wf.name;
                       const isConfigured = configuredFiles.includes(file);
+                      // Determine if this workflow is a trigger based on dynamic trigger map
+                      const triggerMap = (globalThis as any).__triggerMap as any | undefined;
+                      const byFile = triggerMap?.fileToTesting || {};
+                      const baseFile = (wf.path?.split('/')?.pop() || wf.name || '').toLowerCase();
+                      const testingCount = (byFile[baseFile] || []).length;
+                      const isTriggerDetected = testingCount > 0;
+
                       return (
                         <div key={wf.id} className="flex items-center justify-between border border-border rounded-md p-3">
                           <div className="min-w-0">
@@ -1155,7 +1205,7 @@ export default function DashboardPage({ params }: PageProps) {
                                 {[
                                   { key: 'build', label: 'Build', icon: <Hammer className="h-3 w-3" /> },
                                   { key: 'testing', label: 'Testing', icon: <TestTube className="h-3 w-3" /> },
-                                  { key: 'trigger', label: 'Trigger', icon: <Target className="h-3 w-3" /> },
+                                  { key: 'trigger', label: isTriggerDetected ? `Trigger (${testingCount})` : 'Trigger', icon: <Target className={`h-3 w-3 ${isTriggerDetected ? 'text-green-500' : ''}`} /> },
                                   { key: 'utility', label: 'Utility', icon: <Zap className="h-3 w-3" /> },
                                 ]
                                   .sort((a, b) => a.label.localeCompare(b.label))
