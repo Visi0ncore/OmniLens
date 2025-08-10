@@ -219,18 +219,11 @@ export default function HomePage() {
     }
   }, []);
 
-  // Fetch repositories from API
+  // Build repositories list from user-added repos only (no env-configured repos on this branch)
   React.useEffect(() => {
-    const fetchRepositories = async () => {
+    const hydrateUserRepos = async () => {
       try {
-        const response = await fetch('/api/repositories/metrics');
-        if (!response.ok) {
-          throw new Error('Failed to fetch repository metrics');
-        }
-        const data = await response.json();
-        // Merge server repositories with any user-added repos from localStorage
         const userRepos = loadUserAddedRepos();
-        // Map user repos to expected shape
         const mappedUserRepos = userRepos.map((r: any) => ({
           slug: r.slug,
           repoPath: r.repoPath,
@@ -241,20 +234,57 @@ export default function HomePage() {
           metrics: null,
         }));
 
-        // Deduplicate by slug
-        const combined: Record<string, any> = {};
-        [...data.repositories, ...mappedUserRepos].forEach((repo: any) => {
-          combined[repo.slug] = repo;
-        });
-        setAvailableRepos(Object.values(combined));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        // Helper to compute overview metrics (aligned with UI needs)
+        const computeOverview = (runs: any[]) => {
+          const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
+          const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
+          const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
+          const failedRuns = runs.filter((r: any) => r.conclusion === 'failure').length;
+          const successRate = completedRuns > 0 ? Math.round((passedRuns / completedRuns) * 100) : 0;
+          const hasActivity = completedRuns > 0 || inProgressRuns > 0;
+          const totalWorkflows = runs.length;
+          return { totalWorkflows, passedRuns, failedRuns, inProgressRuns, successRate, hasActivity };
+        };
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+
+        const enhanced = await Promise.all(
+          mappedUserRepos.map(async (repo: any) => {
+            try {
+              const raw = localStorage.getItem(`localRepoConfig-${repo.slug}`);
+              const localCfg = raw ? JSON.parse(raw) : null;
+              const configuredFiles: string[] = localCfg
+                ? Object.values(localCfg.categories || {}).flatMap((c: any) => c?.workflows || [])
+                : [];
+
+              const hasLocalWorkflows = configuredFiles.length > 0;
+              if (!hasLocalWorkflows || !repo.repoPath) {
+                return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: hasLocalWorkflows ? { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } : null };
+              }
+
+              const resRuns = await fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repo.repoPath)}&date=${encodeURIComponent(todayStr)}`, { cache: 'no-store' });
+              if (!resRuns.ok) {
+                return { ...repo, hasWorkflows: true, metrics: { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
+              }
+              const json = await resRuns.json();
+              const runs = (json.workflow_runs || []).filter((r: any) => {
+                const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
+                return file && configuredFiles.some((cfg) => file.includes(cfg));
+              });
+              return { ...repo, hasWorkflows: true, metrics: computeOverview(runs) };
+            } catch {
+              return repo;
+            }
+          })
+        );
+
+        setAvailableRepos(enhanced);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchRepositories();
+    hydrateUserRepos();
   }, [loadUserAddedRepos]);
 
   async function handleAddRepo(e: React.FormEvent) {

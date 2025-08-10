@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { format, isToday } from "date-fns";
 
 import WorkflowCard from "@/components/WorkflowCard";
-import SkeletonCards from "@/components/SkeletonCards";
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import ErrorState from "@/components/ErrorState";
 import WorkflowMetrics from "@/components/WorkflowMetrics";
 import OverviewMetrics from "@/components/OverviewMetrics";
@@ -327,6 +327,8 @@ export default function DashboardPage({ params }: PageProps) {
 
   const missingWorkflows = workflowData ? calculateMissingWorkflows(workflowData, repoSlug) : [];
   const categories = workflowData ? categorizeWorkflows(workflowData, [], repoSlug) : null;
+
+  // (deferred skeleton render placed just before final return to avoid hook order issues)
 
   const toggleCategory = (categoryKey: string) => {
     setCollapsedCategories(prev => {
@@ -1048,6 +1050,11 @@ export default function DashboardPage({ params }: PageProps) {
     );
   }
 
+  // Show full dashboard skeleton while loading to avoid UI popping
+  if (todayLoading || yesterdayLoading) {
+    return <DashboardSkeleton />;
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-8">
       <header className="space-y-2">
@@ -1102,7 +1109,6 @@ export default function DashboardPage({ params }: PageProps) {
         </div>
       </header>
 
-      {(todayLoading || yesterdayLoading) && <SkeletonCards />}
       {todayError && <ErrorState />}
 
       {/* When no workflows are configured, don't render the placeholder component */}
