@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getWorkflowRunsForDate, calculateOverviewData, isValidRepoSlug } from '@/lib/github';
+import { calculateOverviewData, getWorkflowRunsForDate, isValidRepoSlug } from '@/lib/github';
 
 // Force this route to be dynamic since it uses search parameters
 export const dynamic = 'force-dynamic';
@@ -9,13 +9,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
     const repo = searchParams.get('repo');
+    const repoPath = searchParams.get('repoPath'); // owner/repo (bypasses slug validation)
     
     if (!date) {
       return NextResponse.json({ error: 'Date parameter is required' }, { status: 400 });
     }
 
-    if (!repo) {
-      return NextResponse.json({ error: 'Repo parameter is required' }, { status: 400 });
+    // Require either repo (slug) or repoPath (owner/repo)
+    if (!repo && !repoPath) {
+      return NextResponse.json({ error: 'Either repo (slug) or repoPath (owner/repo) is required' }, { status: 400 });
     }
 
     const targetDate = new Date(date);
@@ -25,26 +27,86 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
     }
 
-    // Validate repo slug
-    if (!isValidRepoSlug(repo)) {
-      // For unknown/local repos, return an empty response instead of 400 to avoid UI errors
-      return NextResponse.json({
-        workflowRuns: [],
-        overviewData: {
-          completedRuns: 0,
-          inProgressRuns: 0,
-          passedRuns: 0,
-          failedRuns: 0,
-          totalRuntime: 0,
-          didntRunCount: 0,
-          totalWorkflows: 0,
-          missingWorkflows: []
-        }
-      }, { status: 200 });
-    }
+    // If explicit repoPath provided, fetch directly from GitHub using token and bypass slug validation
+    let workflowRuns: any[] = [];
+    let overviewData: any = null;
 
-    const workflowRuns = await getWorkflowRunsForDate(targetDate, repo);
-    const overviewData = calculateOverviewData(workflowRuns, repo);
+    if (repoPath) {
+      const token = process.env.GITHUB_TOKEN;
+      if (!token) {
+        return NextResponse.json({ error: 'Missing GITHUB_TOKEN environment variable' }, { status: 500 });
+      }
+
+      const dateStr = targetDate.toISOString().slice(0, 10);
+      const start = `${dateStr}T00:00:00Z`;
+      const end = `${dateStr}T23:59:59Z`;
+
+      let page = 1;
+      let allRuns: any[] = [];
+      let hasMore = true;
+      while (hasMore) {
+        const res = await fetch(`https://api.github.com/repos/${repoPath}/actions/runs?created=${start}..${end}&per_page=100&page=${page}`, {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+          cache: 'no-store',
+        });
+        if (!res.ok) {
+          const msg = await res.text();
+          return NextResponse.json({ error: `GitHub API error: ${res.status} ${res.statusText} ${msg}` }, { status: res.status });
+        }
+        const json = await res.json();
+        const pageRuns = json.workflow_runs || [];
+        allRuns = allRuns.concat(pageRuns);
+        hasMore = pageRuns.length === 100;
+        page += 1;
+        if (page > 10) break;
+      }
+      // Normalize a subset of fields used by UI
+      workflowRuns = allRuns.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        workflow_id: r.workflow_id,
+        path: r.path,
+        conclusion: r.conclusion,
+        status: r.status,
+        html_url: r.html_url,
+        run_started_at: r.run_started_at,
+        updated_at: r.updated_at,
+      }));
+      // Compute overview without category filtering
+      const completedRuns = workflowRuns.filter(r => r.status === 'completed').length;
+      const inProgressRuns = workflowRuns.filter(r => r.status === 'in_progress' || r.status === 'queued').length;
+      const passedRuns = workflowRuns.filter(r => r.conclusion === 'success').length;
+      const failedRuns = workflowRuns.filter(r => r.conclusion === 'failure').length;
+      const totalRuntime = workflowRuns.reduce((total, r) => {
+        if (r.status === 'completed') {
+          const startMs = new Date(r.run_started_at).getTime();
+          const endMs = new Date(r.updated_at).getTime();
+          return total + Math.max(0, Math.floor((endMs - startMs) / 1000));
+        }
+        return total;
+      }, 0);
+      overviewData = {
+        completedRuns,
+        inProgressRuns,
+        passedRuns,
+        failedRuns,
+        totalRuntime,
+        didntRunCount: 0,
+        totalWorkflows: workflowRuns.length,
+        missingWorkflows: [],
+      };
+    } else {
+      // Existing slug-based path (env repos)
+      if (!isValidRepoSlug(repo)) {
+        return NextResponse.json({ error: 'Invalid repo slug or repo not configured' }, { status: 400 });
+      }
+      workflowRuns = await getWorkflowRunsForDate(targetDate, repo!);
+      overviewData = calculateOverviewData(workflowRuns, repo!);
+    }
 
     return NextResponse.json({
       workflowRuns,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useState, useEffect, useCallback } from "react";
 import { format, isToday } from "date-fns";
 
@@ -137,6 +137,7 @@ interface PageProps {
 
 export default function DashboardPage({ params }: PageProps) {
   const { slug: repoSlug } = params;
+  const queryClient = useQueryClient();
   const isLocalRepo = repoSlug.startsWith('local-');
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [reviewedWorkflows, setReviewedWorkflows] = useState<Record<number, boolean>>({});
@@ -497,6 +498,8 @@ export default function DashboardPage({ params }: PageProps) {
   const [availableWorkflows, setAvailableWorkflows] = useState<Array<{ id: number; name: string; path: string; state: string; html_url: string; }>>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [localToday, setLocalToday] = useState<{ workflowRuns: any[]; overviewData: any } | null>(null);
+  const [localYesterday, setLocalYesterday] = useState<{ workflowRuns: any[]; overviewData: any } | null>(null);
   
   // Get repository name from API
   const [repoDisplayName, setRepoDisplayName] = React.useState<string>(repoSlug);
@@ -567,6 +570,9 @@ export default function DashboardPage({ params }: PageProps) {
   }, [repoSlug]);
 
   // Open Configure Workflows modal and load available workflows
+  type FetchPhase = 'idle' | 'loading' | 'success' | 'error';
+  const [fetchStatus, setFetchStatus] = useState<{ today: FetchPhase; yesterday: FetchPhase }>({ today: 'idle', yesterday: 'idle' });
+
   const openConfigureModal = useCallback(async () => {
     setConfigError(null);
     setShowConfigModal(true);
@@ -590,12 +596,121 @@ export default function DashboardPage({ params }: PageProps) {
       } else {
         setAvailableWorkflows(json.workflows || []);
       }
+
+      // Show the list as soon as we have workflows
+      setIsLoadingWorkflows(false);
+
+      // Preload today's and yesterday's workflow data into React Query cache (run after list is visible)
+      const selectedStr = format(selectedDate, "yyyy-MM-dd");
+      const y = new Date(selectedDate);
+      y.setDate(y.getDate() - 1);
+      const yesterdayStr = format(y, "yyyy-MM-dd");
+
+      setFetchStatus({ today: 'loading', yesterday: 'loading' });
+      // Prefer repoPath if available (added repos)
+      const repoPathForFetch = (() => {
+        try {
+          const stored = localStorage.getItem('userAddedRepos');
+          if (!stored) return null;
+          const parsed = JSON.parse(stored) as Array<any>;
+          const found = parsed.find(r => r.slug === repoSlug);
+          return found?.repoPath || null;
+        } catch { return null; }
+      })();
+
+      const todayUrl = repoPathForFetch
+        ? `/api/workflows?date=${encodeURIComponent(selectedStr)}&repoPath=${encodeURIComponent(repoPathForFetch)}&_t=${Date.now()}`
+        : `/api/workflows?date=${encodeURIComponent(selectedStr)}&repo=${encodeURIComponent(repoSlug)}&_t=${Date.now()}`;
+      const yUrl = repoPathForFetch
+        ? `/api/workflows?date=${encodeURIComponent(yesterdayStr)}&repoPath=${encodeURIComponent(repoPathForFetch)}&_t=${Date.now()}`
+        : `/api/workflows?date=${encodeURIComponent(yesterdayStr)}&repo=${encodeURIComponent(repoSlug)}&_t=${Date.now()}`;
+
+      const [todayRes, yRes] = await Promise.all([
+        fetch(todayUrl, { cache: 'no-store' }),
+        fetch(yUrl, { cache: 'no-store' })
+      ]);
+
+      if (todayRes.ok) {
+        const todayJson = await todayRes.json();
+        queryClient.setQueryData(["workflowData", repoSlug, selectedStr], todayJson);
+        setFetchStatus(prev => ({ ...prev, today: 'success' }));
+      } else {
+        setFetchStatus(prev => ({ ...prev, today: 'error' }));
+      }
+      if (yRes.ok) {
+        const yJson = await yRes.json();
+        // Keep key aligned with page query key which uses selected date
+        queryClient.setQueryData(["yesterdayWorkflowData", repoSlug, selectedStr], yJson);
+        setFetchStatus(prev => ({ ...prev, yesterday: 'success' }));
+      } else {
+        setFetchStatus(prev => ({ ...prev, yesterday: 'error' }));
+      }
+
+      // If this repo isn't recognized by server config, fetch via repoPath and compute metrics for UI
+      if (!repoConfig) {
+        const repoPath = (() => {
+          try {
+            const stored = localStorage.getItem('userAddedRepos');
+            if (!stored) return null;
+            const parsed = JSON.parse(stored) as Array<any>;
+            const found = parsed.find(r => r.slug === repoSlug);
+            return found?.repoPath || null;
+          } catch { return null; }
+        })();
+        const configuredFiles: string[] = localConfig ? Object.values(localConfig.categories).flatMap((c: any) => c.workflows) : [];
+        if (repoPath && configuredFiles.length > 0) {
+          const filterToConfigured = (runs: any[]) => runs.filter((r: any) => {
+            const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
+            return file && configuredFiles.some(cfg => file.includes(cfg));
+          });
+          const computeOverview = (runs: any[]) => {
+            const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
+            const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
+            const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
+            const failedRuns = runs.filter((r: any) => r.conclusion === 'failure').length;
+            const totalRuntime = runs.reduce((total: number, r: any) => {
+              if (r.status === 'completed') {
+                const start = new Date(r.run_started_at).getTime();
+                const end = new Date(r.updated_at).getTime();
+                return total + Math.max(0, Math.floor((end - start) / 1000));
+              }
+              return total;
+            }, 0);
+            const ran = new Set<string>();
+            runs.forEach((r: any) => {
+              const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
+              if (!file) return;
+              configuredFiles.forEach(cfg => { if (file.includes(cfg)) ran.add(cfg); });
+            });
+            const missingWorkflows = configuredFiles.filter(f => !ran.has(f));
+            return { completedRuns, inProgressRuns, passedRuns, failedRuns, totalRuntime, didntRunCount: missingWorkflows.length, totalWorkflows: runs.length, missingWorkflows };
+          };
+          const [tRes2, yRes2] = await Promise.all([
+            fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repoPath)}&date=${encodeURIComponent(selectedStr)}`, { cache: 'no-store' }),
+            fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repoPath)}&date=${encodeURIComponent(yesterdayStr)}`, { cache: 'no-store' })
+          ]);
+          if (tRes2.ok) {
+            const tJson = await tRes2.json();
+            const tRuns = filterToConfigured(tJson.workflow_runs || []);
+            const tOverview = computeOverview(tRuns);
+            setLocalToday({ workflowRuns: tRuns, overviewData: tOverview });
+            queryClient.setQueryData(["workflowData", repoSlug, selectedStr], { workflowRuns: tRuns, overviewData: tOverview });
+          }
+          if (yRes2.ok) {
+            const yJ = await yRes2.json();
+            const yRuns = filterToConfigured(yJ.workflow_runs || []);
+            const yOverview = computeOverview(yRuns);
+            setLocalYesterday({ workflowRuns: yRuns, overviewData: yOverview });
+            queryClient.setQueryData(["yesterdayWorkflowData", repoSlug, selectedStr], { workflowRuns: yRuns, overviewData: yOverview });
+          }
+        }
+      }
     } catch (e) {
       setConfigError('Failed to fetch workflows');
-    } finally {
+      setFetchStatus({ today: 'error', yesterday: 'error' });
       setIsLoadingWorkflows(false);
     }
-  }, [repoSlug]);
+  }, [repoSlug, selectedDate, queryClient]);
 
   const addLocalWorkflowFile = useCallback(async (categoryKey: string, file: string) => {
     if (!localConfig) return;
@@ -784,6 +899,17 @@ export default function DashboardPage({ params }: PageProps) {
                         : undefined
                     }
                   >
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className={`inline-flex items-center gap-1 ${fetchStatus.today === 'loading' ? 'text-yellow-500' : fetchStatus.today === 'success' ? 'text-green-500' : fetchStatus.today === 'error' ? 'text-red-500' : ''}`}>
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: fetchStatus.today === 'loading' ? '#f59e0b' : fetchStatus.today === 'success' ? '#22c55e' : fetchStatus.today === 'error' ? '#ef4444' : 'hsl(var(--muted-foreground))' }}></span>
+                        Today
+                      </span>
+                      <span>•</span>
+                      <span className={`inline-flex items-center gap-1 ${fetchStatus.yesterday === 'loading' ? 'text-yellow-500' : fetchStatus.yesterday === 'success' ? 'text-green-500' : fetchStatus.yesterday === 'error' ? 'text-red-500' : ''}`}>
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: fetchStatus.yesterday === 'loading' ? '#f59e0b' : fetchStatus.yesterday === 'success' ? '#22c55e' : fetchStatus.yesterday === 'error' ? '#ef4444' : 'hsl(var(--muted-foreground))' }}></span>
+                        Yesterday
+                      </span>
+                    </div>
                     {availableWorkflows
                       .slice()
                       .sort((a, b) => {
