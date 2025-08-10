@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar, Hammer, RefreshCw, ArrowLeft, AlertCircle, Plus, Trash2, Settings } from "lucide-react";
+import { Zap, Target, TestTube, Calendar, Hammer, RefreshCw, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { getRepoConfig, removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getTestingWorkflowsForTrigger } from "@/lib/utils";
 
@@ -111,8 +111,22 @@ const fetchWorkflowData = async (date: Date, repoSlug: string) => {
   const timestamp = new Date().toLocaleTimeString();
   
   console.log(`🔄 [${timestamp}] Fetching data for ${dateStr} from repo ${repoSlug}...`);
-  
-  const response = await fetch(`/api/workflows?date=${dateStr}&repo=${repoSlug}&_t=${Date.now()}`, {
+  // Map local slugs to repoPath if present
+  let repoPath: string | null = null;
+  try {
+    const stored = localStorage.getItem('userAddedRepos');
+    if (stored) {
+      const parsed = JSON.parse(stored) as Array<any>;
+      const found = parsed.find(r => r.slug === repoSlug);
+      repoPath = found?.repoPath || null;
+    }
+  } catch {}
+
+  const url = repoPath
+    ? `/api/workflows?date=${dateStr}&repoPath=${encodeURIComponent(repoPath)}&_t=${Date.now()}`
+    : `/api/workflows?date=${dateStr}&repo=${encodeURIComponent(repoSlug)}&_t=${Date.now()}`;
+
+  const response = await fetch(url, {
     // Add cache-busting headers to prevent browser caching
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -139,6 +153,7 @@ export default function DashboardPage({ params }: PageProps) {
   const { slug: repoSlug } = params;
   const queryClient = useQueryClient();
   const isLocalRepo = repoSlug.startsWith('local-');
+  const [addedRepoPath, setAddedRepoPath] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [reviewedWorkflows, setReviewedWorkflows] = useState<Record<number, boolean>>({});
   const [reviewedTestingWorkflows, setReviewedTestingWorkflows] = useState<Record<string, Set<string>>>({});
@@ -234,6 +249,19 @@ export default function DashboardPage({ params }: PageProps) {
 
   // Load reviewed workflows and collapsed categories when date changes
   useEffect(() => {
+    // Detect repoPath for added repos
+    try {
+      const stored = localStorage.getItem('userAddedRepos');
+      if (stored) {
+        const parsed = JSON.parse(stored) as Array<any>;
+        const found = parsed.find(r => r.slug === repoSlug);
+        setAddedRepoPath(found?.repoPath || null);
+      } else {
+        setAddedRepoPath(null);
+      }
+    } catch {
+      setAddedRepoPath(null);
+    }
     const storedReviewed = loadReviewedWorkflows(selectedDate);
     const storedCollapsed = loadCollapsedCategories(selectedDate);
     const storedTestingWorkflows = loadReviewedTestingWorkflows(selectedDate);
@@ -255,7 +283,7 @@ export default function DashboardPage({ params }: PageProps) {
     queryFn: async () => {
       return await fetchWorkflowData(selectedDate, repoSlug);
     },
-    enabled: !!repoConfig, // disable for local/unconfigured repos to avoid 400s
+    enabled: !!repoConfig || !!addedRepoPath,
     staleTime: isSelectedDateToday ? 0 : 5 * 60 * 1000, // Historical data stays fresh longer
     cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     refetchInterval: isSelectedDateToday ? 10000 : false, // Poll every 10s for today, no polling for historical
@@ -274,7 +302,7 @@ export default function DashboardPage({ params }: PageProps) {
       yesterday.setDate(yesterday.getDate() - 1);
       return await fetchWorkflowData(yesterday, repoSlug);
     },
-    enabled: !!repoConfig, // disable for local/unconfigured repos
+    enabled: !!repoConfig || !!addedRepoPath,
     staleTime: 5 * 60 * 1000, // Data is stale after 5 minutes
     cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     refetchOnWindowFocus: false, // Don't refetch on window focus for historical data
@@ -821,57 +849,96 @@ export default function DashboardPage({ params }: PageProps) {
             </div>
           </div>
         ) : (
-          <div className="space-y-12">
-            {localConfig && Object.entries(localConfig.categories).map(([key, categoryConfig]: any) => (
-              categoryConfig.workflows.length > 0 && (
-                <div key={key} className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    {key === 'utility' ? <Zap className="h-6 w-6" /> : key === 'trigger' ? <Target className="h-6 w-6" /> : key === 'testing' ? <TestTube className="h-6 w-6" /> : key === 'build' ? <Hammer className="h-6 w-6" /> : null}
-                    <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">{categoryConfig.name}</h2>
+          <>
+            {/* Metrics row */}
+            {workflowData && overviewData && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-8">
+                <OverviewMetrics
+                  data={overviewData}
+                  onMetricHover={handleMetricHover}
+                  onMetricLeave={handleMetricLeave}
+                />
+                {(() => {
+                  const configured = new Set<string>(
+                    localConfig ? Object.values(localConfig.categories).flatMap((c: any) => c.workflows) : []
+                  );
+                  const filterToConfigured = (runs: any[]) => runs.filter((r: any) => {
+                    const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
+                    return file && Array.from(configured).some(cfg => file.includes(cfg));
+                  });
+                  return (
+                    <WorkflowMetrics
+                      todayRuns={filterToConfigured(workflowData || [])}
+                      yesterdayRuns={filterToConfigured(yesterdayWorkflowData || [])}
+                      onMetricHover={handleMetricHover}
+                      onMetricLeave={handleMetricLeave}
+                    />
+                  );
+                })()}
+              </div>
+            )}
+
+            <div className="space-y-12">
+              {localConfig && Object.entries(localConfig.categories).map(([key, categoryConfig]: any) => (
+                categoryConfig.workflows.length > 0 && (
+                  <div key={key} className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      {key === 'utility' ? <Zap className="h-6 w-6" /> : key === 'trigger' ? <Target className="h-6 w-6" /> : key === 'testing' ? <TestTube className="h-6 w-6" /> : key === 'build' ? <Hammer className="h-6 w-6" /> : null}
+                      <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">{categoryConfig.name}</h2>
+                    </div>
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                      {categoryConfig.workflows.map((file: string) => {
+                        // Try to find the latest actual run for this configured file from today's data
+                        const matchingRuns = (workflowData || []).filter((r: any) => {
+                          const fileName = file.toLowerCase();
+                          const runPath = (r.path || r.workflow_path || r.workflow_name || r.name || '').toLowerCase();
+                          const alt = file.replace('.yml','').replace(/-/g,' ').toLowerCase();
+                          return runPath.includes(fileName) || runPath.includes(alt);
+                        }).sort((a: any, b: any) => new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime());
+
+                        const run = matchingRuns[0] || {
+                          id: `missing-${key}-${file}`,
+                          name: file.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+                          workflow_id: `missing-${file}`,
+                          workflow_name: file,
+                          conclusion: null,
+                          status: 'didnt_run',
+                          html_url: '#',
+                          run_started_at: new Date().toISOString(),
+                          updated_at: new Date().toISOString(),
+                          isMissing: true,
+                        };
+
+                        return (
+                          <div key={file} className="relative">
+                            <WorkflowCard
+                              run={run}
+                              isReviewed={false}
+                              onToggleReviewed={() => {}}
+                              repoSlug={repoSlug}
+                              neutral={false}
+                              rightAction={(
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleRemoveLocalWorkflow(key, file)}
+                                  title="Remove workflow"
+                                  aria-label="Remove workflow"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                    {categoryConfig.workflows.map((file: string) => {
-                      const mockRun: any = {
-                        id: `local-${key}-${file}`,
-                        name: file.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-                        workflow_id: `local-${file}`,
-                        workflow_name: file,
-                        conclusion: null,
-                        status: 'didnt_run',
-                        html_url: '#',
-                        run_started_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                        isMissing: true,
-                      };
-                      return (
-                        <div key={file} className="relative">
-                          <WorkflowCard
-                            run={mockRun}
-                            isReviewed={false}
-                            onToggleReviewed={() => {}}
-                            repoSlug={repoSlug}
-                            neutral
-                            rightAction={(
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleRemoveLocalWorkflow(key, file)}
-                                title="Remove workflow"
-                                aria-label="Remove workflow"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )
-            ))}
-          </div>
+                )
+              ))}
+            </div>
+          </>
         )}
 
         {showConfigModal && (
@@ -899,17 +966,41 @@ export default function DashboardPage({ params }: PageProps) {
                         : undefined
                     }
                   >
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className={`inline-flex items-center gap-1 ${fetchStatus.today === 'loading' ? 'text-yellow-500' : fetchStatus.today === 'success' ? 'text-green-500' : fetchStatus.today === 'error' ? 'text-red-500' : ''}`}>
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: fetchStatus.today === 'loading' ? '#f59e0b' : fetchStatus.today === 'success' ? '#22c55e' : fetchStatus.today === 'error' ? '#ef4444' : 'hsl(var(--muted-foreground))' }}></span>
-                        Today
-                      </span>
-                      <span>•</span>
-                      <span className={`inline-flex items-center gap-1 ${fetchStatus.yesterday === 'loading' ? 'text-yellow-500' : fetchStatus.yesterday === 'success' ? 'text-green-500' : fetchStatus.yesterday === 'error' ? 'text-red-500' : ''}`}>
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: fetchStatus.yesterday === 'loading' ? '#f59e0b' : fetchStatus.yesterday === 'success' ? '#22c55e' : fetchStatus.yesterday === 'error' ? '#ef4444' : 'hsl(var(--muted-foreground))' }}></span>
-                        Yesterday
-                      </span>
-                    </div>
+                    {(() => {
+                      const combined = ((): 'idle' | 'loading' | 'success' | 'error' => {
+                        if (fetchStatus.today === 'error' || fetchStatus.yesterday === 'error') return 'error';
+                        if (fetchStatus.today === 'loading' || fetchStatus.yesterday === 'loading') return 'loading';
+                        if (fetchStatus.today === 'success' && fetchStatus.yesterday === 'success') return 'success';
+                        return 'idle';
+                      })();
+                      return (
+                        <div className="flex items-center gap-2 text-xs">
+                          {combined === 'loading' && (
+                            <span className="inline-flex items-center gap-2 text-yellow-500">
+                              <RefreshCw className="h-3 w-3 animate-spin" />
+                              Fetching data…
+                            </span>
+                          )}
+                          {combined === 'success' && (
+                            <span className="inline-flex items-center gap-2 text-green-500">
+                              <CheckCircle className="h-3 w-3" />
+                              Data loaded
+                            </span>
+                          )}
+                          {combined === 'error' && (
+                            <span className="inline-flex items-center gap-2 text-red-500">
+                              <AlertCircle className="h-3 w-3" />
+                              Failed to fetch data
+                            </span>
+                          )}
+                          {combined === 'idle' && (
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              Waiting to fetch…
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {availableWorkflows
                       .slice()
                       .sort((a, b) => {
@@ -1032,10 +1123,16 @@ export default function DashboardPage({ params }: PageProps) {
       {todayError && <ErrorState />}
 
       {/* When no workflows are configured, don't render the placeholder component */}
-      {!todayLoading && !todayError && repoConfig && (() => {
-        const totalWorkflows = Object.values(repoConfig.categories).reduce((total, category) => 
-          total + category.workflows.length, 0
-        );
+      {!todayLoading && !todayError && (() => {
+        // For env repos, check config. For added repos, check local config or fetched runs
+        if (repoConfig) {
+          const totalWorkflows = Object.values(repoConfig.categories).reduce((total, category: any) => total + category.workflows.length, 0);
+          if (totalWorkflows === 0) return null;
+        } else {
+          // For added repos, if we have no runs and no configured local files, do not render
+          const hasLocalConfigured = localConfig && Object.values(localConfig.categories).some((c: any) => c.workflows.length > 0);
+          if (!hasLocalConfigured && !(workflowData && workflowData.length > 0)) return null;
+        }
         return null;
       })()}
 
@@ -1065,7 +1162,7 @@ export default function DashboardPage({ params }: PageProps) {
                 </div>
               )}
 
-              {categories && (
+              {categories && overviewData && (
                 <div className="space-y-12">
                   {Object.entries(repoConfig.categories).map(([key, categoryConfig]) => {
                     const getIcon = (categoryKey: string) => {
