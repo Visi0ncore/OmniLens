@@ -156,11 +156,11 @@ export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: 
               </div>
             </div>
 
-            {/* Runtime */}
+            {/* Total Runtime */}
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <Clock className="h-4 w-4 text-purple-500 flex-shrink-0" />
-                <span className="text-sm truncate">Runtime</span>
+                <span className="text-sm truncate">Total Runtime</span>
               </div>
               <div className={`font-semibold text-sm flex-shrink-0 ${data.totalRuntime === 0 ? 'text-muted-foreground' : 'text-white'}`}>
                 {formatDuration(data.totalRuntime)}

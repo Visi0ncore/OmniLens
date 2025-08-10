@@ -206,7 +206,7 @@ export default function MetricsOverview({ runs }: MetricsOverviewProps) {
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <Clock className="h-4 w-4" />
-            Runtime
+            Total Runtime
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">

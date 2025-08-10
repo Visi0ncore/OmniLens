@@ -3,7 +3,62 @@
 import React from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Plus, Trash2, Package } from "lucide-react";
+import {
+  AlertCircle,
+  Plus,
+  Trash2,
+  Package,
+  Activity,
+  Bell,
+  Book,
+  Calendar,
+  Camera,
+  CheckCircle,
+  Clock,
+  Cloud,
+  Code,
+  Database,
+  Download,
+  Edit,
+  ExternalLink,
+  Eye,
+  FileText,
+  Folder,
+  GitBranch,
+  GitCommit,
+  GitMerge,
+  GitPullRequest,
+  Globe,
+  HelpCircle,
+  Home,
+  Info,
+  Lightbulb,
+  List,
+  Lock,
+  MessageSquare,
+  Play,
+  Pause,
+  RefreshCw,
+  Rocket,
+  Search,
+  Server,
+  Settings,
+  Shield,
+  Sliders,
+  Star,
+  Sun,
+  Moon,
+  Target,
+  Terminal,
+  ThumbsUp,
+  Timer,
+  TrendingUp,
+  Upload,
+  User,
+  Users,
+  Wrench,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CompactMetricsOverview from "@/components/CompactMetricsOverview";
 
@@ -98,6 +153,7 @@ function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessag
             </p>
           </div>
         )}
+
       </CardContent>
     </Card>
   );
@@ -116,6 +172,7 @@ function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessag
     </Link>
   );
 }
+
 
 function NoRepositoriesFound({
   newRepoUrl,
@@ -233,18 +290,6 @@ export default function HomePage() {
         metrics: null,
       }));
 
-      // Helper to compute overview metrics (aligned with UI needs)
-      const computeOverview = (runs: any[]) => {
-        const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
-        const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
-        const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
-        const failedRuns = runs.filter((r: any) => r.conclusion === 'failure').length;
-        const successRate = completedRuns > 0 ? Math.round((passedRuns / completedRuns) * 100) : 0;
-        const hasActivity = completedRuns > 0 || inProgressRuns > 0;
-        const totalWorkflows = runs.length;
-        return { totalWorkflows, passedRuns, failedRuns, inProgressRuns, successRate, hasActivity };
-      };
-
       const todayStr = new Date().toISOString().slice(0, 10);
 
       const enhanced = await Promise.all(
@@ -258,19 +303,25 @@ export default function HomePage() {
 
             const hasLocalWorkflows = configuredFiles.length > 0;
             if (!hasLocalWorkflows || !repo.repoPath) {
-              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: hasLocalWorkflows ? { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } : null };
+              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: hasLocalWorkflows ? { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } : null };
             }
 
             const resRuns = await fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repo.repoPath)}&date=${encodeURIComponent(todayStr)}`, { cache: 'no-store' });
             if (!resRuns.ok) {
-              return { ...repo, hasWorkflows: true, metrics: { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
+              return { ...repo, hasWorkflows: true, metrics: { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
             }
             const json = await resRuns.json();
             const runs = (json.workflow_runs || []).filter((r: any) => {
               const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
               return file && configuredFiles.some((cfg) => file.includes(cfg));
             });
-            return { ...repo, hasWorkflows: true, metrics: computeOverview(runs) };
+            const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
+            const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
+            const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
+            const failedRuns = runs.filter((r: any) => r.conclusion === 'failure').length;
+            const successRate = completedRuns > 0 ? Math.round((passedRuns / completedRuns) * 100) : 0;
+            const hasActivity = completedRuns > 0 || inProgressRuns > 0;
+            return { ...repo, hasWorkflows: true, metrics: { totalWorkflows: configuredFiles.length, passedRuns, failedRuns, inProgressRuns, successRate, hasActivity } };
           } catch {
             return repo;
           }

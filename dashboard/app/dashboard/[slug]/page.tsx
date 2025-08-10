@@ -326,7 +326,19 @@ export default function DashboardPage({ params }: PageProps) {
   }, [workflowData, yesterdayWorkflowData, selectedDate]);
 
   const missingWorkflows = workflowData ? calculateMissingWorkflows(workflowData, repoSlug) : [];
-  const categories = workflowData ? categorizeWorkflows(workflowData, [], repoSlug) : null;
+  // Only derive categories when using env-configured repos; for local repos keep null
+  const categories = (workflowData && repoConfig) ? categorizeWorkflows(workflowData, [], repoSlug) : null;
+
+  // Lightweight polling to keep today's data fresh even if focus events are missed
+  useEffect(() => {
+    if (!isSelectedDateToday) return;
+    const id = window.setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        refetchToday();
+      }
+    }, 10000);
+    return () => window.clearInterval(id);
+  }, [isSelectedDateToday, refetchToday, repoSlug]);
 
   // (deferred skeleton render placed just before final return to avoid hook order issues)
 
@@ -346,8 +358,8 @@ export default function DashboardPage({ params }: PageProps) {
 
   // Helper function to check and auto-collapse a category if all workflows are reviewed
   const checkAndAutoCollapseCategory = (workflowId: number, reviewedState: Record<number, boolean>) => {
+    // Path 1: env-configured repos using computed categories
     if (categories) {
-      // Find which category contains the workflow that was just reviewed
       const categoryWithWorkflow = Object.entries(categories).find(([_, workflows]) =>
         workflows.some(workflow => workflow.id === workflowId)
       );
@@ -358,17 +370,36 @@ export default function DashboardPage({ params }: PageProps) {
 
         if (allReviewed && workflows.length > 0) {
           setCollapsedCategories(prevCollapsed => {
-            const newCollapsedState = {
-              ...prevCollapsed,
-              [categoryKey]: true
-            };
-
-            // Save to localStorage
+            const newCollapsedState = { ...prevCollapsed, [categoryKey]: true };
             saveCollapsedCategories(selectedDate, newCollapsedState);
-
             return newCollapsedState;
           });
         }
+      }
+      return;
+    }
+
+    // Path 2: local repos using localConfig + workflowData
+    if (!categories && isLocalRepo && localConfig && Array.isArray(workflowData)) {
+      const entries: Array<[string, { name: string; workflows: string[] }]> = Object.entries(localConfig.categories || {});
+      for (const [categoryKey, catConfig] of entries) {
+        const configuredFiles = new Set<string>(catConfig.workflows || []);
+        const runsInCategory = (workflowData || []).filter((r: any) => {
+          const wf = (r.path || r.workflow_path || r.workflow_name || '').toLowerCase();
+          return Array.from(configuredFiles).some((f) => wf.includes(f.toLowerCase()));
+        });
+        const containsWorkflow = runsInCategory.some((r: any) => r.id === workflowId);
+        if (!containsWorkflow) continue;
+
+        const allReviewed = runsInCategory.length > 0 && runsInCategory.every((r: any) => reviewedState[r.id]);
+        if (allReviewed) {
+          setCollapsedCategories(prevCollapsed => {
+            const newCollapsedState = { ...prevCollapsed, [categoryKey]: true };
+            saveCollapsedCategories(selectedDate, newCollapsedState);
+            return newCollapsedState;
+          });
+        }
+        break;
       }
     }
   };
@@ -489,6 +520,44 @@ export default function DashboardPage({ params }: PageProps) {
       }));
     }
   };
+
+  // Auto-collapse pass: when review state changes, verify all categories
+  useEffect(() => {
+    let changed = false;
+    setCollapsedCategories(prev => {
+      const next = { ...prev } as Record<string, boolean>;
+
+      if (categories) {
+        Object.entries(categories).forEach(([key, workflows]) => {
+          if (workflows.length > 0 && workflows.every((w: any) => reviewedWorkflows[w.id])) {
+            if (!next[key]) {
+              next[key] = true;
+              changed = true;
+            }
+          }
+        });
+      } else if (isLocalRepo && localConfig && Array.isArray(workflowData)) {
+        Object.entries(localConfig.categories || {}).forEach(([key, cat]: any) => {
+          const configuredFiles = new Set<string>((cat?.workflows as string[]) || []);
+          const runsInCategory = (workflowData || []).filter((r: any) => {
+            const wf = (r.path || r.workflow_path || r.workflow_name || '').toLowerCase();
+            return Array.from(configuredFiles).some((f) => wf.includes(f.toLowerCase()));
+          });
+          if (runsInCategory.length > 0 && runsInCategory.every((r: any) => reviewedWorkflows[r.id])) {
+            if (!next[key]) {
+              next[key] = true;
+              changed = true;
+            }
+          }
+        });
+      }
+
+      if (changed) {
+        try { saveCollapsedCategories(selectedDate, next); } catch {}
+      }
+      return next;
+    });
+  }, [reviewedWorkflows, categories, /* localConfig below is declared later; keep effect after mount */ workflowData, isLocalRepo, selectedDate]);
 
   // Quick date selection
   const handleSetToday = () => {
@@ -885,42 +954,69 @@ export default function DashboardPage({ params }: PageProps) {
               {localConfig && Object.entries(localConfig.categories).map(([key, categoryConfig]: any) => (
                 categoryConfig.workflows.length > 0 && (
                   <div key={key} className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      {key === 'utility' ? <Zap className="h-6 w-6" /> : key === 'trigger' ? <Target className="h-6 w-6" /> : key === 'testing' ? <TestTube className="h-6 w-6" /> : key === 'build' ? <Hammer className="h-6 w-6" /> : null}
-                      <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">{categoryConfig.name}</h2>
-                    </div>
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                      {(() => {
-                        // Build runs for this category from today's data matching configured files
-                        const configuredFiles = new Set<string>(categoryConfig.workflows || []);
-                        const runsInCategory = (workflowData || []).filter((r: any) => {
-                          const wf = (r.path || r.workflow_path || r.workflow_name || '').toLowerCase();
-                          return Array.from(configuredFiles).some(f => wf.includes(f.toLowerCase()));
-                        }).sort((a: any, b: any) => new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime());
-                        return runsInCategory.map((run: any) => (
-                          <div key={run.id} className="relative">
-                            <WorkflowCard
-                              run={run}
-                              isReviewed={reviewedWorkflows[run.id] || false}
-                              onToggleReviewed={() => toggleReviewed(run.id)}
-                              repoSlug={repoSlug}
-                              rightAction={(
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => handleRemoveLocalWorkflow(key, run.workflow_name || run.path?.split('/').pop() || '')}
-                                  title="Remove workflow"
-                                  aria-label="Remove workflow"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            />
+                    {(() => {
+                      // Build runs for this category from today's data matching configured files
+                      const configuredFiles = new Set<string>(categoryConfig.workflows || []);
+                      const runsInCategory = (workflowData || []).filter((r: any) => {
+                        const wf = (r.path || r.workflow_path || r.workflow_name || '').toLowerCase();
+                        return Array.from(configuredFiles).some(f => wf.includes(f.toLowerCase()));
+                      }).sort((a: any, b: any) => new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime());
+
+                      const isCollapsed = collapsedCategories[key];
+                      const workflowCount = runsInCategory.length;
+                      const reviewedCount = runsInCategory.filter((wf: any) => reviewedWorkflows[wf.id]).length;
+                      const allReviewed = workflowCount > 0 && reviewedCount === workflowCount;
+
+                      // Determine badge variant based on review state
+                      let badgeVariant: any = "secondary";
+                      if (allReviewed) badgeVariant = "success";
+
+                      return (
+                        <>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              {key === 'utility' ? <Zap className="h-6 w-6" /> : key === 'trigger' ? <Target className="h-6 w-6" /> : key === 'testing' ? <TestTube className="h-6 w-6" /> : key === 'build' ? <Hammer className="h-6 w-6" /> : null}
+                              <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">{categoryConfig.name}</h2>
+                            </div>
+                            <div className="hidden sm:block flex-1 h-px bg-border" />
+                            <Badge
+                              variant={badgeVariant}
+                              className="text-xs cursor-pointer hover:opacity-80 transition-opacity self-start sm:self-auto"
+                              onClick={() => toggleCategory(key)}
+                            >
+                              {reviewedCount} / {workflowCount} workflows
+                            </Badge>
                           </div>
-                        ));
-                      })()}
-                    </div>
+
+                          {!isCollapsed && (
+                            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                              {runsInCategory.map((run: any) => (
+                                <div key={run.id} className="relative">
+                                  <WorkflowCard
+                                    run={run}
+                                    isReviewed={reviewedWorkflows[run.id] || false}
+                                    onToggleReviewed={() => toggleReviewed(run.id)}
+                                    repoSlug={repoSlug}
+                                    rightAction={(
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => handleRemoveLocalWorkflow(key, run.workflow_name || run.path?.split('/').pop() || '')}
+                                        title="Remove workflow"
+                                        aria-label="Remove workflow"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )
               ))}

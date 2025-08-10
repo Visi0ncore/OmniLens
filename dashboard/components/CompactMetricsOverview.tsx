@@ -1,4 +1,4 @@
-import { CheckCircle, XCircle, Loader, Target } from "lucide-react";
+import { CheckCircle, XCircle, Loader, Folder } from "lucide-react";
 
 interface CompactMetricsProps {
   totalWorkflows: number;
@@ -39,9 +39,9 @@ export default function CompactMetricsOverview({
       {/* Metrics Row */}
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-3">
-          {/* Total Workflows */}
+          {/* Total Workflows (configured) */}
           <div className="flex items-center gap-1">
-            <Target className="h-3 w-3 text-blue-500" />
+            <Folder className="h-3 w-3 text-blue-500" />
             <span className="text-muted-foreground">{totalWorkflows}</span>
           </div>
           
