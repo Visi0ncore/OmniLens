@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar, Hammer, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle } from "lucide-react";
+import { Zap, Target, TestTube, Calendar, Hammer, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { getRepoConfig, removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getTestingWorkflowsForTrigger } from "@/lib/utils";
 
@@ -365,7 +365,8 @@ export default function DashboardPage({ params }: PageProps) {
         const res = await fetch(url, { cache: 'no-store' });
         if (res.ok) {
           const trig = await res.json();
-          (globalThis as any).__triggerMap = trig;
+          const cache = ((globalThis as any).__triggerMaps ||= {});
+          cache[repoSlug] = trig;
         }
       } catch {}
     })();
@@ -602,6 +603,7 @@ export default function DashboardPage({ params }: PageProps) {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [availableWorkflows, setAvailableWorkflows] = useState<Array<{ id: number; name: string; path: string; state: string; html_url: string; }>>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
+  const [isPreparingTriggers, setIsPreparingTriggers] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
   const [localToday, setLocalToday] = useState<{ workflowRuns: any[]; overviewData: any } | null>(null);
   const [localYesterday, setLocalYesterday] = useState<{ workflowRuns: any[]; overviewData: any } | null>(null);
@@ -678,11 +680,49 @@ export default function DashboardPage({ params }: PageProps) {
   type FetchPhase = 'idle' | 'loading' | 'success' | 'error';
   const [fetchStatus, setFetchStatus] = useState<{ today: FetchPhase; yesterday: FetchPhase }>({ today: 'idle', yesterday: 'idle' });
 
+  // Ensure trigger map is loaded for current repo before opening modal
+  const ensureTriggerMapLoaded = useCallback(async () => {
+    try {
+      setIsPreparingTriggers(true);
+      let url: string | null = null;
+      let repoPathForMap: string | null = null;
+      if (isLocalRepo) {
+        repoPathForMap = addedRepoPath;
+        if (!repoPathForMap) {
+          try {
+            const stored = localStorage.getItem('userAddedRepos');
+            if (stored) {
+              const parsed = JSON.parse(stored) as Array<any>;
+              const found = parsed.find(r => r.slug === repoSlug);
+              repoPathForMap = found?.repoPath || null;
+            }
+          } catch {}
+        }
+        if (repoPathForMap) url = `/api/repositories/trigger-map?repoPath=${encodeURIComponent(repoPathForMap)}`;
+      } else {
+        url = `/api/repositories/trigger-map?repo=${encodeURIComponent(repoSlug)}`;
+      }
+
+      const cache = (globalThis as any).__triggerMaps as Record<string, any> | undefined;
+      if (cache && cache[repoSlug]) return;
+
+      if (!url) { setIsPreparingTriggers(false); return; }
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const trig = await res.json();
+        const c = ((globalThis as any).__triggerMaps ||= {});
+        c[repoSlug] = trig;
+      }
+    } catch {}
+    finally { setIsPreparingTriggers(false); }
+  }, [repoSlug, isLocalRepo, addedRepoPath]);
+
   const openConfigureModal = useCallback(async () => {
     setConfigError(null);
-    setShowConfigModal(true);
     setIsLoadingWorkflows(true);
     try {
+      // Prepare trigger map first so grouping is ready on open
+      await ensureTriggerMapLoaded();
       // Determine repoPath from local storage entry
       let repoPath: string | null = null;
       try {
@@ -702,15 +742,8 @@ export default function DashboardPage({ params }: PageProps) {
         setAvailableWorkflows(json.workflows || []);
       }
 
-      // Fetch trigger map (dynamic detection) in parallel with showing workflows
       setIsLoadingWorkflows(false);
-      try {
-        const trigRes = await fetch(`/api/repositories/trigger-map?repoPath=${encodeURIComponent(repoPath || '')}`);
-        if (trigRes.ok) {
-          const trig = await trigRes.json();
-          (globalThis as any).__triggerMap = trig;
-        }
-      } catch {}
+      setShowConfigModal(true);
 
       // Preload today's and yesterday's workflow data into React Query cache (run after list is visible)
       const selectedStr = format(selectedDate, "yyyy-MM-dd");
@@ -824,7 +857,7 @@ export default function DashboardPage({ params }: PageProps) {
       setFetchStatus({ today: 'error', yesterday: 'error' });
       setIsLoadingWorkflows(false);
     }
-  }, [repoSlug, selectedDate, queryClient]);
+  }, [repoSlug, selectedDate, queryClient, ensureTriggerMapLoaded]);
 
   const addLocalWorkflowFile = useCallback(async (categoryKey: string, file: string) => {
     if (!localConfig) return;
@@ -925,7 +958,11 @@ export default function DashboardPage({ params }: PageProps) {
               {/* Removed manual refresh; auto-refresh is handled via polling and focus events */}
               {localConfig && Object.values(localConfig.categories).some((c: any) => c.workflows.length > 0) && (
                 <Button variant="default" size="sm" onClick={openConfigureModal} className="gap-2">
-                  <Settings className="h-4 w-4" />
+                  {(isPreparingTriggers || isLoadingWorkflows) ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Settings className="h-4 w-4" />
+                  )}
                   Configure Workflows
                 </Button>
               )}
@@ -945,7 +982,11 @@ export default function DashboardPage({ params }: PageProps) {
                 <p className="mt-2 text-sm text-muted-foreground">Configure workflows to start tracking runs and metrics.</p>
                 <div className="mt-6 flex items-center justify-center">
                   <Button variant="default" size="sm" onClick={openConfigureModal} className="gap-2">
-                    <Settings className="h-4 w-4" />
+                    {(isPreparingTriggers || isLoadingWorkflows) ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Settings className="h-4 w-4" />
+                    )}
                     Configure Workflows
                   </Button>
                 </div>
@@ -1138,9 +1179,32 @@ export default function DashboardPage({ params }: PageProps) {
                   <h2 className="text-lg font-semibold">Configure Workflows</h2>
                   {(() => {
                     const configuredCount = localConfig ? Object.values(localConfig.categories).flatMap((c: any) => c.workflows).length : 0;
-                    const totalAvailable = availableWorkflows.length;
+                    // Compute visible list count using the same trigger-filter/grouping rules as the list
+                    const trig = ((globalThis as any).__triggerMaps || {})[repoSlug] as any | undefined;
+                    const byFile: Record<string, string[]> = trig?.fileToTesting || {};
+                    const byName: Record<string, string[]> = trig?.nameToTesting || {};
+                    const normalize = (s: string | undefined | null) => (s ? String(s).toLowerCase().trim() : '');
+                    const testingFileSet = new Set<string>();
+                    Object.values(byFile).forEach((arr: any) => (arr || []).forEach((f: string) => testingFileSet.add(String(f).toLowerCase())));
+                    Object.values(byName).forEach((arr: any) => (arr || []).forEach((f: string) => testingFileSet.add(String(f).toLowerCase())));
+
+                    const visibleTotal = availableWorkflows
+                      .slice()
+                      .map((wf) => {
+                        const file = wf.path?.split('/')?.pop() || wf.name;
+                        const sortKey = (file || '').toLowerCase();
+                        const fromFile = (byFile[sortKey] || []) as string[];
+                        const fromName = byName[normalize(wf.name)] || [];
+                        const testingBases = Array.from(new Set([...(fromFile || []), ...(fromName || [])]));
+                        const isTriggerDetected = testingBases.length > 0;
+                        const isTestingChild = testingFileSet.has(sortKey);
+                        return { isTriggerDetected, isTestingChild };
+                      })
+                      .filter((row) => !(row.isTestingChild && !row.isTriggerDetected))
+                      .length;
+
                     return (
-                      <Badge variant="secondary" className="text-xs">{configuredCount} / {totalAvailable} configured</Badge>
+                      <Badge variant="secondary" className="text-xs">{configuredCount} / {visibleTotal} configured</Badge>
                     );
                   })()}
                 </div>
@@ -1162,29 +1226,74 @@ export default function DashboardPage({ params }: PageProps) {
                         : undefined
                     }
                   >
-                    {/* Removed fetch-status row; replaced by header badge */}
-                    {availableWorkflows
-                      .slice()
-                      .sort((a, b) => {
-                        const fa = (a.path?.split('/')?.pop() || a.name || '').toLowerCase();
-                        const fb = (b.path?.split('/')?.pop() || b.name || '').toLowerCase();
-                        return fa.localeCompare(fb);
-                      })
-                      .map((wf) => {
-                      const file = wf.path?.split('/').pop() || wf.name;
-                      const isConfigured = configuredFiles.includes(file);
-                      // Determine if this workflow is a trigger based on dynamic trigger map
-                      const triggerMap = (globalThis as any).__triggerMap as any | undefined;
-                      const byFile = triggerMap?.fileToTesting || {};
-                      const baseFile = (wf.path?.split('/')?.pop() || wf.name || '').toLowerCase();
-                      const testingCount = (byFile[baseFile] || []).length;
-                      const isTriggerDetected = testingCount > 0;
+                    {/* Group triggers to the top, keep alphabetical sorting within each group */}
+                    {(() => {
+                      const triggerMap = ((globalThis as any).__triggerMaps || {})[repoSlug] as any | undefined;
+                      const byFile: Record<string, string[]> = triggerMap?.fileToTesting || {};
+                      const byName: Record<string, string[]> = triggerMap?.nameToTesting || {};
+                      const normalize = (s: string | undefined | null) => (s ? String(s).toLowerCase().trim() : '');
+                      // Build quick lookup for workflow meta by base file name
+                      const metaByBase: Record<string, { name: string; path: string } > = {};
+                      for (const w of availableWorkflows) {
+                        const b = (w.path?.split('/')?.pop() || w.name || '').toLowerCase();
+                        metaByBase[b] = { name: w.name, path: w.path } as any;
+                      }
 
-                      return (
-                        <div key={wf.id} className="flex items-center justify-between border border-border rounded-md p-3">
+                      // Build a set of all testing workflow basenames referenced by any trigger
+                      const testingFileSet = new Set<string>();
+                      Object.values(byFile).forEach((arr) => (arr || []).forEach((f) => testingFileSet.add(String(f).toLowerCase())));
+                      Object.values(byName).forEach((arr) => (arr || []).forEach((f) => testingFileSet.add(String(f).toLowerCase())));
+
+                      const enriched = availableWorkflows
+                        .slice()
+                        .map((wf) => {
+                          const file = wf.path?.split('/')?.pop() || wf.name;
+                          const sortKey = (file || '').toLowerCase();
+                          // Collect testing files from both file-based and name-based mappings
+                          const fromFile = (byFile[sortKey] || []) as string[];
+                          const fromName = byName[normalize(wf.name)] || [];
+                          const testingBases = Array.from(new Set([...(fromFile || []), ...(fromName || [])]));
+                          const testingCount = testingBases.length;
+                          const isTriggerDetected = testingCount > 0;
+                          const testingDetails = testingBases.map((tb) => {
+                            const meta = metaByBase[tb];
+                            return {
+                              base: tb,
+                              name: meta?.name || tb.replace(/\.ya?ml$/i, '').replace(/[-_]/g, ' '),
+                              path: meta?.path || `/.github/workflows/${tb}`,
+                            };
+                          });
+                          const isTestingChild = testingFileSet.has(sortKey);
+                          return { wf, file, sortKey, testingCount, isTriggerDetected, testingDetails, isTestingChild };
+                        })
+                        .sort((a, b) => {
+                          if (a.isTriggerDetected !== b.isTriggerDetected) {
+                            return a.isTriggerDetected ? -1 : 1;
+                          }
+                          return a.sortKey.localeCompare(b.sortKey);
+                        })
+                        // Hide testing workflows that are listed under a trigger (keep if they are also triggers)
+                        .filter((row) => !(row.isTestingChild && !row.isTriggerDetected));
+
+                      return enriched.map(({ wf, file, testingCount, isTriggerDetected, testingDetails }) => {
+                        const isConfigured = configuredFiles.includes(file);
+                        return (
+                        <div key={wf.id} className="flex items-start justify-between border border-border rounded-md p-3">
                           <div className="min-w-0">
                             <div className="font-medium text-sm truncate">{wf.name}</div>
                             <div className="text-xs text-muted-foreground truncate">{wf.path}</div>
+                            {isTriggerDetected && testingDetails.length > 0 && (
+                              <div className="mt-2">
+                                <div className="grid gap-1">
+                                  {testingDetails
+                                    .slice()
+                                    .sort((a, b) => a.name.localeCompare(b.name))
+                                    .map((td) => (
+                                      <div key={td.base} className="text-xs leading-tight truncate">{td.name}</div>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             {isConfigured ? (
@@ -1219,8 +1328,9 @@ export default function DashboardPage({ params }: PageProps) {
                             )}
                           </div>
                         </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                   </div>
                 )}
               </div>
@@ -1280,12 +1390,17 @@ export default function DashboardPage({ params }: PageProps) {
               const hasConfiguredLocal = !!localConfig && Object.values(localConfig.categories).some((c: any) => c.workflows.length > 0);
               const hasConfiguredEnv = !!repoConfig && Object.values(repoConfig.categories).some((c: any) => (c as any).workflows?.length > 0);
               const showHeaderConfigure = hasConfiguredLocal || hasConfiguredEnv;
-              return showHeaderConfigure ? (
+              if (!showHeaderConfigure) return null;
+              return (
                 <Button variant="default" size="sm" onClick={openConfigureModal} className="gap-2">
-                  <Settings className="h-4 w-4" />
+                  {(isPreparingTriggers || isLoadingWorkflows) ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Settings className="h-4 w-4" />
+                  )}
                   Configure Workflows
                 </Button>
-              ) : null;
+              );
             })()}
           </div>
         </div>
