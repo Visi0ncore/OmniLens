@@ -50,12 +50,16 @@ export async function GET(request: NextRequest) {
             Accept: 'application/vnd.github+json',
             Authorization: `Bearer ${token}`,
             'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'OmniLens-Dashboard'
           },
           cache: 'no-store',
         });
         if (!res.ok) {
           const msg = await res.text();
-          return NextResponse.json({ error: `GitHub API error: ${res.status} ${res.statusText} ${msg}` }, { status: res.status });
+          const sso = res.headers.get('X-GitHub-SSO') || '';
+          const isRateLimit = (res.headers.get('X-RateLimit-Remaining') === '0') || /rate limit/i.test(msg);
+          const detail = isRateLimit ? 'GitHub API rate limit exceeded' : (sso ? `SSO authorization required: ${sso}` : msg);
+          return NextResponse.json({ error: `GitHub API error: ${res.status} ${res.statusText} ${detail}` }, { status: res.status });
         }
         const json = await res.json();
         const pageRuns = json.workflow_runs || [];

@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar, Hammer, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle, Loader2 } from "lucide-react";
+import { Zap, Target, TestTube, Calendar, Hammer, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle, Loader2, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { getRepoConfig, removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getTestingWorkflowsForTrigger } from "@/lib/utils";
 
@@ -940,6 +940,16 @@ export default function DashboardPage({ params }: PageProps) {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Link href={`/dashboard/${repoSlug}/report`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Report
+                </Button>
+              </Link>
               <Button
                 variant={isSelectedDateToday ? "default" : "outline"}
                 size="sm"
@@ -1407,7 +1417,17 @@ export default function DashboardPage({ params }: PageProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Button
+              <Link href={`/dashboard/${repoSlug}/report`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Report
+                </Button>
+              </Link>
+              <Button
               variant={isSelectedDateToday ? "default" : "outline"}
               size="sm"
               onClick={handleSetToday}
