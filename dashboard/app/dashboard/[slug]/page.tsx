@@ -553,43 +553,9 @@ export default function DashboardPage({ params }: PageProps) {
     }
   };
 
-  // Auto-collapse pass: when review state changes, verify all categories
-  useEffect(() => {
-    let changed = false;
-    setCollapsedCategories(prev => {
-      const next = { ...prev } as Record<string, boolean>;
-
-      if (categories) {
-        Object.entries(categories).forEach(([key, workflows]) => {
-          if (workflows.length > 0 && workflows.every((w: any) => reviewedWorkflows[w.id])) {
-            if (!next[key]) {
-              next[key] = true;
-              changed = true;
-            }
-          }
-        });
-      } else if (isLocalRepo && localConfig && Array.isArray(workflowData)) {
-        Object.entries(localConfig.categories || {}).forEach(([key, cat]: any) => {
-          const configuredFiles = new Set<string>((cat?.workflows as string[]) || []);
-          const runsInCategory = (workflowData || []).filter((r: any) => {
-            const wf = (r.path || r.workflow_path || r.workflow_name || '').toLowerCase();
-            return Array.from(configuredFiles).some((f) => wf.includes(f.toLowerCase()));
-          });
-          if (runsInCategory.length > 0 && runsInCategory.every((r: any) => reviewedWorkflows[r.id])) {
-            if (!next[key]) {
-              next[key] = true;
-              changed = true;
-            }
-          }
-        });
-      }
-
-      if (changed) {
-        try { saveCollapsedCategories(selectedDate, next); } catch {}
-      }
-      return next;
-    });
-  }, [reviewedWorkflows, categories, /* localConfig below is declared later; keep effect after mount */ workflowData, isLocalRepo, selectedDate]);
+  // Note: Auto-collapse is now isolated to the category for the toggled workflow,
+  // handled by checkAndAutoCollapseCategory. We intentionally avoid collapsing
+  // other categories here to prevent unexpected UI changes.
 
   // Quick date selection
   const handleSetToday = () => {
