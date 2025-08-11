@@ -707,10 +707,23 @@ export default function DashboardPage({ params }: PageProps) {
   type FetchPhase = 'idle' | 'loading' | 'success' | 'error';
   const [fetchStatus, setFetchStatus] = useState<{ today: FetchPhase; yesterday: FetchPhase }>({ today: 'idle', yesterday: 'idle' });
 
-  // Ensure trigger map is loaded for current repo before opening modal
+  // Ensure trigger map is loaded for current repo
   const ensureTriggerMapLoaded = useCallback(async () => {
     try {
       setIsPreparingTriggers(true);
+      // Try localStorage cache first for faster loads
+      try {
+        const raw = localStorage.getItem(`triggerMap-${repoSlug}`);
+        if (raw) {
+          const parsed = JSON.parse(raw) as { ts: number; data: any };
+          // 1 day TTL for local cache; adjust as needed
+          if (parsed && parsed.data && Date.now() - parsed.ts < 24 * 60 * 60 * 1000) {
+            const c = ((globalThis as any).__triggerMaps ||= {});
+            c[repoSlug] = parsed.data;
+            return; // already satisfied from cache
+          }
+        }
+      } catch {}
       let url: string | null = null;
       let repoPathForMap: string | null = null;
       if (isLocalRepo) {
@@ -739,6 +752,8 @@ export default function DashboardPage({ params }: PageProps) {
         const trig = await res.json();
         const c = ((globalThis as any).__triggerMaps ||= {});
         c[repoSlug] = trig;
+        // Persist to localStorage for quicker subsequent loads
+        try { localStorage.setItem(`triggerMap-${repoSlug}`, JSON.stringify({ ts: Date.now(), data: trig })); } catch {}
       }
     } catch {}
     finally { setIsPreparingTriggers(false); }
@@ -748,8 +763,8 @@ export default function DashboardPage({ params }: PageProps) {
     setConfigError(null);
     setIsLoadingWorkflows(true);
     try {
-      // Prepare trigger map first so grouping is ready on open
-      await ensureTriggerMapLoaded();
+      // Start preparing trigger map in background; don't block opening the modal
+      const ensurePromise = ensureTriggerMapLoaded();
       // Determine repoPath from local storage entry
       let repoPath: string | null = null;
       try {
@@ -771,6 +786,8 @@ export default function DashboardPage({ params }: PageProps) {
 
       setIsLoadingWorkflows(false);
       setShowConfigModal(true);
+      // Allow trigger map preparation to finish in the background
+      try { await ensurePromise; } catch {}
 
       // Preload today's and yesterday's workflow data into React Query cache (run after list is visible)
       const selectedStr = format(selectedDate, "yyyy-MM-dd");

@@ -50,6 +50,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'repoPath or repo (slug) is required' }, { status: 400 });
     }
 
+    // In-memory TTL cache to avoid recomputing trigger maps repeatedly
+    const cacheKey = repoPath || slug || '';
+    try {
+      const globalCache = ((globalThis as any).__triggerMapApiCache ||= {
+        data: new Map<string, { ts: number; value: any }>(),
+        ttlMs: 5 * 60 * 1000, // 5 minutes
+      });
+      const hit = globalCache.data.get(cacheKey);
+      if (hit && Date.now() - hit.ts < globalCache.ttlMs) {
+        return NextResponse.json(hit.value, { headers: { 'Cache-Control': 'no-store' } });
+      }
+    } catch {}
+
     // 1) List workflows
     let page = 1;
     let allWorkflows: any[] = [];
@@ -146,13 +159,24 @@ export async function GET(request: NextRequest) {
       for (const t of list) merge(testingToTrigger, t, k);
     }
 
-    return NextResponse.json({
+    const payload = {
       repoPath,
       workflows: workflowsMeta,
       nameToTesting, // key: normalized workflow name -> testing file basenames
       fileToTesting, // key: trigger file basename -> testing file basenames
       testingToTrigger,
-    }, {
+    };
+
+    // Save to in-memory cache
+    try {
+      const globalCache = ((globalThis as any).__triggerMapApiCache ||= {
+        data: new Map<string, { ts: number; value: any }>(),
+        ttlMs: 5 * 60 * 1000,
+      });
+      globalCache.data.set(cacheKey, { ts: Date.now(), value: payload });
+    } catch {}
+
+    return NextResponse.json(payload, {
       headers: {
         'Cache-Control': 'no-store',
       }
