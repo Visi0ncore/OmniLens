@@ -1,6 +1,6 @@
 import { Clock, ExternalLink, Check, Eye } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { WorkflowRun } from "@/lib/github";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -107,7 +107,23 @@ export default function WorkflowCard({
 
   // Determine card height - trigger cards should only be taller when testing workflows are visible
   const shouldShowTestingWorkflows = isTrigger && testingWorkflows.length > 0 && !isReviewed;
-  const cardHeightClass = shouldShowTestingWorkflows ? 'min-h-[200px]' : 'h-full';
+  // Use a minimum height when testing workflows are shown to avoid layout jumps,
+  // otherwise allow the card to size naturally instead of stretching to the tallest row peer.
+  const cardHeightClass = shouldShowTestingWorkflows ? 'min-h-[200px]' : 'h-auto';
+
+  // Smooth collapse/expand for testing workflows section using max-height transition
+  const testingContainerRef = useRef<HTMLDivElement | null>(null);
+  const [testingMaxHeight, setTestingMaxHeight] = useState<number>(0);
+  useEffect(() => {
+    const el = testingContainerRef.current;
+    if (!el) return;
+    if (shouldShowTestingWorkflows) {
+      // Measure content height for expansion
+      setTestingMaxHeight(el.scrollHeight);
+    } else {
+      setTestingMaxHeight(0);
+    }
+  }, [shouldShowTestingWorkflows, testingWorkflows.length]);
 
   // Prefer workflow file name when available; fall back to API-provided name
   const getDisplayName = (): string => {
@@ -188,35 +204,42 @@ export default function WorkflowCard({
       <CardContent className="pt-0">
 
 
-        {/* Show testing workflows for trigger workflows only when not reviewed */}
-        {isTrigger && !isMissing && testingWorkflows.length > 0 && !isReviewed && (
-          <div className="mb-3 p-2 rounded-md">
-            <div className="text-xs font-medium text-muted-foreground mb-1">Testing Workflows:</div>
-            <div className="space-y-1">
-              {testingWorkflows.map((testingWorkflow, index) => {
-                return (
-                  <div key={index} className="flex items-center justify-between text-xs">
-                    <span className="truncate pr-2">
-                      {testingWorkflow.name}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant={reviewedTestingWorkflows.has(testingWorkflow.name) ? "default" : "outline"}
-                        size="sm"
-                        className={`h-5 px-2 text-xs ${reviewedTestingWorkflows.has(testingWorkflow.name) ? "bg-green-600 hover:bg-green-700" : ""}`}
-                        onClick={() => {
-                          if (onToggleTestingWorkflowReviewed) {
-                            onToggleTestingWorkflowReviewed(testingWorkflow.name);
-                          }
-                        }}
-                      >
-                        <Check className="h-3 w-3 mr-1" />
-                        {reviewedTestingWorkflows.has(testingWorkflow.name) ? "" : "Review"}
-                      </Button>
+        {/* Smoothly collapsible testing workflows section for trigger workflows */}
+        {isTrigger && !isMissing && testingWorkflows.length > 0 && (
+          <div
+            ref={testingContainerRef}
+            style={{ maxHeight: testingMaxHeight, overflow: 'hidden', transition: 'max-height 200ms ease' }}
+            className={`mb-3 rounded-md ${shouldShowTestingWorkflows ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`}
+            aria-hidden={!shouldShowTestingWorkflows}
+          >
+            <div className="p-2">
+              <div className="text-xs font-medium text-muted-foreground mb-1">Testing Workflows:</div>
+              <div className="space-y-1">
+                {testingWorkflows.map((testingWorkflow, index) => {
+                  return (
+                    <div key={index} className="flex items-center justify-between text-xs">
+                      <span className="truncate pr-2">
+                        {testingWorkflow.name}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant={reviewedTestingWorkflows.has(testingWorkflow.name) ? "default" : "outline"}
+                          size="sm"
+                          className={`h-5 px-2 text-xs ${reviewedTestingWorkflows.has(testingWorkflow.name) ? "bg-green-600 hover:bg-green-700" : ""}`}
+                          onClick={() => {
+                            if (onToggleTestingWorkflowReviewed) {
+                              onToggleTestingWorkflowReviewed(testingWorkflow.name);
+                            }
+                          }}
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          {reviewedTestingWorkflows.has(testingWorkflow.name) ? "" : "Review"}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
