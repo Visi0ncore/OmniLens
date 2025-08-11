@@ -646,6 +646,33 @@ export default function DashboardPage({ params }: PageProps) {
   useEffect(() => {
     if (!isLocalRepo) return;
     try {
+      // If repo was removed from home, ensure any leftover local state is cleared before reading
+      try {
+        const stored = localStorage.getItem('userAddedRepos');
+        const list = stored ? JSON.parse(stored) as Array<any> : [];
+        const exists = Array.isArray(list) && list.some(r => r.slug === repoSlug);
+        if (!exists) {
+          // Clear stale state and bail out; UI will render empty until repo is (re)added
+          try {
+            localStorage.removeItem(`localRepoConfig-${repoSlug}`);
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i += 1) {
+              const key = localStorage.key(i);
+              if (!key) continue;
+              if (
+                key.startsWith(`reviewedWorkflows-${repoSlug}-`) ||
+                key.startsWith(`collapsedCategories-${repoSlug}-`) ||
+                key.startsWith(`reviewedTestingWorkflows-${repoSlug}-`)
+              ) {
+                keysToRemove.push(key);
+              }
+            }
+            keysToRemove.forEach((k) => localStorage.removeItem(k));
+          } catch {}
+          return;
+        }
+      } catch {}
+
       const key = `localRepoConfig-${repoSlug}`;
       const stored = localStorage.getItem(key);
       if (stored) {
@@ -1111,7 +1138,7 @@ export default function DashboardPage({ params }: PageProps) {
                         const wf = (run.path || run.workflow_path || run.workflow_name || '').toLowerCase();
                         const match = configuredFilesArr.find(f => wf.includes(f.toLowerCase()));
                         if (!match) continue;
-                        const prev = latestByFile.get(match);
+                        const prev = latestByFile.get(match); 
                         if (!prev || new Date(run.run_started_at).getTime() > new Date(prev.run_started_at).getTime()) {
                           latestByFile.set(match, run);
                         }

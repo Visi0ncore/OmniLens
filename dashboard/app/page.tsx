@@ -276,6 +276,37 @@ export default function HomePage() {
     }
   }, []);
 
+  // Remove all locally persisted state for a given repo slug
+  const clearRepoLocalState = React.useCallback((repoSlug: string) => {
+    try {
+      // Remove repo-specific config
+      localStorage.removeItem(`localRepoConfig-${repoSlug}`);
+
+      // Remove per-date UI state (reviewed, collapsed, testing-reviewed)
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (
+          key.startsWith(`reviewedWorkflows-${repoSlug}-`) ||
+          key.startsWith(`collapsedCategories-${repoSlug}-`) ||
+          key.startsWith(`reviewedTestingWorkflows-${repoSlug}-`)
+        ) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {}
+
+    // Clear any in-memory trigger map cache for this repo
+    try {
+      const cache = (globalThis as any).__triggerMaps as Record<string, any> | undefined;
+      if (cache && cache[repoSlug]) {
+        delete cache[repoSlug];
+      }
+    } catch {}
+  }, []);
+
   // Build repositories list from user-added repos only (no env-configured repos on this branch)
   const hydrateUserRepos = React.useCallback(async () => {
     try {
@@ -383,6 +414,9 @@ export default function HomePage() {
         metrics: null,
       };
 
+      // Ensure any stale local state from a previous add is cleared before re-adding
+      clearRepoLocalState(slug);
+
       setAvailableRepos(prev => {
         const exists = prev.some(r => r.slug === slug);
         const next = exists ? prev : [...prev, newRepo];
@@ -477,6 +511,7 @@ export default function HomePage() {
                         const stored = loadUserAddedRepos();
                         const updated = stored.filter((r: any) => r.slug !== repoToDelete.slug);
                         saveUserAddedRepos(updated);
+                        clearRepoLocalState(repoToDelete.slug);
                         setRepoToDelete(null);
                       } finally {
                         setIsDeleting(false);
@@ -593,6 +628,7 @@ export default function HomePage() {
                       const stored = loadUserAddedRepos();
                       const updated = stored.filter((r: any) => r.slug !== repoToDelete.slug);
                       saveUserAddedRepos(updated);
+                      clearRepoLocalState(repoToDelete.slug);
                       setRepoToDelete(null);
                     } finally {
                       setIsDeleting(false);
