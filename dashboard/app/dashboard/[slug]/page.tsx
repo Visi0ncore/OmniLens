@@ -133,6 +133,7 @@ export default function DashboardPage({ params }: PageProps) {
   const [reviewedWorkflows, setReviewedWorkflows] = useState<Record<number, boolean>>({});
   const [reviewedTestingWorkflows, setReviewedTestingWorkflows] = useState<Record<string, Set<string>>>({});
   const [hoverState, setHoverState] = useState<HoverState>({ metricType: null, workflowIds: new Set() });
+  const [triggerMapVersion, setTriggerMapVersion] = useState<number>(0);
 
   // Initialize with today's date explicitly  
   const today = new Date();
@@ -340,37 +341,8 @@ export default function DashboardPage({ params }: PageProps) {
     return () => window.clearInterval(id);
   }, [isSelectedDateToday, refetchToday, repoSlug]);
 
-  // Preload trigger map on load (env repos by slug; local repos by repoPath from storage)
-  useEffect(() => {
-    (async () => {
-      try {
-        let url: string | null = null;
-        if (isLocalRepo) {
-          let rp: string | null = addedRepoPath;
-          if (!rp) {
-            try {
-              const stored = localStorage.getItem('userAddedRepos');
-              if (stored) {
-                const parsed = JSON.parse(stored) as Array<any>;
-                const found = parsed.find(r => r.slug === repoSlug);
-                rp = found?.repoPath || null;
-              }
-            } catch {}
-          }
-          if (rp) url = `/api/repositories/trigger-map?repoPath=${encodeURIComponent(rp)}`;
-        } else {
-          url = `/api/repositories/trigger-map?repo=${encodeURIComponent(repoSlug)}`;
-        }
-        if (!url) return;
-        const res = await fetch(url, { cache: 'no-store' });
-        if (res.ok) {
-          const trig = await res.json();
-          const cache = ((globalThis as any).__triggerMaps ||= {});
-          cache[repoSlug] = trig;
-        }
-      } catch {}
-    })();
-  }, [repoSlug, isLocalRepo, addedRepoPath]);
+  // Preload trigger map on load via loader-aware helper so skeleton covers it
+  // Moved below ensureTriggerMapLoaded declaration to avoid use-before-assign
 
   // (deferred skeleton render placed just before final return to avoid hook order issues)
 
@@ -720,10 +692,16 @@ export default function DashboardPage({ params }: PageProps) {
         c[repoSlug] = trig;
         // Persist to localStorage for quicker subsequent loads
         try { localStorage.setItem(`triggerMap-${repoSlug}`, JSON.stringify({ ts: Date.now(), data: trig })); } catch {}
+        setTriggerMapVersion((v) => v + 1);
       }
     } catch {}
     finally { setIsPreparingTriggers(false); }
   }, [repoSlug, isLocalRepo, addedRepoPath]);
+
+  // Preload trigger map on load via loader-aware helper so skeleton covers it
+  useEffect(() => {
+    ensureTriggerMapLoaded();
+  }, [ensureTriggerMapLoaded]);
 
   const openConfigureModal = useCallback(async () => {
     setConfigError(null);
@@ -928,6 +906,22 @@ export default function DashboardPage({ params }: PageProps) {
     setLocalConfig(next);
     saveLocalConfig(next);
   }, [localConfig, saveLocalConfig]);
+
+  // Use skeleton while critical data is loading, but NOT for "no workflows configured" views
+  const isLocalNoConfigured = isLocalRepo && !repoConfig && !!localConfig &&
+    !Object.values(localConfig.categories || {}).some((c: any) => (c?.workflows || []).length > 0);
+  const isEnvNoConfigured = !!repoConfig &&
+    !Object.values(repoConfig.categories || {}).some((c: any) => (c as any)?.workflows?.length > 0);
+
+  const shouldShowSkeletonEarly = (
+    (todayLoading || yesterdayLoading || (isPreparingTriggers && !(isLocalNoConfigured || isEnvNoConfigured)) ||
+    (isLocalRepo && !repoConfig && addedRepoPath === null)) &&
+    !(isLocalNoConfigured || isEnvNoConfigured)
+  );
+
+  if (shouldShowSkeletonEarly) {
+    return <DashboardSkeleton />;
+  }
 
   // Local repo configuration UI
   if (!repoConfig && isLocalRepo) {
@@ -1198,6 +1192,7 @@ export default function DashboardPage({ params }: PageProps) {
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     )}
+                                    triggerMapVersion={triggerMapVersion}
                                   />
                                 </div>
                               ))}
@@ -1386,8 +1381,13 @@ export default function DashboardPage({ params }: PageProps) {
     );
   }
 
-  // Show full dashboard skeleton while loading to avoid UI popping
-  if (todayLoading || yesterdayLoading) {
+  // Show full dashboard skeleton while loading to avoid UI popping, except for "no workflows configured"
+  const shouldShowSkeletonLate = (
+    (todayLoading || yesterdayLoading || (isPreparingTriggers && !(isLocalNoConfigured || isEnvNoConfigured)) ||
+    (isLocalRepo && !repoConfig && addedRepoPath === null)) &&
+    !(isLocalNoConfigured || isEnvNoConfigured)
+  );
+  if (shouldShowSkeletonLate) {
     return <DashboardSkeleton />;
   }
 

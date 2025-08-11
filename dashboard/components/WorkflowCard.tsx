@@ -1,6 +1,6 @@
 import { Clock, ExternalLink, Check, Eye } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import type { WorkflowRun } from "@/lib/github";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,7 @@ interface WorkflowCardProps {
   reviewedTestingWorkflows?: Set<string>;
   onToggleTestingWorkflowReviewed?: (testingWorkflowName: string) => void;
   rightAction?: React.ReactNode; // Optional right-side action button (e.g., delete)
+  triggerMapVersion?: number; // bump to recompute testing mappings when trigger map updates
 }
 
 export default function WorkflowCard({
@@ -111,19 +112,7 @@ export default function WorkflowCard({
   // otherwise allow the card to size naturally instead of stretching to the tallest row peer.
   const cardHeightClass = shouldShowTestingWorkflows ? 'min-h-[200px]' : 'h-auto';
 
-  // Smooth collapse/expand for testing workflows section using max-height transition
-  const testingContainerRef = useRef<HTMLDivElement | null>(null);
-  const [testingMaxHeight, setTestingMaxHeight] = useState<number>(0);
-  useEffect(() => {
-    const el = testingContainerRef.current;
-    if (!el) return;
-    if (shouldShowTestingWorkflows) {
-      // Measure content height for expansion
-      setTestingMaxHeight(el.scrollHeight);
-    } else {
-      setTestingMaxHeight(0);
-    }
-  }, [shouldShowTestingWorkflows, testingWorkflows.length]);
+  // Removed animated collapse/expand to ensure immediate visibility of testing workflows
 
   // Prefer workflow file name when available; fall back to API-provided name
   const getDisplayName = (): string => {
@@ -136,7 +125,7 @@ export default function WorkflowCard({
   };
 
   return (
-    <Card className={`${cardHeightClass} transition-all duration-200 ${getBorderClass()}`}>
+    <Card className={`${cardHeightClass} ${getBorderClass()}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm leading-tight truncate pr-2">
@@ -204,14 +193,9 @@ export default function WorkflowCard({
       <CardContent className="pt-0">
 
 
-        {/* Smoothly collapsible testing workflows section for trigger workflows */}
-        {isTrigger && !isMissing && testingWorkflows.length > 0 && (
-          <div
-            ref={testingContainerRef}
-            style={{ maxHeight: testingMaxHeight, overflow: 'hidden', transition: 'max-height 200ms ease' }}
-            className={`mb-3 rounded-md ${shouldShowTestingWorkflows ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`}
-            aria-hidden={!shouldShowTestingWorkflows}
-          >
+        {/* Testing workflows section for trigger workflows (no animation) */}
+        {shouldShowTestingWorkflows && (
+          <div className="mb-3 rounded-md">
             <div className="p-2">
               <div className="text-xs font-medium text-muted-foreground mb-1">Testing Workflows:</div>
               <div className="space-y-1">
