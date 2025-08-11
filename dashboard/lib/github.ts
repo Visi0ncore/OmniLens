@@ -352,7 +352,8 @@ export function calculateOverviewData(workflowRuns: WorkflowRun[], repoSlug: str
   // Calculate how many configured workflows didn't run (using original workflowRuns, not filtered)
   const missingWorkflows = calculateMissingWorkflows(workflowRuns, repoSlug);
   const didntRunCount = missingWorkflows.length;
-  const totalWorkflows = filteredRuns.length;
+  // Total configured workflows should reflect configuration, not how many ran
+  const totalWorkflows = getAllConfiguredWorkflows(repoSlug).length;
 
   return {
     completedRuns,

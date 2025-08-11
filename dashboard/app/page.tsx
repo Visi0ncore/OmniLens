@@ -3,7 +3,63 @@
 import React from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, AlertCircle } from "lucide-react";
+import {
+  AlertCircle,
+  Plus,
+  Trash2,
+  Package,
+  Activity,
+  Bell,
+  Book,
+  Calendar,
+  Camera,
+  CheckCircle,
+  Clock,
+  Cloud,
+  Code,
+  Database,
+  Download,
+  Edit,
+  ExternalLink,
+  Eye,
+  FileText,
+  Folder,
+  GitBranch,
+  GitCommit,
+  GitMerge,
+  GitPullRequest,
+  Globe,
+  HelpCircle,
+  Home,
+  Info,
+  Lightbulb,
+  List,
+  Lock,
+  MessageSquare,
+  Play,
+  Pause,
+  RefreshCw,
+  Rocket,
+  Search,
+  Server,
+  Settings,
+  Shield,
+  Sliders,
+  Star,
+  Sun,
+  Moon,
+  Target,
+  Terminal,
+  ThumbsUp,
+  Timer,
+  TrendingUp,
+  Upload,
+  User,
+  Users,
+  Wrench,
+  Zap,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import CompactMetricsOverview from "@/components/CompactMetricsOverview";
 
 
@@ -34,11 +90,13 @@ interface RepositoryCardProps {
     successRate: number;
     hasActivity: boolean;
   } | null;
+  isUserRepo?: boolean;
+  onRequestDelete?: () => void;
 }
 
-function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessage, hasWorkflows, metrics }: RepositoryCardProps) {
+function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessage, hasWorkflows, metrics, isUserRepo = false, onRequestDelete }: RepositoryCardProps) {
   const cardContent = (
-    <Card className={`h-full transition-all duration-200 ${
+    <Card className={`relative h-full transition-all duration-200 ${
       hasError 
         ? 'border-red-500 bg-card hover:border-red-400' 
         : 'border-border bg-card hover:border-border/80 hover:shadow-md'
@@ -48,7 +106,25 @@ function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessag
           <CardTitle className="text-lg font-semibold">
             {formatRepoDisplayName(displayName)}
           </CardTitle>
-          {hasError && <AlertCircle className="h-5 w-5 text-red-500" />}
+          <div className="flex items-center gap-2">
+            {hasError && <AlertCircle className="h-5 w-5 text-red-500" />}
+            {isUserRepo && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRequestDelete?.();
+                }}
+                title="Remove repository"
+                aria-label="Remove repository"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
         <p className="text-sm text-muted-foreground font-mono">
           {displayName}
@@ -77,11 +153,12 @@ function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessag
             </p>
           </div>
         )}
+
       </CardContent>
     </Card>
   );
 
-  if (hasError || !hasWorkflows) {
+  if (hasError) {
     return (
       <div className="opacity-75">
         {cardContent}
@@ -96,21 +173,55 @@ function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessag
   );
 }
 
-function NoRepositoriesFound() {
+
+function NoRepositoriesFound({
+  newRepoUrl,
+  isValidating,
+  addError,
+  onUrlChange,
+  onSubmit,
+}: {
+  newRepoUrl: string;
+  isValidating: boolean;
+  addError: string | null;
+  onUrlChange: (value: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4">
-      <div className="rounded-full bg-muted p-6">
-        <Calendar className="h-12 w-12 text-muted-foreground" />
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-xl font-semibold">
-          No repositories found
-        </h2>
-        <p className="text-muted-foreground max-w-md">
-          Please configure <code className="bg-muted px-2 py-1 rounded text-sm">GITHUB_REPO_1</code>, 
-          <code className="bg-muted px-2 py-1 rounded text-sm mx-1">GITHUB_REPO_2</code>, or 
-          <code className="bg-muted px-2 py-1 rounded text-sm">GITHUB_REPO_3</code> environment variables.
-        </p>
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-full max-w-xl">
+        <div className="border rounded-lg bg-card/60 backdrop-blur-sm p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+            <Package className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-2xl font-semibold tracking-tight">No repositories yet</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Add a GitHub repository to start tracking workflows and metrics.
+          </p>
+
+          <form onSubmit={onSubmit} className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
+            <input
+              type="text"
+              value={newRepoUrl}
+              onChange={(e) => onUrlChange(e.target.value)}
+              placeholder="owner/repo or GitHub URL"
+              className="w-full sm:w-80 px-3 py-2 rounded-md bg-background border border-input text-sm outline-none focus:ring-2 focus:ring-primary"
+            />
+            <div className="flex gap-2 justify-center">
+              <Button type="submit" size="sm" disabled={isValidating} className="gap-2">
+                <Plus className="h-4 w-4" />
+                {isValidating ? 'Validating…' : 'Add Repo'}
+              </Button>
+            </div>
+          </form>
+
+          {addError && (
+            <p className="mt-2 text-sm text-red-500">{addError}</p>
+          )}
+
+          
+
+        </div>
       </div>
     </div>
   );
@@ -135,26 +246,196 @@ export default function HomePage() {
   }>>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = React.useState(false);
+  const [newRepoUrl, setNewRepoUrl] = React.useState("");
+  const [addError, setAddError] = React.useState<string | null>(null);
+  const [isValidating, setIsValidating] = React.useState(false);
+  const [repoToDelete, setRepoToDelete] = React.useState<{
+    slug: string;
+    displayName: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
-  // Fetch repositories from API
-  React.useEffect(() => {
-    const fetchRepositories = async () => {
-      try {
-        const response = await fetch('/api/repositories/metrics');
-        if (!response.ok) {
-          throw new Error('Failed to fetch repository metrics');
-        }
-        const data = await response.json();
-        setAvailableRepos(data.repositories);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchRepositories();
+  const loadUserAddedRepos = React.useCallback(() => {
+    try {
+      const stored = localStorage.getItem('userAddedRepos');
+      if (!stored) return [] as any[];
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) return [] as any[];
+      return parsed as Array<any>;
+    } catch {
+      return [] as any[];
+    }
   }, []);
+
+  const saveUserAddedRepos = React.useCallback((repos: any[]) => {
+    try {
+      localStorage.setItem('userAddedRepos', JSON.stringify(repos));
+    } catch {
+      // ignore storage failures
+    }
+  }, []);
+
+  // Remove all locally persisted state for a given repo slug
+  const clearRepoLocalState = React.useCallback((repoSlug: string) => {
+    try {
+      // Remove repo-specific config
+      localStorage.removeItem(`localRepoConfig-${repoSlug}`);
+
+      // Remove per-date UI state (reviewed, collapsed, testing-reviewed)
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (
+          key.startsWith(`reviewedWorkflows-${repoSlug}-`) ||
+          key.startsWith(`collapsedCategories-${repoSlug}-`) ||
+          key.startsWith(`reviewedTestingWorkflows-${repoSlug}-`)
+        ) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {}
+
+    // Clear any in-memory trigger map cache for this repo
+    try {
+      const cache = (globalThis as any).__triggerMaps as Record<string, any> | undefined;
+      if (cache && cache[repoSlug]) {
+        delete cache[repoSlug];
+      }
+    } catch {}
+  }, []);
+
+  // Build repositories list from user-added repos only (no env-configured repos on this branch)
+  const hydrateUserRepos = React.useCallback(async () => {
+    try {
+      const userRepos = loadUserAddedRepos();
+      const mappedUserRepos = userRepos.map((r: any) => ({
+        slug: r.slug,
+        repoPath: r.repoPath,
+        envKey: 'LOCAL',
+        displayName: r.displayName || r.repoPath,
+        hasConfig: false,
+        hasWorkflows: false,
+        metrics: null,
+      }));
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+
+      const enhanced = await Promise.all(
+        mappedUserRepos.map(async (repo: any) => {
+          try {
+            const raw = localStorage.getItem(`localRepoConfig-${repo.slug}`);
+            const localCfg = raw ? JSON.parse(raw) : null;
+            const configuredFiles: string[] = localCfg
+              ? Object.values(localCfg.categories || {}).flatMap((c: any) => c?.workflows || [])
+              : [];
+
+            const hasLocalWorkflows = configuredFiles.length > 0;
+            if (!hasLocalWorkflows || !repo.repoPath) {
+              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: hasLocalWorkflows ? { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } : { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
+            }
+
+            const resRuns = await fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repo.repoPath)}&date=${encodeURIComponent(todayStr)}`, { cache: 'no-store' });
+            if (!resRuns.ok) {
+              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
+            }
+            const json = await resRuns.json();
+            const runs = (json.workflow_runs || []).filter((r: any) => {
+              const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
+              return file && configuredFiles.some((cfg) => file.includes(cfg));
+            });
+            const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
+            const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
+            const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
+            const failedRuns = runs.filter((r: any) => r.conclusion === 'failure').length;
+            const successRate = completedRuns > 0 ? Math.round((passedRuns / completedRuns) * 100) : 0;
+            const hasActivity = completedRuns > 0 || inProgressRuns > 0;
+            return { ...repo, hasWorkflows: true, metrics: { totalWorkflows: configuredFiles.length, passedRuns, failedRuns, inProgressRuns, successRate, hasActivity } };
+          } catch {
+            return repo;
+          }
+        })
+      );
+
+      setAvailableRepos(enhanced);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadUserAddedRepos]);
+
+  React.useEffect(() => {
+    hydrateUserRepos();
+  }, [hydrateUserRepos]);
+
+  // Poll in the background to reflect new runs without manual refresh
+  React.useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        hydrateUserRepos();
+      }
+    }, 10000); // 10s
+    return () => window.clearInterval(intervalId);
+  }, [hydrateUserRepos]);
+
+  async function handleAddRepo(e: React.FormEvent) {
+    e.preventDefault();
+    setAddError(null);
+    const input = newRepoUrl.trim();
+    if (!input) {
+      setAddError('Please enter a GitHub repository URL or owner/repo');
+      return;
+    }
+    setIsValidating(true);
+    try {
+      const res = await fetch('/api/repositories/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoUrl: input }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.valid === false) {
+        setAddError(json?.error || 'Repository validation failed');
+        return;
+      }
+
+      const repoPath: string = json.repoPath;
+      const displayName: string = json.displayName || repoPath;
+      const slug = `local-${repoPath.replace(/\//g, '-')}`;
+
+      const newRepo = {
+        slug,
+        repoPath,
+        envKey: 'LOCAL',
+        displayName,
+        hasConfig: false,
+        hasWorkflows: false,
+        metrics: null,
+      };
+
+      // Ensure any stale local state from a previous add is cleared before re-adding
+      clearRepoLocalState(slug);
+
+      setAvailableRepos(prev => {
+        const exists = prev.some(r => r.slug === slug);
+        const next = exists ? prev : [...prev, newRepo];
+        // Persist minimal representation
+        const stored = loadUserAddedRepos();
+        const storedExists = stored.some((r: any) => r.slug === slug);
+        const updatedStored = storedExists ? stored : [...stored, { slug, repoPath, displayName }];
+        saveUserAddedRepos(updatedStored);
+        return next;
+      });
+
+      setNewRepoUrl('');
+      setShowAddForm(false);
+    } catch (err) {
+      setAddError('Network error validating repository');
+    } finally {
+      setIsValidating(false);
+    }
+  }
 
   // Show loading state
   if (isLoading) {
@@ -191,35 +472,71 @@ export default function HomePage() {
   if (availableRepos.length === 0) {
     return (
       <div className="min-h-screen bg-[#0D0D0D]">
-        <div className="container mx-auto p-6">
-          <header className="mb-8">
+        <div className="container mx-auto p-6 space-y-8">
+          <header className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">👁️ OmniLens</h1>
           </header>
-          <NoRepositoriesFound />
+          <NoRepositoriesFound
+            newRepoUrl={newRepoUrl}
+            isValidating={isValidating}
+            addError={addError}
+            onUrlChange={(v) => setNewRepoUrl(v)}
+            onSubmit={handleAddRepo}
+          />
+          {/* Confirmation Modal (hidden when no repo) */}
+          {repoToDelete && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="w-full max-w-md rounded-lg border border-border bg-background shadow-lg">
+                <div className="p-4 border-b border-border">
+                  <h2 className="text-lg font-semibold">Remove repository</h2>
+                </div>
+                <div className="p-4 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Are you sure you want to remove
+                    {" "}
+                    <span className="font-medium text-foreground">{formatRepoDisplayName(repoToDelete.displayName)}</span>?
+                  </p>
+                  
+                </div>
+                <div className="p-4 border-t border-border flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setRepoToDelete(null)}>Cancel</Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={async () => {
+                      if (!repoToDelete) return;
+                      setIsDeleting(true);
+                      try {
+                        setAvailableRepos(prev => prev.filter(r => r.slug !== repoToDelete.slug));
+                        const stored = loadUserAddedRepos();
+                        const updated = stored.filter((r: any) => r.slug !== repoToDelete.slug);
+                        saveUserAddedRepos(updated);
+                        clearRepoLocalState(repoToDelete.slug);
+                        setRepoToDelete(null);
+                      } finally {
+                        setIsDeleting(false);
+                      }
+                    }}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? 'Removing…' : 'Remove'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   // Process each repository to check for errors and workflow configuration
-  const repositoryData = availableRepos.map(repo => {
-    let hasError = false;
-    let errorMessage = '';
-
-    if (!repo.hasConfig) {
-      hasError = true;
-      errorMessage = 'Repository not found in configuration';
-    } else if (!repo.hasWorkflows) {
-      hasError = true;
-      errorMessage = 'No workflows configured';
-    }
-
-    return {
-      ...repo,
-      hasError,
-      errorMessage
-    };
-  }).sort((a, b) => {
+  const repositoryData = availableRepos.map(repo => ({
+    ...repo,
+    // Keep neutral style and allow navigation even when not configured
+    hasError: false,
+    errorMessage: ''
+  })).sort((a, b) => {
     // Sort alphabetically by repository name (not org/user)
     const repoNameA = formatRepoDisplayName(a.displayName);
     const repoNameB = formatRepoDisplayName(b.displayName);
@@ -230,7 +547,40 @@ export default function HomePage() {
     <div className="min-h-screen bg-[#0D0D0D]">
       <div className="container mx-auto p-6 space-y-8">
         <header className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">👁️ OmniLens</h1>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-3xl font-bold tracking-tight">👁️ OmniLens</h1>
+            <div className="w-full sm:w-auto">
+              {!showAddForm ? (
+                <div className="flex justify-end">
+                  <Button variant="default" size="sm" onClick={() => setShowAddForm(true)}>
+                    <Plus className="h-4 w-4" />
+                    Add Repo
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleAddRepo} className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={newRepoUrl}
+                    onChange={(e) => setNewRepoUrl(e.target.value)}
+                    placeholder="owner/repo or GitHub URL"
+                    className="w-full sm:w-80 px-3 py-2 rounded-md bg-background border border-input text-sm outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" disabled={isValidating}>
+                      {isValidating ? 'Validating…' : 'Add'}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => { setShowAddForm(false); setAddError(null); }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
+              {addError && (
+                <p className="mt-2 text-sm text-red-500">{addError}</p>
+              )}
+            </div>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -244,9 +594,54 @@ export default function HomePage() {
               errorMessage={repo.errorMessage}
               hasWorkflows={repo.hasWorkflows}
               metrics={repo.metrics}
+              isUserRepo={repo.envKey === 'LOCAL' || repo.slug.startsWith('local-')}
+              onRequestDelete={() => setRepoToDelete({ slug: repo.slug, displayName: repo.displayName })}
             />
           ))}
         </div>
+
+        {/* Confirmation Modal */}
+        {repoToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-md rounded-lg border border-border bg-background shadow-lg">
+              <div className="p-4 border-b border-border">
+                <h2 className="text-lg font-semibold">Remove repository</h2>
+              </div>
+              <div className="p-4 space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Are you sure you want to remove
+                  {" "}
+                  <span className="font-medium text-foreground">{formatRepoDisplayName(repoToDelete.displayName)}</span>?
+                </p>
+                
+              </div>
+              <div className="p-4 border-t border-border flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setRepoToDelete(null)}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={async () => {
+                    if (!repoToDelete) return;
+                    setIsDeleting(true);
+                    try {
+                      setAvailableRepos(prev => prev.filter(r => r.slug !== repoToDelete.slug));
+                      const stored = loadUserAddedRepos();
+                      const updated = stored.filter((r: any) => r.slug !== repoToDelete.slug);
+                      saveUserAddedRepos(updated);
+                      clearRepoLocalState(repoToDelete.slug);
+                      setRepoToDelete(null);
+                    } finally {
+                      setIsDeleting(false);
+                    }
+                  }}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Removing…' : 'Remove'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

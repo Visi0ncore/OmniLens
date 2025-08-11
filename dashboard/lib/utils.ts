@@ -102,30 +102,59 @@ export function calculateMissingWorkflows(runs: any[], repoSlug: string): string
 // Get testing workflows for a given trigger workflow in a specific repo
 export function getTestingWorkflowsForTrigger(triggerWorkflowName: string, repoSlug: string): string[] {
   if (!triggerWorkflowName) return [];
-  
+  const normalize = (s: string | undefined | null) => (s ? String(s).toLowerCase().trim() : '');
+
+  // Prefer dynamic trigger map (per-repo cache)
+  try {
+    const maps = (globalThis as any).__triggerMaps as Record<string, any> | undefined;
+    const repoMap = maps?.[repoSlug];
+    if (repoMap) {
+      const key = normalize(triggerWorkflowName);
+      const fromName = repoMap.nameToTesting?.[key];
+      if (fromName && fromName.length > 0) return fromName as string[];
+
+      // Try by matching workflow meta to find file base
+      const workflowsMeta: Array<{ path?: string; name?: string }> = repoMap.workflows || [];
+      const match = workflowsMeta.find((wf) => normalize(wf.name) === key || normalize(wf.path?.split('/').pop()) === key);
+      if (match && match.path) {
+        const base = match.path.split('/').pop()?.toLowerCase();
+        const fromFile = base ? (repoMap.fileToTesting?.[base] as string[] | undefined) : undefined;
+        if (fromFile && fromFile.length > 0) return fromFile;
+      }
+    }
+  } catch {}
+
+  // Fallback to static config mapping
   const repoConfig = getRepoConfig(repoSlug);
   if (!repoConfig) return [];
-  
-  // Get trigger workflows from the config
   const triggerWorkflows = repoConfig.categories.trigger?.workflows || [];
   const triggerMappings = repoConfig.trigger_mappings || {};
-  
-  // Find which trigger workflow this matches
   const matchingTriggerFile = triggerWorkflows.find(triggerFile => {
-    // Convert trigger file name to workflow name for comparison
     const triggerWorkflowNameFromFile = triggerFile.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     return triggerWorkflowName.toLowerCase().includes(triggerWorkflowNameFromFile.toLowerCase());
   });
-  
-  // Return the testing workflows for this trigger
   return matchingTriggerFile ? (triggerMappings[matchingTriggerFile] || []) : [];
 }
 
 // Get trigger workflow for a given testing workflow in a specific repo
 export function getTriggerWorkflowForTesting(testingWorkflowName: string, repoSlug: string): string | null {
+  const normalize = (s: string | undefined | null) => (s ? String(s).toLowerCase().trim() : '');
+
+  // Try dynamic reverse mapping first
+  try {
+    const maps = (globalThis as any).__triggerMaps as Record<string, any> | undefined;
+    const repoMap = maps?.[repoSlug];
+    if (repoMap && repoMap.testingToTrigger) {
+      const key = normalize(testingWorkflowName);
+      // testingToTrigger maps testing base file -> array of trigger names/files (normalized)
+      const list = repoMap.testingToTrigger[key] as string[] | undefined;
+      if (list && list.length > 0) return list[0] || null;
+    }
+  } catch {}
+
+  // Fallback to static config
   const repoConfig = getRepoConfig(repoSlug);
   if (!repoConfig) return null;
-  
   const triggerMappings = repoConfig.trigger_mappings || {};
   for (const [triggerWorkflow, testingWorkflows] of Object.entries(triggerMappings)) {
     if (Array.isArray(testingWorkflows) && testingWorkflows.includes(testingWorkflowName)) {
@@ -138,16 +167,32 @@ export function getTriggerWorkflowForTesting(testingWorkflowName: string, repoSl
 // Check if a workflow is a trigger workflow in a specific repo
 export function isTriggerWorkflow(workflowName: string, repoSlug: string): boolean {
   if (!workflowName) return false;
-  
+  const normalize = (s: string | undefined | null) => (s ? String(s).toLowerCase().trim() : '');
+
+  // Dynamic map first (per-repo)
+  try {
+    const maps = (globalThis as any).__triggerMaps as Record<string, any> | undefined;
+    const repoMap = maps?.[repoSlug];
+    if (repoMap) {
+      const key = normalize(workflowName);
+      if (repoMap.nameToTesting && Array.isArray(repoMap.nameToTesting[key]) && repoMap.nameToTesting[key].length > 0) return true;
+
+      // Check via workflows meta + fileToTesting
+      const workflowsMeta: Array<{ path?: string; name?: string; isTrigger?: boolean }> = repoMap.workflows || [];
+      const match = workflowsMeta.find((wf) => normalize(wf.name) === key || normalize(wf.path?.split('/').pop()) === key);
+      if (match) {
+        if (match.isTrigger) return true;
+        const base = match.path?.split('/')?.pop()?.toLowerCase();
+        if (base && repoMap.fileToTesting && Array.isArray(repoMap.fileToTesting[base]) && repoMap.fileToTesting[base].length > 0) return true;
+      }
+    }
+  } catch {}
+
+  // Fallback to static config
   const repoConfig = getRepoConfig(repoSlug);
   if (!repoConfig) return false;
-  
-  // Get trigger workflows from the config
   const triggerWorkflows = repoConfig.categories.trigger?.workflows || [];
-  
-  // Check if this workflow name matches any trigger workflow file
   return triggerWorkflows.some(triggerFile => {
-    // Convert trigger file name to workflow name for comparison
     const triggerWorkflowName = triggerFile.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     return workflowName.toLowerCase().includes(triggerWorkflowName.toLowerCase());
   });

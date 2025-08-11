@@ -1,6 +1,6 @@
 import { Clock, ExternalLink, Check, Eye } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { WorkflowRun } from "@/lib/github";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,8 @@ interface WorkflowCardProps {
   allWorkflowRuns?: WorkflowRun[]; // All workflow runs to find testing workflows
   reviewedTestingWorkflows?: Set<string>;
   onToggleTestingWorkflowReviewed?: (testingWorkflowName: string) => void;
+  rightAction?: React.ReactNode; // Optional right-side action button (e.g., delete)
+  triggerMapVersion?: number; // bump to recompute testing mappings when trigger map updates
 }
 
 export default function WorkflowCard({
@@ -51,11 +53,13 @@ export default function WorkflowCard({
   highlightColor = '',
   allWorkflowRuns = [],
   reviewedTestingWorkflows = new Set(),
-  onToggleTestingWorkflowReviewed
+  onToggleTestingWorkflowReviewed,
+  rightAction
 }: WorkflowCardProps) {
   const status = run.conclusion ?? run.status;
-  const isSuccess = status === "success";
-  const isDidntRun = status === "didnt_run" || run.isMissing;
+  const isMissing = (run as any).isMissing === true || status === 'missing';
+  const isSuccess = !isMissing && status === "success";
+  const isInProgress = !isMissing && (status === "in_progress" || status === 'queued');
 
   // Check if this is a trigger workflow - try both name and workflow_name
   const isTrigger = isTriggerWorkflow(run.name, repoSlug) || isTriggerWorkflow(run.workflow_name || '', repoSlug);
@@ -104,18 +108,32 @@ export default function WorkflowCard({
 
   // Determine card height - trigger cards should only be taller when testing workflows are visible
   const shouldShowTestingWorkflows = isTrigger && testingWorkflows.length > 0 && !isReviewed;
-  const cardHeightClass = shouldShowTestingWorkflows ? 'min-h-[200px]' : 'h-full';
+  // Use a minimum height when testing workflows are shown to avoid layout jumps,
+  // otherwise allow the card to size naturally instead of stretching to the tallest row peer.
+  const cardHeightClass = shouldShowTestingWorkflows ? 'min-h-[200px]' : 'h-auto';
+
+  // Removed animated collapse/expand to ensure immediate visibility of testing workflows
+
+  // Prefer workflow file name when available; fall back to API-provided name
+  const getDisplayName = (): string => {
+    const source = (run.workflow_name || run.path || run.name || '').toString();
+    const last = source.split('/').pop() || source;
+    const noExt = last.replace(/\.ya?ml$/i, '');
+    const cleaned = noExt.replace(/[-_]/g, ' ').trim();
+    if (!cleaned) return cleanWorkflowName(run.name || '');
+    return cleaned.replace(/\b\w/g, (l) => l.toUpperCase());
+  };
 
   return (
-    <Card className={`${cardHeightClass} transition-all duration-200 ${getBorderClass()}`}>
+    <Card className={`${cardHeightClass} ${getBorderClass()}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm leading-tight truncate pr-2">
-            {cleanWorkflowName(run.name)}
+            {getDisplayName()}
           </h3>
           <div className="flex items-center gap-2">
             {/* Show run count badge if workflow was run multiple times */}
-            {run.run_count && run.run_count > 1 && (
+            {!isMissing && run.run_count && run.run_count > 1 && (
               <Popover>
                 <PopoverTrigger asChild>
                   <Badge variant="secondary" className="shrink-0 text-xs cursor-pointer hover:opacity-80">
@@ -135,21 +153,18 @@ export default function WorkflowCard({
                             <span className="font-mono w-24">
                               #{runDetail.id}
                             </span>
-                            <Badge
-                              variant={
-                                runDetail.conclusion === 'success' ? "success" :
-                                  runDetail.conclusion === null && runDetail.status === 'in_progress' ? "destructive" :
-                                    "destructive"
-                              }
-                              className={`text-xs justify-self-start ${runDetail.conclusion === null && runDetail.status === 'in_progress'
-                                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                                  : ''
-                                }`}
-                            >
-                              {runDetail.conclusion === 'success' ? "Pass" :
-                                runDetail.conclusion === null && runDetail.status === 'in_progress' ? "Running" :
-                                  "Fail"}
-                            </Badge>
+                            {(() => {
+                              const isDetailRunning = (runDetail.status === 'in_progress' || runDetail.status === 'queued') && (runDetail.conclusion === null || runDetail.conclusion === undefined);
+                              const isDetailSuccess = runDetail.conclusion === 'success';
+                              const label = isDetailSuccess ? 'Pass' : isDetailRunning ? 'Running' : 'Fail';
+                              const variant = isDetailSuccess ? 'success' : 'destructive';
+                              const runningClass = isDetailRunning ? 'bg-orange-500 hover:bg-orange-600 text-white' : '';
+                              return (
+                                <Badge variant={variant} className={`text-xs justify-self-start ${runningClass}`}>
+                                  {label}
+                                </Badge>
+                              );
+                            })()}
                             <Button variant="ghost" size="sm" asChild className="h-6 px-1">
                               <Link href={runDetail.html_url} target="_blank">
                                 <Eye className="h-3 w-3" />
@@ -166,69 +181,60 @@ export default function WorkflowCard({
               </Popover>
             )}
             <Badge
-              variant={
-                isSuccess ? "success" :
-                  isDidntRun ? "warning" :
-                    status === "in_progress" ? "destructive" :
-                      "destructive"
-              }
-              className={`shrink-0 ${status === "in_progress"
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                  : ''
-                }`}
+              variant={isMissing ? "secondary" : isSuccess ? "success" : isInProgress ? "destructive" : "destructive"}
+              className={`shrink-0 ${isInProgress ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
             >
-              {/* eslint-disable-next-line react/no-unescaped-entities */}
-              {isSuccess ? "Pass" :
-                isDidntRun ? "Didn't Run" :
-                  status === "in_progress" ? "Running" :
-                    "Fail"}
+              {isMissing ? "Didn't Run" : isSuccess ? "Pass" : isInProgress ? "Running" : "Fail"}
             </Badge>
+            {rightAction}
           </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
 
 
-        {/* Show testing workflows for trigger workflows only when not reviewed */}
-        {isTrigger && testingWorkflows.length > 0 && !isReviewed && (
-          <div className="mb-3 p-2 rounded-md">
-            <div className="text-xs font-medium text-muted-foreground mb-1">Testing Workflows:</div>
-            <div className="space-y-1">
-              {testingWorkflows.map((testingWorkflow, index) => {
-                return (
-                  <div key={index} className="flex items-center justify-between text-xs">
-                    <span className="truncate pr-2">
-                      {testingWorkflow.name}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant={reviewedTestingWorkflows.has(testingWorkflow.name) ? "default" : "outline"}
-                        size="sm"
-                        className={`h-5 px-2 text-xs ${reviewedTestingWorkflows.has(testingWorkflow.name) ? "bg-green-600 hover:bg-green-700" : ""}`}
-                        onClick={() => {
-                          if (onToggleTestingWorkflowReviewed) {
-                            onToggleTestingWorkflowReviewed(testingWorkflow.name);
-                          }
-                        }}
-                      >
-                        <Check className="h-3 w-3 mr-1" />
-                        {reviewedTestingWorkflows.has(testingWorkflow.name) ? "" : "Review"}
-                      </Button>
+        {/* Testing workflows section for trigger workflows (no animation) */}
+        {shouldShowTestingWorkflows && (
+          <div className="mb-3 rounded-md">
+            <div className="p-2">
+              <div className="text-xs font-medium text-muted-foreground mb-1">Testing Workflows:</div>
+              <div className="space-y-1">
+                {testingWorkflows.map((testingWorkflow, index) => {
+                  return (
+                    <div key={index} className="flex items-center justify-between text-xs">
+                      <span className="truncate pr-2">
+                        {testingWorkflow.name}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant={reviewedTestingWorkflows.has(testingWorkflow.name) ? "default" : "outline"}
+                          size="sm"
+                          className={`h-5 px-2 text-xs ${reviewedTestingWorkflows.has(testingWorkflow.name) ? "bg-green-600 hover:bg-green-700" : ""}`}
+                          onClick={() => {
+                            if (onToggleTestingWorkflowReviewed) {
+                              onToggleTestingWorkflowReviewed(testingWorkflow.name);
+                            }
+                          }}
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          {reviewedTestingWorkflows.has(testingWorkflow.name) ? "" : "Review"}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>{isDidntRun ? "Not executed" : duration(run.run_started_at, run.updated_at)}</span>
-          </div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>{isMissing ? "No runs" : isInProgress ? "Running" : (run.run_started_at && run.updated_at ? duration(run.run_started_at, run.updated_at) : "")}</span>
+            </div>
           <div className="flex items-center gap-2">
-            {!isDidntRun ? (
+            {!isInProgress && !isMissing ? (
               <Button variant="outline" size="sm" asChild>
                 <Link href={run.html_url} target="_blank">
                   <Eye className="h-3 w-3 mr-1" />
@@ -245,7 +251,7 @@ export default function WorkflowCard({
               variant={isReviewed ? "default" : "outline"}
               size="sm"
               onClick={onToggleReviewed}
-              disabled={isTrigger && testingWorkflows.length > 0 && !allTestingWorkflowsReviewed}
+              disabled={(!isMissing) && isTrigger && testingWorkflows.length > 0 && !allTestingWorkflowsReviewed}
               className={isReviewed ? "bg-green-600 hover:bg-green-700" : ""}
             >
               <Check className={`h-3 w-3 ${!isReviewed ? "mr-1" : ""}`} />
