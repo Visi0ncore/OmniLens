@@ -11,6 +11,7 @@ import { getRepoNameFromEnv } from "@/lib/github";
 import DailyReportCard from "@/components/DailyReportCard";
 import ThirtyDayHealthCard from "@/components/ThirtyDayHealthCard";
 import NinetyDayHealthCard from "@/components/NinetyDayHealthCard";
+import ThirtyDayWorkflowHealthDetails from "@/components/ThirtyDayWorkflowHealthDetails";
 
 import type { WorkflowRun } from "@/lib/github";
 
@@ -130,6 +131,8 @@ export default function ReportPage({ params }: PageProps) {
         <ThirtyDayHealthCard repoSlug={repoSlug} repoPath={repoPath} />
         <NinetyDayHealthCard repoSlug={repoSlug} repoPath={repoPath} />
       </div>
+
+      <ThirtyDayWorkflowHealthDetails repoSlug={repoSlug} repoPath={repoPath} />
 
       
     </div>

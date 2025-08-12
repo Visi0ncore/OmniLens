@@ -70,10 +70,11 @@ function categorizeWorkflows(runs: any[], _missingWorkflowsIgnored: string[] = [
       return categoryConfig.workflows.some((cfg: string) => workflowFile.includes(cfg));
     });
 
+    // Sort by workflow file basename (case-insensitive)
     categories[key] = actualRuns.sort((a, b) => {
-      const cleanNameA = cleanWorkflowName(a.name || '');
-      const cleanNameB = cleanWorkflowName(b.name || '');
-      return cleanNameA.localeCompare(cleanNameB);
+      const baseA = ((a.path || a.workflow_path || a.workflow_name || '').toString().split('/').pop() || '').toLowerCase();
+      const baseB = ((b.path || b.workflow_path || b.workflow_name || '').toString().split('/').pop() || '').toLowerCase();
+      return baseA.localeCompare(baseB);
     });
   });
 
@@ -1148,7 +1149,11 @@ export default function DashboardPage({ params }: PageProps) {
                           updated_at: selectedDate.toISOString(),
                           isMissing: true,
                         } as any;
-                      }).sort((a: any, b: any) => new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime());
+                       }).sort((a: any, b: any) => {
+                         const baseA = ((a.path || a.workflow_path || a.workflow_name || '').toString().split('/').pop() || '').toLowerCase();
+                         const baseB = ((b.path || b.workflow_path || b.workflow_name || '').toString().split('/').pop() || '').toLowerCase();
+                         return baseA.localeCompare(baseB);
+                       });
 
                       const isCollapsed = collapsedCategories[key];
                       const workflowCount = runsInCategory.length;

@@ -84,7 +84,13 @@ export default function WorkflowCard({
       file: file,
       run: matchingRun
     };
-  }); // Remove the filter to see all testing workflows, even if not found
+  })
+  // Sort by workflow file basename (case-insensitive)
+  .sort((a, b) => {
+    const baseA = (a.file || '').toString().split('/').pop()?.toLowerCase() || '';
+    const baseB = (b.file || '').toString().split('/').pop()?.toLowerCase() || '';
+    return baseA.localeCompare(baseB);
+  }); // Keep all testing workflows, even if a matching run isn't found
 
   // Check if all testing workflows are reviewed
   const allTestingWorkflowsReviewed = isTrigger && testingWorkflows.length > 0 &&
