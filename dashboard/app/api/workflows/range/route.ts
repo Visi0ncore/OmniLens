@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getRepoNameFromEnv, isValidRepoSlug } from '@/lib/github';
 
 // Simple in-memory cache (per server instance)
 const rangeCache = new Map<string, { ts: number; data: any }>();
@@ -12,12 +13,21 @@ export async function GET(request: NextRequest) {
     if (!token) return NextResponse.json({ error: 'Missing GITHUB_TOKEN' }, { status: 500 });
 
     const { searchParams } = new URL(request.url);
-    const repoPath = searchParams.get('repoPath'); // owner/repo
+    let repoPath = searchParams.get('repoPath'); // owner/repo
+    const repoSlug = searchParams.get('repo'); // optional slug for env-mapped repos
     const start = searchParams.get('start'); // yyyy-mm-dd or iso
     const end = searchParams.get('end');
 
-    if (!repoPath || !start || !end) {
-      return NextResponse.json({ error: 'repoPath, start and end are required' }, { status: 400 });
+    if ((!repoPath && !repoSlug) || !start || !end) {
+      return NextResponse.json({ error: 'repoPath or repo (slug), start and end are required' }, { status: 400 });
+    }
+
+    // If repoPath missing but repo slug provided, resolve via server env
+    if (!repoPath && repoSlug) {
+      if (!isValidRepoSlug(repoSlug)) {
+        return NextResponse.json({ error: 'Invalid repo slug or repo not configured' }, { status: 400 });
+      }
+      repoPath = getRepoNameFromEnv(repoSlug);
     }
 
     // Normalize to full-day UTC range

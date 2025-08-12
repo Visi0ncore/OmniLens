@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { format, subDays } from "date-fns";
@@ -63,6 +64,7 @@ export default function ReportPage({ params }: PageProps) {
   const repoConfig = getRepoConfig(repoSlug);
   const today = new Date();
   const yesterday = subDays(today, 1);
+  const queryClient = useQueryClient();
 
   // Resolve local repoPath if this is a locally added repository
   const [repoPath, setRepoPath] = useState<string | null>(null);
@@ -86,6 +88,61 @@ export default function ReportPage({ params }: PageProps) {
 
   const todayRuns: WorkflowRun[] = todayData?.workflowRuns || [];
   const yRuns: WorkflowRun[] = yData?.workflowRuns || [];
+
+  // Prefetch 30-day and 90-day range + 30-day details to make cards instant on refresh
+  useEffect(() => {
+    const doPrefetch = async () => {
+      const configured = !!repoConfig || !!repoPath;
+      if (!configured) return;
+      const end = new Date();
+      const start30 = subDays(end, 30);
+      const start90 = subDays(end, 90);
+      const qp = repoPath
+        ? `repoPath=${encodeURIComponent(repoPath)}`
+        : `repo=${encodeURIComponent(repoSlug)}`; // allow server to resolve slug to env repoPath
+
+      // 30-day range
+      queryClient.prefetchQuery({
+        queryKey: ["report-30-health-range", repoSlug, repoPath || null],
+        queryFn: async () => {
+          const qs = `${qp}&start=${format(start30, "yyyy-MM-dd")}&end=${format(end, "yyyy-MM-dd")}`;
+          const res = await fetch(`/api/workflows/range?${qs}`);
+          if (!res.ok) return { workflow_runs: [] } as any;
+          return res.json();
+        },
+        staleTime: 60 * 1000,
+        cacheTime: 5 * 60 * 1000,
+      });
+
+      // 90-day range
+      queryClient.prefetchQuery({
+        queryKey: ["report-90-health-range", repoSlug, repoPath || null],
+        queryFn: async () => {
+          const qs = `${qp}&start=${format(start90, "yyyy-MM-dd")}&end=${format(end, "yyyy-MM-dd")}`;
+          const res = await fetch(`/api/workflows/range?${qs}`);
+          if (!res.ok) return { workflow_runs: [] } as any;
+          return res.json();
+        },
+        staleTime: 60 * 1000,
+        cacheTime: 5 * 60 * 1000,
+      });
+
+      // 30-day details uses the same range endpoint under the hood. Prefetching 30-day range is sufficient,
+      // but also seed the details query key to avoid the initial network turn.
+      queryClient.prefetchQuery({
+        queryKey: ["report-30-health-details", repoSlug, repoPath || null],
+        queryFn: async () => {
+          const qs = `${qp}&start=${format(start30, "yyyy-MM-dd")}&end=${format(end, "yyyy-MM-dd")}`;
+          const res = await fetch(`/api/workflows/range?${qs}`);
+          if (!res.ok) return { workflow_runs: [] } as any;
+          return res.json();
+        },
+        staleTime: 60 * 1000,
+        cacheTime: 5 * 60 * 1000,
+      });
+    };
+    doPrefetch();
+  }, [repoSlug, repoConfig, repoPath, queryClient]);
 
   // Today vs Yesterday summary
   const tPassed = todayRuns.filter((r) => r.conclusion === "success").length;

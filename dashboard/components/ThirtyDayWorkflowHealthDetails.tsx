@@ -56,16 +56,34 @@ function statusOf(run: SimpleRun | undefined): "passed" | "failed" | "running" |
 
 export default function ThirtyDayWorkflowHealthDetails({ repoSlug, repoPath }: Props) {
   const repoConfigured = !!getRepoConfig(repoSlug) || !!repoPath;
+  const endForKey = format(new Date(), 'yyyy-MM-dd');
+  const storageKey = React.useMemo(() => {
+    const id = repoPath || repoSlug;
+    return `report-cache-30-details-${id}-${endForKey}`;
+  }, [repoPath, repoSlug, endForKey]);
 
   const { data, isLoading } = useQuery<{ groups: Grouped } | undefined>({
     queryKey: ["report-30-health-details", repoSlug, repoPath || null],
     enabled: repoConfigured,
     staleTime: 60 * 1000, // keep for 60s to avoid refetch storms
     cacheTime: 5 * 60 * 1000,
+    initialData: (() => {
+      if (typeof window === 'undefined') return undefined;
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return undefined;
+        const parsed = JSON.parse(raw) as { ts: number; payload: any };
+        if (parsed && parsed.payload && Date.now() - parsed.ts < 10 * 60 * 1000) {
+          return parsed.payload;
+        }
+      } catch {}
+      return undefined;
+    })(),
     queryFn: async () => {
       const end = new Date();
       const start = subDays(end, 30);
-      const qs = `repoPath=${encodeURIComponent(repoPath || "")}&start=${format(start, "yyyy-MM-dd")}&end=${format(end, "yyyy-MM-dd")}`;
+      const base = repoPath ? `repoPath=${encodeURIComponent(repoPath)}` : `repo=${encodeURIComponent(repoSlug)}`;
+      const qs = `${base}&start=${format(start, "yyyy-MM-dd")}&end=${format(end, "yyyy-MM-dd")}`;
       const sevenStart = subDays(end, 7);
       const res = await fetch(`/api/workflows/range?${qs}`);
       if (!res.ok) return { groups: { consistent: [], improved: [], regressed: [], regressing: [] } };
@@ -144,7 +162,9 @@ export default function ThirtyDayWorkflowHealthDetails({ repoSlug, repoPath }: P
       buckets.regressed.sort(sortByName);
       buckets.regressing.sort(sortByName);
 
-      return { groups: buckets };
+      const payload = { groups: buckets };
+      try { if (typeof window !== 'undefined') localStorage.setItem(storageKey, JSON.stringify({ ts: Date.now(), payload })); } catch {}
+      return payload;
     },
   });
 

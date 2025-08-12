@@ -56,16 +56,35 @@ function Bars({ segments }: { segments: Segment[] }) {
 
 export default function NinetyDayHealthCard({ repoSlug, repoPath }: Props) {
   const repoConfigured = !!getRepoConfig(repoSlug) || !!repoPath;
+  const endForKey = format(new Date(), 'yyyy-MM-dd');
+  const storageKey = React.useMemo(() => {
+    const id = repoPath || repoSlug;
+    return `report-cache-90-${id}-${endForKey}`;
+  }, [repoPath, repoSlug, endForKey]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-90-health-range", repoSlug, repoPath || null],
     enabled: repoConfigured,
     staleTime: 60 * 1000, // 60s - aligns with API cache
     cacheTime: 5 * 60 * 1000,
+    initialData: (() => {
+      if (typeof window === 'undefined') return undefined;
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return undefined;
+        const parsed = JSON.parse(raw) as { ts: number; payload: any };
+        // 10 min TTL for 90-day metrics
+        if (parsed && parsed.payload && Date.now() - parsed.ts < 10 * 60 * 1000) {
+          return parsed.payload;
+        }
+      } catch {}
+      return undefined;
+    })(),
     queryFn: async () => {
       const end = new Date();
       const start = subDays(end, 90);
-      const qs = `repoPath=${encodeURIComponent(repoPath || '')}&start=${format(start, 'yyyy-MM-dd')}&end=${format(end, 'yyyy-MM-dd')}`;
+      const base = repoPath ? `repoPath=${encodeURIComponent(repoPath)}` : `repo=${encodeURIComponent(repoSlug)}`;
+      const qs = `${base}&start=${format(start, 'yyyy-MM-dd')}&end=${format(end, 'yyyy-MM-dd')}`;
       const res = await fetch(`/api/workflows/range?${qs}`);
       if (!res.ok) return { consistent: 0, improved: 0, regressed: 0, regressing: 0, passCount: 0, failCount: 0, dailyAvgRuntime: [] };
       const json = await res.json();
@@ -107,7 +126,10 @@ export default function NinetyDayHealthCard({ repoSlug, repoPath }: Props) {
         regressing += cmp.regressing;
       }
 
-      return { consistent, improved, regressed, regressing, passCount, failCount, dailyAvgRuntime };
+      const payload = { consistent, improved, regressed, regressing, passCount, failCount, dailyAvgRuntime };
+      // Persist for instant reloads
+      try { if (typeof window !== 'undefined') localStorage.setItem(storageKey, JSON.stringify({ ts: Date.now(), payload })); } catch {}
+      return payload;
     }
   });
 
@@ -122,12 +144,12 @@ export default function NinetyDayHealthCard({ repoSlug, repoPath }: Props) {
   const fail = data?.failCount || 0;
   const avgArr = data?.dailyAvgRuntime || [];
   const avgOverall = (() => {
-    const vals = avgArr.filter((v) => v > 0);
+    const vals = avgArr.filter((v: number) => v > 0);
     if (vals.length === 0) return 0;
-    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+    return Math.round(vals.reduce((a: number, b: number) => a + b, 0) / vals.length);
   })();
   const minOverall = (() => {
-    const vals = avgArr.filter((v) => v > 0);
+    const vals = avgArr.filter((v: number) => v > 0);
     if (vals.length === 0) return 0;
     return Math.min(...vals);
   })();
