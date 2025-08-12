@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Simple in-memory cache (per server instance)
+const rangeCache = new Map<string, { ts: number; data: any }>();
+const RANGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -24,6 +28,17 @@ export async function GET(request: NextRequest) {
     }
     const startStr = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate(), 0, 0, 0, 0)).toISOString();
     const endStr = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate(), 23, 59, 59, 999)).toISOString();
+
+    // Cache key normalized on repo and exact UTC range
+    const cacheKey = `${repoPath}|${startStr}|${endStr}`;
+    const cached = rangeCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < RANGE_TTL_MS) {
+      return NextResponse.json(cached.data, {
+        headers: {
+          'Cache-Control': 'public, max-age=60, stale-while-revalidate=600'
+        }
+      });
+    }
 
     let page = 1;
     let allRuns: any[] = [];
@@ -68,7 +83,13 @@ export async function GET(request: NextRequest) {
       if (page > 25) break; // safety
     }
 
-    return NextResponse.json({ workflow_runs: allRuns }, { headers: { 'Cache-Control': 'no-store' } });
+    const payload = { workflow_runs: allRuns };
+    rangeCache.set(cacheKey, { ts: Date.now(), data: payload });
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': 'public, max-age=60, stale-while-revalidate=600'
+      }
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to fetch range' }, { status: 500 });
   }

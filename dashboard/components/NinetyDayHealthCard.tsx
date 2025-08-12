@@ -60,6 +60,8 @@ export default function NinetyDayHealthCard({ repoSlug, repoPath }: Props) {
   const { data, isLoading } = useQuery({
     queryKey: ["report-90-health-range", repoSlug, repoPath || null],
     enabled: repoConfigured,
+    staleTime: 60 * 1000, // 60s - aligns with API cache
+    cacheTime: 5 * 60 * 1000,
     queryFn: async () => {
       const end = new Date();
       const start = subDays(end, 90);

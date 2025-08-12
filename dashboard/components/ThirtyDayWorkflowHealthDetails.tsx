@@ -60,10 +60,13 @@ export default function ThirtyDayWorkflowHealthDetails({ repoSlug, repoPath }: P
   const { data, isLoading } = useQuery<{ groups: Grouped } | undefined>({
     queryKey: ["report-30-health-details", repoSlug, repoPath || null],
     enabled: repoConfigured,
+    staleTime: 60 * 1000, // keep for 60s to avoid refetch storms
+    cacheTime: 5 * 60 * 1000,
     queryFn: async () => {
       const end = new Date();
       const start = subDays(end, 30);
       const qs = `repoPath=${encodeURIComponent(repoPath || "")}&start=${format(start, "yyyy-MM-dd")}&end=${format(end, "yyyy-MM-dd")}`;
+      const sevenStart = subDays(end, 7);
       const res = await fetch(`/api/workflows/range?${qs}`);
       if (!res.ok) return { groups: { consistent: [], improved: [], regressed: [], regressing: [] } };
       const json = await res.json();
@@ -81,61 +84,53 @@ export default function ThirtyDayWorkflowHealthDetails({ repoSlug, repoPath }: P
       const sortedDays = Array.from(byDay.keys()).sort();
       if (sortedDays.length === 0) return { groups: { consistent: [], improved: [], regressed: [], regressing: [] } };
 
-      // Build per-day maps of latest runs per workflow
-      const perDayMaps: Array<Map<number, SimpleRun>> = sortedDays.map((d) => pickLatestPerWorkflow(byDay.get(d) || []));
-
-      // Track latest run across the 30-day window per workflow for display
-      const latestAcross = new Map<number, SimpleRun>();
+      // Build per-workflow run history across the 30-day window
+      const runsByWorkflow = new Map<number, SimpleRun[]>();
       for (const r of all) {
-        const existing = latestAcross.get(r.workflow_id);
-        if (!existing) {
-          latestAcross.set(r.workflow_id, r as unknown as SimpleRun);
-        } else {
-          const prev = new Date(existing.run_started_at || existing.updated_at).getTime();
-          const cur = new Date(r.run_started_at || r.updated_at).getTime();
-          if (cur > prev) latestAcross.set(r.workflow_id, r as unknown as SimpleRun);
-        }
+        const arr = runsByWorkflow.get(r.workflow_id) || [];
+        arr.push(r as unknown as SimpleRun);
+        runsByWorkflow.set(r.workflow_id, arr);
+      }
+      // Sort each workflow's runs by time ascending
+      for (const [id, arr] of runsByWorkflow) {
+        arr.sort((a, b) => new Date(a.run_started_at || a.updated_at).getTime() - new Date(b.run_started_at || b.updated_at).getTime());
       }
 
-      // Accumulate transitions across consecutive days
-      const counts = new Map<number, { consistent: number; improved: number; regressed: number; regressing: number }>();
-      const inc = (id: number, key: keyof { consistent: number; improved: number; regressed: number; regressing: number }) => {
-        const cur = counts.get(id) || { consistent: 0, improved: 0, regressed: 0, regressing: 0 };
-        cur[key] += 1;
-        counts.set(id, cur);
-      };
-
-      for (let i = 1; i < perDayMaps.length; i++) {
-        const prev = perDayMaps[i - 1];
-        const cur = perDayMaps[i];
-        for (const id of cur.keys()) {
-          if (!prev.has(id)) continue; // require presence on both days
-          const t = cur.get(id);
-          const y = prev.get(id);
-          const ts = statusOf(t);
-          const ys = statusOf(y);
-          if (ts === "running") continue;
-          if (ts === "passed" && ys === "passed") inc(id, "consistent");
-          else if (ts === "passed" && ys === "failed") inc(id, "improved");
-          else if (ts === "failed" && ys === "passed") inc(id, "regressed");
-          else if (ts === "failed" && ys === "failed") inc(id, "regressing");
-        }
+      // Latest run across window for display
+      const latestAcross = new Map<number, SimpleRun>();
+      for (const [id, arr] of runsByWorkflow) {
+        latestAcross.set(id, arr[arr.length - 1]);
       }
 
-      // Assign to dominant category over window with severity priority
+      // Categorize by counts over the window
       const buckets: Grouped = { consistent: [], improved: [], regressed: [], regressing: [] };
-      const priority: Array<keyof Grouped> = ["regressing", "regressed", "improved", "consistent"];
-      for (const [id, c] of counts) {
-        const maxVal = Math.max(c.consistent, c.improved, c.regressed, c.regressing);
-        if (maxVal === 0) continue;
-        const candidates: Array<keyof Grouped> = [];
-        if (c.regressing === maxVal) candidates.push("regressing");
-        if (c.regressed === maxVal) candidates.push("regressed");
-        if (c.improved === maxVal) candidates.push("improved");
-        if (c.consistent === maxVal) candidates.push("consistent");
-        const chosen = priority.find((k) => candidates.includes(k)) || "consistent";
-        const run = latestAcross.get(id);
-        if (run) buckets[chosen].push(run);
+      for (const [id, arr] of runsByWorkflow) {
+        const statuses = arr.map((r) => statusOf(r)).filter((s) => s !== "running");
+        if (statuses.length === 0) continue;
+        const passCount = statuses.filter((s) => s === "passed").length;
+        const failCount = statuses.filter((s) => s === "failed").length;
+        // Last 7 days snapshot for consistency check
+        const last7 = arr.filter((r) => new Date(r.run_started_at || r.updated_at).getTime() >= sevenStart.getTime());
+        const last7Statuses = last7.map((r) => statusOf(r)).filter((s) => s !== "running");
+        const last7PassCount = last7Statuses.filter((s) => s === "passed").length;
+        const last7FailCount = last7Statuses.filter((s) => s === "failed").length;
+
+        if (failCount > 0 && passCount === 0) {
+          buckets.regressing.push(latestAcross.get(id)!);
+          continue;
+        }
+        // New Consistent definition: more passes than failures over 30 days AND no failures in the last 7 days (and at least one pass in last 7)
+        if (passCount > failCount && last7FailCount === 0 && last7PassCount > 0) {
+          buckets.consistent.push(latestAcross.get(id)!);
+          continue;
+        }
+        if (passCount > failCount) {
+          buckets.improved.push(latestAcross.get(id)!);
+        } else if (failCount > passCount) {
+          buckets.regressed.push(latestAcross.get(id)!);
+        } else {
+          // equal counts: do not categorize
+        }
       }
 
       // Sort each group alphabetically by workflow display
