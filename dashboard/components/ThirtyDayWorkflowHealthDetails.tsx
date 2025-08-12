@@ -189,7 +189,7 @@ export default function ThirtyDayWorkflowHealthDetails({ repoSlug, repoPath }: P
         </div>
         <div className="text-sm font-semibold tabular-nums">{items.length}</div>
       </div>
-      <div className="rounded border border-border max-h-64 overflow-y-auto pr-2 [scrollbar-gutter:stable]">
+      <div className="rounded border border-border">
         {items.length === 0 ? (
           <div className="p-3 text-sm text-muted-foreground">None</div>
         ) : (

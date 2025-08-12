@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ import DailyReportCard from "@/components/DailyReportCard";
 import ThirtyDayHealthCard from "@/components/ThirtyDayHealthCard";
 import NinetyDayHealthCard from "@/components/NinetyDayHealthCard";
 import ThirtyDayWorkflowHealthDetails from "@/components/ThirtyDayWorkflowHealthDetails";
+import SaveReportButton from "@/components/SaveReportButton";
 
 import type { WorkflowRun } from "@/lib/github";
 
@@ -65,6 +66,7 @@ export default function ReportPage({ params }: PageProps) {
   const today = new Date();
   const yesterday = subDays(today, 1);
   const queryClient = useQueryClient();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Resolve local repoPath if this is a locally added repository
   const [repoPath, setRepoPath] = useState<string | null>(null);
@@ -150,8 +152,11 @@ export default function ReportPage({ params }: PageProps) {
   const yPassed = yRuns.filter((r) => r.conclusion === "success").length;
   const yFailed = yRuns.filter((r) => r.conclusion === "failure").length;
 
+  const fileName = `${repoSlug}-${format(today, "yyyy-MM-dd")}.png`;
+
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div ref={containerRef} className="px-6 md:px-8 py-6">
+      <div className="container mx-auto px-0 space-y-8">
       <header className="space-y-2">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -169,7 +174,9 @@ export default function ReportPage({ params }: PageProps) {
               <p className="text-muted-foreground">{format(today, "EEEE, MMM d, yyyy")}</p>
             </div>
           </div>
-          
+          <div className="flex items-center gap-2">
+            <SaveReportButton targetRef={containerRef as React.RefObject<HTMLElement>} fileName={fileName} />
+          </div>
         </div>
       </header>
 
@@ -192,6 +199,7 @@ export default function ReportPage({ params }: PageProps) {
       <ThirtyDayWorkflowHealthDetails repoSlug={repoSlug} repoPath={repoPath} />
 
       
+      </div>
     </div>
   );
 }
