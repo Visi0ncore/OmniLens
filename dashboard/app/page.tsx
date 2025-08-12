@@ -95,6 +95,8 @@ interface RepositoryCardProps {
 }
 
 function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessage, hasWorkflows, metrics, isUserRepo = false, onRequestDelete }: RepositoryCardProps) {
+  const owner = (repoPath || displayName || '').split('/')[0] || '';
+  const avatarUrl = owner ? `https://github.com/${owner}.png?size=48` : null;
   const cardContent = (
     <Card className={`relative h-full transition-all duration-200 ${
       hasError 
@@ -103,9 +105,22 @@ function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessag
     }`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">
-            {formatRepoDisplayName(displayName)}
-          </CardTitle>
+          <div className="flex items-center gap-3">
+            {avatarUrl && (
+              <img
+                src={avatarUrl}
+                alt={`${owner} avatar`}
+                className="h-6 w-6 rounded-full border border-border"
+                width={24}
+                height={24}
+                loading="lazy"
+                decoding="async"
+              />
+            )}
+            <CardTitle className="text-lg font-semibold">
+              {formatRepoDisplayName(displayName)}
+            </CardTitle>
+          </div>
           <div className="flex items-center gap-2">
             {hasError && <AlertCircle className="h-5 w-5 text-red-500" />}
             {isUserRepo && (

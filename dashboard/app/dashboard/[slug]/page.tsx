@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar, Hammer, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle, Loader2 } from "lucide-react";
+import { Zap, Target, TestTube, Calendar, Hammer, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle, Loader2, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { getRepoConfig, removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getTestingWorkflowsForTrigger } from "@/lib/utils";
 
@@ -70,10 +70,11 @@ function categorizeWorkflows(runs: any[], _missingWorkflowsIgnored: string[] = [
       return categoryConfig.workflows.some((cfg: string) => workflowFile.includes(cfg));
     });
 
+    // Sort by workflow file basename (case-insensitive)
     categories[key] = actualRuns.sort((a, b) => {
-      const cleanNameA = cleanWorkflowName(a.name || '');
-      const cleanNameB = cleanWorkflowName(b.name || '');
-      return cleanNameA.localeCompare(cleanNameB);
+      const baseA = ((a.path || a.workflow_path || a.workflow_name || '').toString().split('/').pop() || '').toLowerCase();
+      const baseB = ((b.path || b.workflow_path || b.workflow_name || '').toString().split('/').pop() || '').toLowerCase();
+      return baseA.localeCompare(baseB);
     });
   });
 
@@ -940,6 +941,16 @@ export default function DashboardPage({ params }: PageProps) {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Link href={`/dashboard/${repoSlug}/report`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Report
+                </Button>
+              </Link>
               <Button
                 variant={isSelectedDateToday ? "default" : "outline"}
                 size="sm"
@@ -1138,7 +1149,11 @@ export default function DashboardPage({ params }: PageProps) {
                           updated_at: selectedDate.toISOString(),
                           isMissing: true,
                         } as any;
-                      }).sort((a: any, b: any) => new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime());
+                       }).sort((a: any, b: any) => {
+                         const baseA = ((a.path || a.workflow_path || a.workflow_name || '').toString().split('/').pop() || '').toLowerCase();
+                         const baseB = ((b.path || b.workflow_path || b.workflow_name || '').toString().split('/').pop() || '').toLowerCase();
+                         return baseA.localeCompare(baseB);
+                       });
 
                       const isCollapsed = collapsedCategories[key];
                       const workflowCount = runsInCategory.length;
@@ -1407,7 +1422,17 @@ export default function DashboardPage({ params }: PageProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Button
+              <Link href={`/dashboard/${repoSlug}/report`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Report
+                </Button>
+              </Link>
+              <Button
               variant={isSelectedDateToday ? "default" : "outline"}
               size="sm"
               onClick={handleSetToday}

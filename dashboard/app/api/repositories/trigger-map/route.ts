@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     if (!repoPath && slug) {
       const available = getAvailableRepositories();
       const found = available.find(r => r.slug === slug);
-      repoPath = found?.repoPath || undefined;
+      repoPath = found?.repoPath || null;
     }
 
     if (!repoPath) {

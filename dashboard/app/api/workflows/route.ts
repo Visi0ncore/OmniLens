@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+// In-memory cache for daily requests (per server instance)
+const dailyCache = new Map<string, { ts: number; data: any }>();
+const DAILY_TTL_MS = 60 * 1000; // 60 seconds (short TTL to keep near-real-time while speeding refreshes)
 import { calculateOverviewData, getWorkflowRunsForDate, isValidRepoSlug } from '@/lib/github';
 
 // Force this route to be dynamic since it uses search parameters
@@ -27,6 +30,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
     }
 
+    // Cache key combines repo identifier and date
+    const repoKey = repoPath ? `rp:${repoPath}` : `rs:${repo}`;
+    const dayKey = `${repoKey}|${targetDate.toISOString().slice(0,10)}`;
+    const cached = dailyCache.get(dayKey);
+    if (cached && Date.now() - cached.ts < DAILY_TTL_MS) {
+      return NextResponse.json(cached.data, {
+        headers: {
+          'Cache-Control': 'public, max-age=30, stale-while-revalidate=300',
+        }
+      });
+    }
+
     // If explicit repoPath provided, fetch directly from GitHub using token and bypass slug validation
     let workflowRuns: any[] = [];
     let overviewData: any = null;
@@ -50,12 +65,16 @@ export async function GET(request: NextRequest) {
             Accept: 'application/vnd.github+json',
             Authorization: `Bearer ${token}`,
             'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'OmniLens-Dashboard'
           },
           cache: 'no-store',
         });
         if (!res.ok) {
           const msg = await res.text();
-          return NextResponse.json({ error: `GitHub API error: ${res.status} ${res.statusText} ${msg}` }, { status: res.status });
+          const sso = res.headers.get('X-GitHub-SSO') || '';
+          const isRateLimit = (res.headers.get('X-RateLimit-Remaining') === '0') || /rate limit/i.test(msg);
+          const detail = isRateLimit ? 'GitHub API rate limit exceeded' : (sso ? `SSO authorization required: ${sso}` : msg);
+          return NextResponse.json({ error: `GitHub API error: ${res.status} ${res.statusText} ${detail}` }, { status: res.status });
         }
         const json = await res.json();
         const pageRuns = json.workflow_runs || [];
@@ -139,15 +158,11 @@ export async function GET(request: NextRequest) {
       overviewData = calculateOverviewData(workflowRuns, repo);
     }
 
-    return NextResponse.json({
-      workflowRuns,
-      overviewData
-    }, {
+    const payload = { workflowRuns, overviewData };
+    dailyCache.set(dayKey, { ts: Date.now(), data: payload });
+    return NextResponse.json(payload, {
       headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-        'Last-Modified': new Date().toUTCString()
+        'Cache-Control': 'public, max-age=30, stale-while-revalidate=300'
       }
     });
 
