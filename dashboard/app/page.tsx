@@ -32,6 +32,7 @@ interface RepositoryCardProps {
   repoPath: string;
   displayName: string;
   avatarUrl?: string;
+  htmlUrl?: string;
   hasError: boolean;
   errorMessage?: string;
   hasWorkflows?: boolean;
@@ -47,7 +48,7 @@ interface RepositoryCardProps {
   onRequestDelete?: () => void;
 }
 
-function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, hasError, errorMessage, hasWorkflows, metrics, isUserRepo = false, onRequestDelete }: RepositoryCardProps) {
+function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, htmlUrl, hasError, errorMessage, hasWorkflows, metrics, isUserRepo = false, onRequestDelete }: RepositoryCardProps) {
   // Get avatar URL from the repository data if available, otherwise fallback to GitHub API
   const owner = (repoPath || displayName || '').split('/')[0] || '';
   const cardContent = (
@@ -80,17 +81,15 @@ function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, hasError, 
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              asChild
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                window.open(htmlUrl || `https://github.com/${repoPath}`, '_blank', 'noopener,noreferrer');
               }}
               title="View on GitHub"
               aria-label="View on GitHub"
             >
-              <Link href={`https://github.com/${repoPath}`} target="_blank" rel="noopener noreferrer">
-                <Github className="h-4 w-4" />
-              </Link>
+              <Github className="h-4 w-4" />
             </Button>
             {isUserRepo && (
               <Button
@@ -148,9 +147,9 @@ function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, hasError, 
   }
 
   return (
-    <Link href={`/dashboard/${repoSlug}`} className="block transition-all duration-200 hover:scale-[1.02]">
+    <div className="block transition-all duration-200 hover:scale-[1.02] cursor-pointer" onClick={() => window.location.href = `/dashboard/${repoSlug}`}>
       {cardContent}
-    </Link>
+    </div>
   );
 }
 
@@ -215,6 +214,7 @@ export default function HomePage() {
     envKey: string;
     displayName: string;
     avatarUrl?: string;
+    htmlUrl?: string;
     hasConfig: boolean;
     hasWorkflows?: boolean;
     metrics?: {
@@ -289,6 +289,7 @@ export default function HomePage() {
       const mappedRepos = allRepos.map((r: any) => ({
         slug: r.slug,
         repoPath: r.repoPath || r.slug.replace(/-/g, '/'), // Convert slug back to repoPath if needed
+        htmlUrl: r.htmlUrl,
         envKey: r.envKey || 'LOCAL',
         displayName: r.displayName,
         avatarUrl: r.avatarUrl,
@@ -583,6 +584,7 @@ export default function HomePage() {
               repoPath={repo.repoPath}
               displayName={repo.displayName}
               avatarUrl={repo.avatarUrl}
+              htmlUrl={repo.htmlUrl}
               hasError={repo.hasError}
               errorMessage={repo.errorMessage}
               hasWorkflows={repo.hasWorkflows}

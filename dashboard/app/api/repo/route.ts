@@ -9,7 +9,8 @@ const repositorySchema = z.object({
   slug: z.string(),
   displayName: z.string(),
   hasConfig: z.boolean(),
-  avatarUrl: z.string().nullable()
+  avatarUrl: z.string().nullable(),
+  htmlUrl: z.string().optional()
 });
 
 const repositoriesResponseSchema = z.object({
@@ -25,7 +26,8 @@ export async function GET() {
       slug: repo.slug,
       displayName: repo.displayName,
       hasConfig: false, // User-added repos don't have config files initially
-      avatarUrl: repo.avatarUrl || null
+      avatarUrl: repo.avatarUrl || null,
+      htmlUrl: repo.htmlUrl || null
     }));
 
     // Validate response with Zod
