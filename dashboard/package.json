@@ -10,7 +10,8 @@
     "start": "bunx next start",
     "lint": "bunx next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:api": "node tests/api-endpoints.test.js"
   },
   "dependencies": {
     "@radix-ui/react-popover": "^1.1.14",

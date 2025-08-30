@@ -179,13 +179,14 @@ paths:
 
 ### Phase 1: Add Validation (30 minutes)
 1. ✅ Install Zod: `bun add zod`
-2. 🔄 Add validation to `/api/repositories/validate`
-3. 🔄 Test the endpoint works
+2. ✅ Add validation to `/api/repositories/validate`
+3. ✅ Test the endpoint works
 
 ### Phase 2: Repeat for Other Endpoints (1-2 hours)
-1. 🔄 Add validation to `/api/workflows` (GET with query params)
-2. 🔄 Add validation to `/api/repositories/workflow-runs` (GET with query params)
-3. 🔄 Add validation to remaining endpoints
+1. ✅ Add validation to `/api/repositories` (GET)
+2. 🔄 Add validation to `/api/workflows` (GET with query params)
+3. 🔄 Add validation to `/api/repositories/workflow-runs` (GET with query params)
+4. 🔄 Add validation to remaining endpoints
 
 ### Phase 3: Optional Documentation (30 minutes)
 1. 🔄 Add OpenAPI comments if desired
@@ -342,11 +343,12 @@ curl -X POST http://localhost:3000/api/repositories/validate \
 
 ## Simple Checklist
 
-- [ ] Install Zod: `bun add zod`
-- [ ] Add validation to `/api/repositories/validate`
-- [ ] Test the endpoint works
+- [x] Install Zod: `bun add zod`
+- [x] Add validation to `/api/repositories/validate`
+- [x] Test the endpoint works
+- [x] Add validation to `/api/repositories` (GET)
 - [ ] Add validation to other endpoints (optional)
-- [ ] Add OpenAPI documentation (optional)
+- [x] Add OpenAPI documentation (optional)
 
 **That's it!** No complex setup, no weeks of work.
 

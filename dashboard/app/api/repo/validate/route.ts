@@ -74,13 +74,14 @@ export async function POST(request: NextRequest) {
     const fullName: string = json.full_name; // owner/repo
     const htmlUrl: string = json.html_url;
     const defaultBranch: string = json.default_branch;
+    const repoName: string = json.name; // just the repo name
 
     return NextResponse.json({
       valid: true,
       repoPath: fullName,
       htmlUrl,
       defaultBranch,
-      displayName: fullName,
+      displayName: repoName,
     });
   } catch (error: unknown) {
     // Handle Zod validation errors

@@ -404,49 +404,48 @@ export default function HomePage() {
     }
     setIsValidating(true);
     try {
-      const res = await fetch('/api/repositories/validate', {
+      // Step 1: Validate the repository
+      const validateRes = await fetch('/api/repo/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoUrl: input }),
       });
-      const json = await res.json();
-      if (!res.ok || json.valid === false) {
-        setAddError(json?.error || 'Repository validation failed');
+      const validateJson = await validateRes.json();
+      
+      if (!validateRes.ok || validateJson.valid === false) {
+        setAddError(validateJson?.error || 'Repository validation failed');
         return;
       }
 
-      const repoPath: string = json.repoPath;
-      const displayName: string = json.displayName || repoPath;
-      const slug = `local-${repoPath.replace(/\//g, '-')}`;
-
-      const newRepo = {
-        slug,
-        repoPath,
-        envKey: 'LOCAL',
-        displayName,
-        hasConfig: false,
-        hasWorkflows: false,
-        metrics: null,
-      };
-
-      // Ensure any stale local state from a previous add is cleared before re-adding
-      clearRepoLocalState(slug);
-
-      setAvailableRepos(prev => {
-        const exists = prev.some(r => r.slug === slug);
-        const next = exists ? prev : [...prev, newRepo];
-        // Persist minimal representation
-        const stored = loadUserAddedRepos();
-        const storedExists = stored.some((r: any) => r.slug === slug);
-        const updatedStored = storedExists ? stored : [...stored, { slug, repoPath, displayName }];
-        saveUserAddedRepos(updatedStored);
-        return next;
+      // Step 2: Add the repository to dashboard
+      const addRes = await fetch('/api/repo/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoPath: validateJson.repoPath,
+          displayName: validateJson.displayName,
+          htmlUrl: validateJson.htmlUrl,
+          defaultBranch: validateJson.defaultBranch
+        }),
       });
+      const addJson = await addRes.json();
+      
+      if (!addRes.ok) {
+        if (addRes.status === 409) {
+          setAddError('Repository already exists in your dashboard');
+        } else {
+          setAddError(addJson?.error || 'Failed to add repository to dashboard');
+        }
+        return;
+      }
 
+      // Success! Refresh the repositories list
+      await hydrateUserRepos();
+      
       setNewRepoUrl('');
       setShowAddForm(false);
     } catch (err) {
-      setAddError('Network error validating repository');
+      setAddError('Network error processing repository');
     } finally {
       setIsValidating(false);
     }
