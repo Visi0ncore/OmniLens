@@ -79,4 +79,4 @@ jobs:
 
     - name: Run API repository tests
       working-directory: ./dashboard
-      run: bun run test:api
+      run: bun run test:api:repo
