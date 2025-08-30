@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 
 const API_BASE = 'https://api.github.com';
+
+// Zod schema for repository validation
+const validateRepoSchema = z.object({
+  repoUrl: z.string().min(1, 'Repository URL is required')
+});
 
 function normalizeRepoInput(input: string): string | null {
   if (!input) return null;
@@ -35,10 +41,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const repoUrl: string | undefined = body?.repoUrl;
-    if (!repoUrl) {
-      return NextResponse.json({ error: 'repoUrl is required' }, { status: 400 });
-    }
+    
+    // Validate request body with Zod
+    const { repoUrl } = validateRepoSchema.parse(body);
 
     const repoPath = normalizeRepoInput(repoUrl);
     if (!repoPath) {
@@ -69,15 +74,24 @@ export async function POST(request: NextRequest) {
     const fullName: string = json.full_name; // owner/repo
     const htmlUrl: string = json.html_url;
     const defaultBranch: string = json.default_branch;
+    const repoName: string = json.name; // just the repo name
 
     return NextResponse.json({
       valid: true,
       repoPath: fullName,
       htmlUrl,
       defaultBranch,
-      displayName: fullName,
+      displayName: repoName,
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ 
+        error: 'Invalid request', 
+        message: 'Repository URL is required'
+      }, { status: 400 });
+    }
+    
     console.error('Validation API Error:', error);
     return NextResponse.json({ error: 'Failed to validate repository' }, { status: 500 });
   }

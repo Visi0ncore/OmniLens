@@ -1,4 +1,4 @@
-name: 🏗️ Build Validation
+name: 🏗️ Build
 
 on:
   push:
@@ -69,11 +69,6 @@ jobs:
         if: always()
         working-directory: ./dashboard
         run: bun run lint
-
-      - name: Run tests
-        if: always()
-        working-directory: ./dashboard
-        run: bun run test
 
       - name: Build application
         working-directory: ./dashboard

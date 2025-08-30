@@ -1,0 +1,82 @@
+name: 🚂 Test API - Repo
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'dashboard/**'
+      - '.github/workflows/test-api-repo.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'dashboard/**'
+      - '.github/workflows/test-api-repo.yml'
+  workflow_dispatch:
+
+jobs:
+  test-api-repo:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: omnilens
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      working-directory: ./dashboard
+      run: bun install
+
+    - name: Setup database
+      working-directory: ./dashboard
+      run: |
+        # Wait for PostgreSQL to be ready
+        sleep 10
+        
+        # Create database schema using the SQL file
+        psql -h localhost -U postgres -d omnilens -f lib/schema.sql
+      env:
+        PGPASSWORD: postgres
+
+    - name: Start development server
+      working-directory: ./dashboard
+      run: |
+        # Set environment variables
+        echo "DB_USER=postgres" >> .env.local
+        echo "DB_HOST=localhost" >> .env.local
+        echo "DB_NAME=omnilens" >> .env.local
+        echo "DB_PASSWORD=postgres" >> .env.local
+        echo "DB_PORT=5432" >> .env.local
+        echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env.local
+        
+        # Start server in background
+        bun run dev &
+        sleep 10
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Run API repository tests
+      working-directory: ./dashboard
+      run: bun run test:api:repo

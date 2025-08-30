@@ -553,7 +553,7 @@ export default function DashboardPage({ params }: PageProps) {
   React.useEffect(() => {
     const fetchRepoName = async () => {
       try {
-        const response = await fetch('/api/repositories');
+        const response = await fetch('/api/repo');
         if (response.ok) {
           const data = await response.json();
           const repo = data.repositories.find((r: any) => r.slug === repoSlug);
