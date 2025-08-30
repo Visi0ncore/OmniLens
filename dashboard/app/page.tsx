@@ -8,6 +8,8 @@ import {
   Plus,
   Trash2,
   Package,
+  CheckCircle,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CompactMetricsOverview from "@/components/CompactMetricsOverview";
@@ -219,6 +221,8 @@ export default function HomePage() {
     displayName: string;
   } | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
+
+
 
 
 
@@ -483,11 +487,13 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-          )}
-        </div>
+                  )}
+        
+
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   // Process each repository to check for errors and workflow configuration
   const repositoryData = availableRepos.map(repo => ({
@@ -505,6 +511,49 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#0D0D0D]">
       <div className="p-6 space-y-8">
+        <div className="flex justify-end mb-6">
+          <div className="flex items-center gap-2">
+            {showAddForm && (
+              <form onSubmit={handleAddRepo} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newRepoUrl}
+                  onChange={(e) => setNewRepoUrl(e.target.value)}
+                  placeholder="owner/repo or GitHub URL"
+                  className={`w-80 px-3 py-2 rounded-md bg-background border text-sm outline-none focus:ring-2 focus:ring-primary ${
+                    addError ? 'border-red-500' : 'border-input'
+                  }`}
+                  autoFocus
+                  onFocus={() => {
+                    if (addError) {
+                      setAddError(null);
+                      setNewRepoUrl("");
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!isValidating) {
+                      setShowAddForm(false);
+                      setAddError(null);
+                      setNewRepoUrl("");
+                    }
+                  }}
+                />
+                <Button type="submit" size="sm" disabled={isValidating} onMouseDown={(e) => e.preventDefault()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {isValidating ? 'Validating…' : 'Add Repo'}
+                </Button>
+              </form>
+            )}
+            {!showAddForm && (
+              <Button variant="default" size="sm" onClick={() => setShowAddForm(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Repo
+              </Button>
+            )}
+          </div>
+          
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {repositoryData.map((repo) => (
             <RepositoryCard
@@ -567,53 +616,6 @@ export default function HomePage() {
                   disabled={isDeleting}
                 >
                   {isDeleting ? 'Removing…' : 'Remove'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Floating Action Button */}
-        {!showAddForm && (
-          <div className="fixed bottom-6 right-6 z-50">
-            <Button 
-              size="lg" 
-              className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
-              onClick={() => setShowAddForm(true)}
-            >
-              <Plus className="h-6 w-6" />
-            </Button>
-          </div>
-        )}
-        
-        {/* Add Repository Modal */}
-        {showAddForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-md rounded-lg border border-border bg-background shadow-lg">
-              <div className="p-4 border-b border-border">
-                <h2 className="text-lg font-semibold">Add Repository</h2>
-              </div>
-              <div className="p-4">
-                <form onSubmit={handleAddRepo} className="space-y-4">
-                  <input
-                    type="text"
-                    value={newRepoUrl}
-                    onChange={(e) => setNewRepoUrl(e.target.value)}
-                    placeholder="owner/repo or GitHub URL"
-                    className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm outline-none focus:ring-2 focus:ring-primary"
-                    autoFocus
-                  />
-                  {addError && (
-                    <p className="text-sm text-red-500">{addError}</p>
-                  )}
-                </form>
-              </div>
-              <div className="p-4 border-t border-border flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setShowAddForm(false); setAddError(null); setNewRepoUrl(""); }}>
-                  Cancel
-                </Button>
-                <Button size="sm" disabled={isValidating} onClick={handleAddRepo}>
-                  {isValidating ? 'Validating…' : 'Add Repository'}
                 </Button>
               </div>
             </div>
