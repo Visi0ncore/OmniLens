@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: OmniLens Dashboard API
+  version: 1.0.0
+  description: GitHub Actions workflow monitoring and analytics API for the OmniLens Dashboard
+  contact:
+    name: OmniLens Support
+    email: support@omnilens.dev
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://your-domain.com/api
+    description: Production server
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - GITHUB_API_ERROR
+            - RATE_LIMITED
+            - INTERNAL_ERROR
+            - BAD_REQUEST
+          description: Error code for programmatic handling
+        message:
+          type: string
+          description: Additional error details
+        details:
+          description: Structured error details (validation errors, etc.)
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of when the error occurred
+      required:
+        - error
+        - code
+
+    RepositoryValidationRequest:
+      type: object
+      properties:
+        repoUrl:
+          type: string
+          description: GitHub repository URL or owner/repo format
+          example: "https://github.com/owner/repo"
+      required:
+        - repoUrl
+
+    RepositoryValidationResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: Whether the repository is valid and accessible
+          example: true
+        repoPath:
+          type: string
+          description: Normalized owner/repo format
+          example: "owner/repo"
+        htmlUrl:
+          type: string
+          format: uri
+          description: Full GitHub repository URL
+          example: "https://github.com/owner/repo"
+        defaultBranch:
+          type: string
+          description: Default branch name
+          example: "main"
+        displayName:
+          type: string
+          description: Display name for the repository
+          example: "owner/repo"
+        error:
+          type: string
+          description: Error message if validation failed
+
+  securitySchemes:
+    githubToken:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: GitHub personal access token with repo permissions
+
+paths:
+  /repositories/validate:
+    post:
+      summary: Validate a GitHub repository URL or owner/repo format
+      description: Validates that a GitHub repository exists and is accessible with the current token
+      tags:
+        - Repositories
+      security:
+        - githubToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryValidationRequest'
+            examples:
+              url_format:
+                summary: Using GitHub URL format
+                value:
+                  repoUrl: "https://github.com/microsoft/vscode"
+              owner_repo_format:
+                summary: Using owner/repo format
+                value:
+                  repoUrl: "microsoft/vscode"
+      responses:
+        '200':
+          description: Repository validation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryValidationResponse'
+              examples:
+                success:
+                  summary: Successful validation
+                  value:
+                    valid: true
+                    repoPath: "microsoft/vscode"
+                    htmlUrl: "https://github.com/microsoft/vscode"
+                    defaultBranch: "main"
+                    displayName: "microsoft/vscode"
+
+        '400':
+          description: Invalid request or repository format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_format:
+                  summary: Invalid repository format
+                  value:
+                    error: "Invalid GitHub repository URL or format. Use owner/repo or a full GitHub URL."
+                    code: "VALIDATION_ERROR"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+                validation_error:
+                  summary: Request validation failed
+                  value:
+                    error: "Validation failed"
+                    code: "VALIDATION_ERROR"
+                    details:
+                      - field: "repoUrl"
+                        message: "String must contain at least 1 character(s)"
+                        code: "too_small"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+
+        '403':
+          description: Repository access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryValidationResponse'
+              examples:
+                access_denied:
+                  summary: Repository not accessible
+                  value:
+                    valid: false
+                    error: "Repository access denied. Check token permissions."
+
+        '404':
+          description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryValidationResponse'
+              examples:
+                not_found:
+                  summary: Repository doesn't exist
+                  value:
+                    valid: false
+                    error: "Repository not found"
+
+        '500':
+          description: Server error or GitHub API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                server_error:
+                  summary: Internal server error
+                  value:
+                    error: "Failed to validate repository"
+                    code: "INTERNAL_ERROR"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+                github_api_error:
+                  summary: GitHub API error
+                  value:
+                    error: "GitHub API error"
+                    code: "GITHUB_API_ERROR"
+                    message: "API rate limit exceeded"
+                    timestamp: "2024-01-15T10:30:00.000Z"
