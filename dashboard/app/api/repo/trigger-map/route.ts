@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAvailableRepositories } from '@/lib/github';
+
 import YAML from 'yaml';
 
 const API_BASE = 'https://api.github.com';
@@ -41,9 +41,7 @@ export async function GET(request: NextRequest) {
     const slug = searchParams.get('repo');
 
     if (!repoPath && slug) {
-      const available = getAvailableRepositories();
-      const found = available.find(r => r.slug === slug);
-      repoPath = found?.repoPath || null;
+      return NextResponse.json({ error: 'Repository path is required' }, { status: 400 });
     }
 
     if (!repoPath) {

@@ -51,7 +51,8 @@ async function testAddRepository(validationData) {
       repoPath: validationData.repoPath,
       displayName: validationData.displayName,
       htmlUrl: validationData.htmlUrl,
-      defaultBranch: validationData.defaultBranch
+      defaultBranch: validationData.defaultBranch,
+      avatarUrl: validationData.avatarUrl
     })
   });
   

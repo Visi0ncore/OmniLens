@@ -8,7 +8,7 @@ export const BASE_URL = 'http://localhost:3000';
 
 // Test repository configuration
 export const TEST_REPO = 'https://github.com/Visi0ncore/OmniLens';
-export const TEST_SLUG = 'Visi0ncore-OmniLens';
+export const TEST_SLUG = 'OmniLens';
 
 // Colors for console output
 export const colors = {
