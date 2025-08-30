@@ -1,36 +1,22 @@
-name: Test All
+name: Test Health & Infrastructure
 
 on:
   push:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-all.yml'
+      - '.github/workflows/test-health.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-all.yml'
+      - '.github/workflows/test-health.yml'
   workflow_dispatch:
 
 jobs:
-  test-all:
+  test-health:
     runs-on: ubuntu-latest
     
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: omnilens
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -49,17 +35,6 @@ jobs:
       working-directory: ./dashboard
       run: bun install
 
-    - name: Setup database
-      working-directory: ./dashboard
-      run: |
-        # Wait for PostgreSQL to be ready
-        sleep 10
-        
-        # Create database schema using the SQL file
-        psql -h localhost -U postgres -d omnilens -f lib/schema.sql
-      env:
-        PGPASSWORD: postgres
-
     - name: Start development server
       working-directory: ./dashboard
       run: |
@@ -77,15 +52,15 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Run all tests
+    - name: Run health tests
       working-directory: ./dashboard
-      run: bun run test
+      run: bun run test:health
 
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: all-test-results
+        name: health-test-results
         path: |
           dashboard/test-results/
           dashboard/coverage/

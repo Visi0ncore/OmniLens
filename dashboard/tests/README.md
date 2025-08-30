@@ -25,15 +25,23 @@ Predefined test cases and test data:
 - CRUD test sequence definitions
 - API endpoint test definitions
 
-### `api-repo.test.js`
-Comprehensive test suite for all API endpoints including:
+### `health.test.js` ⭐ NEW
+Health and infrastructure test suite including:
 - Server health check
 - OpenAPI specification validation
 - API documentation page
-- All repository endpoints (individual testing)
 - Zod validation integration
-- Slug generation
+- Slug generation testing
+- Core system functionality validation
+
+**Run with:** `bun run test:health`
+
+### `api-repo.test.js`
+Comprehensive test suite for API endpoints including:
+- All repository endpoints (individual testing)
+- CRUD operations validation
 - Multiple test cases per endpoint (valid, invalid, edge cases)
+- Database integration testing
 
 **Run with:** `bun run test:api`
 
@@ -64,23 +72,26 @@ Golden repository test suite for the complete user journey:
 # Run all tests
 bun run test
 
+# Run health tests only
+bun run test:health
+
 # Run API repository tests only
 bun run test:api
 
 # Run golden repository tests only
 bun run test:golden
 
-# Run both test suites
-bun run test:api && bun run test:golden
+# Run specific test suites
+bun run test:health && bun run test:api && bun run test:golden
 ```
 
 ### GitHub Actions
 
 The following workflows are available for automated testing:
 
+- **`test-health.yml`** - Runs health and infrastructure tests only
 - **`test-api-repo.yml`** - Runs API repository tests only
-- **`test-golden-repo.yml`** - Runs golden repository tests only  
-- **`test-all.yml`** - Runs both test suites (recommended)
+- **`test-golden-repo.yml`** - Runs golden repository tests only
 
 **Triggers:**
 - Push to `main` or `develop` branches
@@ -88,9 +99,11 @@ The following workflows are available for automated testing:
 - Manual dispatch via GitHub Actions UI
 
 **Requirements:**
-- PostgreSQL 15 service container
+- PostgreSQL 15 service container (for API and golden tests)
 - GitHub token for API access
 - Bun runtime environment
+
+**Note:** Each workflow runs independently. To run all tests locally, use `bun run test`.
 
 ## Test Coverage
 
@@ -102,6 +115,7 @@ The following workflows are available for automated testing:
 - ✅ `DELETE /api/repo/{slug}` - Delete repository
 
 ### Test Coverage
+- ✅ **Health & Infrastructure Testing**: System health, OpenAPI spec, documentation
 - ✅ **API Repository Testing**: Individual endpoint testing with multiple test cases
 - ✅ **Golden Repository Testing**: Complete user journey testing with OmniLens repo
 - ✅ **Error Handling**: Non-existent resources, validation errors

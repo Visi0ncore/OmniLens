@@ -5,14 +5,13 @@
  * 
  * This test suite validates all our API endpoints individually to ensure they're working correctly
  * and returning the expected responses. Tests each endpoint in isolation with various test cases.
+ * Focuses on CRUD operations and API functionality.
  * 
  * Run with: node tests/api-repo.test.js
  */
 
 import {
   BASE_URL,
-  API_DOCS_URL,
-  OPENAPI_SPEC_URL,
   log,
   logTest,
   logSuccess,
@@ -22,8 +21,6 @@ import {
   makeRequest,
   checkServer,
   VALIDATION_TEST_CASES,
-  ZOD_VALIDATION_TEST_CASES,
-  SLUG_TEST_CASES,
   ADD_REPO_TEST_CASES,
   NON_EXISTENT_REPO_TEST_CASES,
   ADD_NON_EXISTENT_REPO_TEST_CASES,
@@ -31,71 +28,6 @@ import {
 } from './test-utils.js';
 
 // Test functions
-async function testServerHealth() {
-  logTest('Server Health Check');
-  
-  const response = await makeRequest(BASE_URL);
-  
-  if (response.ok) {
-    logSuccess('Server is running and responding');
-    return true;
-  } else {
-    logError(`Server health check failed: ${response.status}`);
-    return false;
-  }
-}
-
-async function testOpenAPISpec() {
-  logTest('OpenAPI Specification');
-  
-  const response = await makeRequest(OPENAPI_SPEC_URL);
-  
-  if (response.ok && response.data) {
-    logSuccess('OpenAPI spec is accessible');
-    
-    // Check for key content - handle both text and parsed JSON
-    const specText = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-    
-    if (specText.includes('openapi:') && specText.includes('info:') && specText.includes('paths:')) {
-      logSuccess('OpenAPI spec has valid structure');
-      
-      // Count endpoints by looking for path patterns
-      const pathMatches = specText.match(/^\s+\/api\/[^:]+:/gm);
-      const endpoints = pathMatches ? pathMatches.map(p => p.trim().replace(':', '')) : [];
-      logInfo(`Found ${endpoints.length} endpoints: ${endpoints.join(', ')}`);
-      
-      return true;
-    } else {
-      logError('OpenAPI spec has invalid structure');
-      return false;
-    }
-  } else {
-    logError(`OpenAPI spec not accessible: ${response.status}`);
-    return false;
-  }
-}
-
-async function testAPIDocsPage() {
-  logTest('API Documentation Page');
-  
-  const response = await makeRequest(API_DOCS_URL);
-  
-  if (response.ok && response.data) {
-    logSuccess('API docs page is accessible');
-    
-    // Check for Swagger UI content
-    if (response.data.includes('swagger-ui') || response.data.includes('SwaggerUI')) {
-      logSuccess('Swagger UI is properly loaded');
-      return true;
-    } else {
-      logWarning('Swagger UI content not found in response');
-      return true; // Still accessible, just might not be fully loaded
-    }
-  } else {
-    logError(`API docs page not accessible: ${response.status}`);
-    return false;
-  }
-}
 
 async function testGetRepositories() {
   logTest('GET /api/repo');
@@ -441,81 +373,19 @@ async function testDeleteRepository() {
   return allPassed;
 }
 
-async function testSlugGeneration() {
-  logTest('Slug Generation (Clean URLs)');
-  
-  // Test the slug generation logic
-  const testCases = SLUG_TEST_CASES;
-  
-  let allPassed = true;
-  
-  for (const testCase of testCases) {
-    const actualSlug = testCase.repoPath.replace(/\//g, '-');
-    
-    if (actualSlug === testCase.expectedSlug) {
-      logSuccess(`✅ ${testCase.description}: "${actualSlug}"`);
-    } else {
-      logError(`❌ ${testCase.description}: Expected "${testCase.expectedSlug}", got "${actualSlug}"`);
-      allPassed = false;
-    }
-  }
-  
-  return allPassed;
-}
-
-async function testZodValidation() {
-  logTest('Zod Validation Integration');
-  
-  const testCases = ZOD_VALIDATION_TEST_CASES;
-  
-  let allPassed = true;
-  
-  for (const testCase of testCases) {
-    logInfo(`  Testing: ${testCase.name}`);
-    
-    const response = await makeRequest(`${BASE_URL}/api/repo/validate`, {
-      method: 'POST',
-      body: JSON.stringify(testCase.data)
-    });
-    
-    if (testCase.shouldPass) {
-      if (response.ok) {
-        logSuccess(`    ✅ ${testCase.name} - Zod validation passed`);
-      } else {
-        logError(`    ❌ ${testCase.name} - Zod validation failed: ${response.status}`);
-        allPassed = false;
-      }
-    } else {
-      if (!response.ok && response.status === 400) {
-        logSuccess(`    ✅ ${testCase.name} - Zod validation correctly rejected`);
-      } else {
-        logError(`    ❌ ${testCase.name} - Expected 400 but got: ${response.status}`);
-        allPassed = false;
-      }
-    }
-  }
-  
-  return allPassed;
-}
-
 // Main test runner
 async function runAllTests() {
   log('\n🚀 Starting OmniLens API Test Suite', 'bright');
   log('=' .repeat(50), 'bright');
   
   const tests = [
-    { name: 'Server Health', fn: testServerHealth },
-    { name: 'OpenAPI Specification', fn: testOpenAPISpec },
-    { name: 'API Documentation Page', fn: testAPIDocsPage },
     { name: 'GET /api/repo', fn: testGetRepositories },
     { name: 'POST /api/repo/validate', fn: testValidateRepository },
     { name: 'POST /api/repo/validate (Non-existent)', fn: testValidateNonExistentRepository },
     { name: 'POST /api/repo/add', fn: testAddRepository },
     { name: 'POST /api/repo/add (Non-existent)', fn: testAddNonExistentRepository },
     { name: 'GET /api/repo/{slug}', fn: testGetSpecificRepository },
-    { name: 'DELETE /api/repo/{slug}', fn: testDeleteRepository },
-    { name: 'Slug Generation', fn: testSlugGeneration },
-    { name: 'Zod Validation', fn: testZodValidation }
+    { name: 'DELETE /api/repo/{slug}', fn: testDeleteRepository }
   ];
   
   const results = [];
@@ -577,16 +447,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 export {
   runAllTests,
-  testServerHealth,
-  testOpenAPISpec,
-  testAPIDocsPage,
   testGetRepositories,
   testValidateRepository,
   testValidateNonExistentRepository,
   testAddRepository,
   testAddNonExistentRepository,
   testGetSpecificRepository,
-  testDeleteRepository,
-  testSlugGeneration,
-  testZodValidation
+  testDeleteRepository
 };
