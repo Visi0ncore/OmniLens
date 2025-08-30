@@ -74,11 +74,6 @@ async function testGetAllRepositories() {
   
   const { response, data, ok, status } = await makeRequest(`${BASE_URL}/api/repo`);
   
-  // Debug: Log the actual response in CI
-  if (process.env.CI) {
-    log(`Debug: Status: ${status}, Response: ${JSON.stringify(data)}`, 'yellow');
-  }
-  
   if (ok && data.repositories) {
     const testRepo = data.repositories.find(repo => repo.slug === TEST_SLUG);
     if (testRepo) {
