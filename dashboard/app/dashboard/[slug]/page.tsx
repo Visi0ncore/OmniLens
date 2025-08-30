@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar, Hammer, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle, Loader2, BarChart3 } from "lucide-react";
+import { Zap, Target, TestTube, Calendar, Hammer, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle, Loader2, BarChart3, Package } from "lucide-react";
 import Link from "next/link";
 import { getRepoConfig, removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getTestingWorkflowsForTrigger } from "@/lib/utils";
 
@@ -31,20 +31,19 @@ function formatRepoDisplayName(repoName: string): string {
 
 function NoWorkflowsFound({ repoName }: { repoName: string }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
-      <div className="rounded-full bg-muted p-6">
-        <AlertCircle className="h-12 w-12 text-muted-foreground" />
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-xl font-semibold">
-          No workflows configured
-        </h2>
-        <p className="text-muted-foreground max-w-md">
-          The repository <code className="bg-muted px-2 py-1 rounded text-sm">{repoName}</code> has no workflows configured in the dashboard.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Add workflow files to start monitoring.
-        </p>
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-full max-w-xl">
+        <div className="border rounded-lg bg-card/60 backdrop-blur-sm p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+            <Package className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-2xl font-semibold mb-4">
+            No workflows configured
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Add workflow files to start monitoring.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -265,9 +264,6 @@ export default function DashboardPage({ params }: PageProps) {
               </Link>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{formatRepoDisplayName(repoDisplayName)}</h1>
-                <p className="text-muted-foreground">
-                  Workflow runs for {selectedDateStr}
-                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -324,9 +320,6 @@ export default function DashboardPage({ params }: PageProps) {
             </Link>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{formatRepoDisplayName(repoDisplayName)}</h1>
-              <p className="text-muted-foreground">
-                Workflow runs for {selectedDateStr}
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
