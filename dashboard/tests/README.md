@@ -28,13 +28,20 @@ Predefined test cases and test data:
 ### `health.test.js` ⭐ NEW
 Health and infrastructure test suite including:
 - Server health check
-- OpenAPI specification validation
-- API documentation page
 - Zod validation integration
 - Slug generation testing
 - Core system functionality validation
 
 **Run with:** `bun run test:health`
+
+### `api-docs.test.js` ⭐ NEW
+Comprehensive API documentation test suite including:
+- OpenAPI specification endpoint testing
+- API documentation page endpoint testing
+- Content validation for both endpoints
+- Endpoint structure verification
+
+**Run with:** `bun run test:api:docs`
 
 ### `api-repo.test.js`
 Comprehensive test suite for API endpoints including:
@@ -43,7 +50,7 @@ Comprehensive test suite for API endpoints including:
 - Multiple test cases per endpoint (valid, invalid, edge cases)
 - Database integration testing
 
-**Run with:** `bun run test:api`
+**Run with:** `bun run test:api:recon`
 
 ### `golden-repo.test.js`
 Golden repository test suite for the complete user journey:
@@ -75,14 +82,17 @@ bun run test
 # Run health tests only
 bun run test:health
 
+# Run API documentation tests only
+bun run test:api:docs
+
 # Run API repository tests only
-bun run test:api
+bun run test:api:recon
 
 # Run golden repository tests only
 bun run test:golden
 
 # Run specific test suites
-bun run test:health && bun run test:api && bun run test:golden
+bun run test:health && bun run test:api:docs && bun run test:api:recon && bun run test:golden
 ```
 
 ### GitHub Actions
@@ -90,6 +100,7 @@ bun run test:health && bun run test:api && bun run test:golden
 The following workflows are available for automated testing:
 
 - **`test-health.yml`** - Runs health and infrastructure tests only
+- **`test-api-docs.yml`** - Runs API documentation tests only
 - **`test-api-repo.yml`** - Runs API repository tests only
 - **`test-golden-repo.yml`** - Runs golden repository tests only
 
@@ -115,7 +126,8 @@ The following workflows are available for automated testing:
 - ✅ `DELETE /api/repo/{slug}` - Delete repository
 
 ### Test Coverage
-- ✅ **Health & Infrastructure Testing**: System health, OpenAPI spec, documentation
+- ✅ **Health & Infrastructure Testing**: System health, Zod validation, slug generation
+- ✅ **API Documentation Testing**: OpenAPI spec and documentation endpoints
 - ✅ **API Repository Testing**: Individual endpoint testing with multiple test cases
 - ✅ **Golden Repository Testing**: Complete user journey testing with OmniLens repo
 - ✅ **Error Handling**: Non-existent resources, validation errors
