@@ -4,18 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useState, useEffect, useCallback } from "react";
 import { format, isToday } from "date-fns";
 
-import WorkflowCard from "@/components/WorkflowCard";
-import DashboardSkeleton from "@/components/DashboardSkeleton";
 import ErrorState from "@/components/ErrorState";
-import WorkflowMetrics from "@/components/WorkflowMetrics";
-import OverviewMetrics from "@/components/OverviewMetrics";
 import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, TestTube, Calendar, Hammer, ArrowLeft, AlertCircle, Plus, Trash2, Settings, CheckCircle, Loader2, BarChart3, Package } from "lucide-react";
+import { Zap, Calendar, ArrowLeft, Settings, Loader2, BarChart3, Package } from "lucide-react";
 import Link from "next/link";
-import { getRepoConfig, removeEmojiFromWorkflowName, cleanWorkflowName, filterWorkflowsByCategories, calculateMissingWorkflows, getTestingWorkflowsForTrigger } from "@/lib/utils";
 
 // Helper function to format repository name for display
 function formatRepoDisplayName(repoName: string): string {
@@ -374,15 +369,35 @@ export default function DashboardPage({ params }: PageProps) {
             />
           </div>
         </div>
-        
-                    <NoWorkflowsFound 
-              repoName={formatRepoDisplayName(repoDisplayName)} 
-              repoSlug={repoSlug}
-              onConfigureWorkflows={handleConfigureWorkflows}
-              isConfiguringWorkflows={isConfiguringWorkflows}
-            />
-      </div>
-    );
+
+      {/* Show configured workflows or no workflows found */}
+      {configuredWorkflows.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Settings className="h-6 w-6" />
+            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
+              Available Workflows
+            </h2>
+            <Badge variant="secondary" className="text-xs">
+              {configuredWorkflows.length} workflows
+            </Badge>
+          </div>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {configuredWorkflows.map((workflow: any) => (
+              <WorkflowDefinitionCard key={workflow.id} workflow={workflow} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <NoWorkflowsFound 
+          repoName={formatRepoDisplayName(repoDisplayName)} 
+          repoSlug={repoSlug}
+          onConfigureWorkflows={handleConfigureWorkflows}
+          isConfiguringWorkflows={isConfiguringWorkflows}
+        />
+      )}
+    </div>
+  );
   }
 
   // Show error state
@@ -434,16 +449,6 @@ export default function DashboardPage({ params }: PageProps) {
       </div>
 
       {/* Show configured workflows or no workflows found */}
-      {(() => {
-        console.log('=== UI RENDER DEBUG ===');
-        console.log('configuredWorkflows:', configuredWorkflows);
-        console.log('configuredWorkflows.length:', configuredWorkflows.length);
-        console.log('workflowData:', workflowData);
-        console.log('workflowData.length:', workflowData?.length || 0);
-        console.log('Should show workflows:', configuredWorkflows.length > 0);
-        console.log('Should show NoWorkflowsFound:', (!workflowData || workflowData.length === 0));
-        return null;
-      })()}
       {configuredWorkflows.length > 0 ? (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
@@ -461,77 +466,13 @@ export default function DashboardPage({ params }: PageProps) {
             ))}
           </div>
         </div>
-      ) : (!workflowData || workflowData.length === 0) ? (
+      ) : (
         <NoWorkflowsFound 
           repoName={formatRepoDisplayName(repoDisplayName)} 
           repoSlug={repoSlug}
           onConfigureWorkflows={handleConfigureWorkflows}
           isConfiguringWorkflows={isConfiguringWorkflows}
         />
-      ) : (
-        <>
-          {/* Compact Overview Row */}
-          {workflowData && overviewData && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-8">
-              <OverviewMetrics
-                data={overviewData}
-                onMetricHover={handleMetricHover}
-                onMetricLeave={handleMetricLeave}
-              />
-              <WorkflowMetrics
-                todayRuns={workflowData}
-                yesterdayRuns={yesterdayWorkflowData || []}
-                onMetricHover={handleMetricHover}
-                onMetricLeave={handleMetricLeave}
-              />
-            </div>
-          )}
-
-          {/* All Workflows Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Zap className="h-6 w-6" />
-              <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
-                All Workflows
-              </h2>
-              <Badge variant="secondary" className="text-xs">
-                {workflowData.length} workflows
-              </Badge>
-            </div>
-
-            {workflowData && workflowData.length > 0 ? (
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {workflowData.map((run: any) => {
-                  const isHighlighted = hoverState.metricType !== null && hoverState.workflowIds.has(run.id);
-                  const highlightColor = isHighlighted && hoverState.metricType
-                    ? getBorderColorForMetric(hoverState.metricType)
-                    : '';
-
-                  return (
-                    <WorkflowCard
-                      key={run.id}
-                      run={run}
-                      isReviewed={reviewedWorkflows[run.id] || false}
-                      onToggleReviewed={() => toggleReviewed(run.id)}
-                      repoSlug={repoSlug}
-                      isHighlighted={isHighlighted}
-                      highlightColor={highlightColor}
-                      allWorkflowRuns={workflowData || []}
-                      reviewedTestingWorkflows={new Set()}
-                      onToggleTestingWorkflowReviewed={() => {}}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">
-                  No workflows found for this date
-                </p>
-              </div>
-            )}
-          </div>
-        </>
       )}
     </div>
   );
