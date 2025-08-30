@@ -255,12 +255,13 @@ export default function DashboardPage({ params }: PageProps) {
   // Show empty state for new repositories (no API calls)
   if (!todayData && !yesterdayData) {
     return (
-      <div className="container mx-auto p-6 space-y-8">
+      <div className="px-6 py-8 space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-5 w-5" />
             </Link>
+            <h1 className="text-3xl font-bold tracking-tight">{repoDisplayName}</h1>
           </div>
           <div className="flex items-center gap-3">
             <Link href={`/dashboard/${repoSlug}/report`}>
