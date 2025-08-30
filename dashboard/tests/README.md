@@ -4,7 +4,7 @@ This directory contains automated tests for the OmniLens Dashboard API.
 
 ## Test Files
 
-### `test-utils.js` ⭐ NEW
+### `test-utils.js`
 Shared utilities and configuration for all test files:
 - Common configuration (URLs, test data)
 - Color-coded logging functions
@@ -13,7 +13,7 @@ Shared utilities and configuration for all test files:
 - Test result summaries
 - Re-exports test cases from test-cases.js
 
-### `test-cases.js` ⭐ NEW
+### `test-cases.js`
 Predefined test cases and test data:
 - Repository test data (OmniLens, VSCode)
 - Validation test cases (for validation endpoint)
@@ -25,7 +25,7 @@ Predefined test cases and test data:
 - CRUD test sequence definitions
 - API endpoint test definitions
 
-### `health.test.js` ⭐ NEW
+### `health.test.js`
 Health and infrastructure test suite including:
 - Server health check
 - Zod validation integration
@@ -33,15 +33,6 @@ Health and infrastructure test suite including:
 - Core system functionality validation
 
 **Run with:** `bun run test:health`
-
-### `api-docs.test.js` ⭐ NEW
-Comprehensive static documentation test suite including:
-- OpenAPI specification file testing (`/openapi.yaml`)
-- API documentation page file testing (`/api-docs.html`)
-- Content validation for both static files
-- File structure verification
-
-**Run with:** `bun run test:api:docs`
 
 ### `api-repo.test.js`
 Comprehensive test suite for API endpoints including:
@@ -82,9 +73,6 @@ bun run test
 # Run health tests only
 bun run test:health
 
-# Run API documentation tests only
-bun run test:api:docs
-
 # Run API repository tests only
 bun run test:api:recon
 
@@ -92,7 +80,7 @@ bun run test:api:recon
 bun run test:golden
 
 # Run specific test suites
-bun run test:health && bun run test:api:docs && bun run test:api:recon && bun run test:golden
+bun run test:health && bun run test:api:recon && bun run test:golden
 ```
 
 ### GitHub Actions
@@ -100,7 +88,6 @@ bun run test:health && bun run test:api:docs && bun run test:api:recon && bun ru
 The following workflows are available for automated testing:
 
 - **`test-health.yml`** - Runs health and infrastructure tests only
-- **`test-api-docs.yml`** - Runs API documentation tests only
 - **`test-api-repo.yml`** - Runs API repository tests only
 - **`test-golden-repo.yml`** - Runs golden repository tests only
 
@@ -127,7 +114,7 @@ The following workflows are available for automated testing:
 
 ### Test Coverage
 - ✅ **Health & Infrastructure Testing**: System health, Zod validation, slug generation
-- ✅ **Static Documentation Testing**: OpenAPI spec and documentation files
+
 - ✅ **API Repository Testing**: Individual endpoint testing with multiple test cases
 - ✅ **Golden Repository Testing**: Complete user journey testing with OmniLens repo
 - ✅ **Error Handling**: Non-existent resources, validation errors

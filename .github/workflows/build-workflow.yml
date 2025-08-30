@@ -1,4 +1,4 @@
-name: 🏗️ Build Validation
+name: 🏗️ Build
 
 on:
   push:

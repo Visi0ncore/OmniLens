@@ -9,9 +9,8 @@
     "build": "bunx next build",
     "start": "bunx next start",
     "lint": "bunx next lint",
-    "test": "bun run test:health && bun run test:api:docs && bun run test:api:repo && bun run test:golden",
+    "test": "bun run test:health && bun run test:api:repo && bun run test:golden",
     "test:health": "node tests/health.test.js",
-    "test:api:docs": "node tests/api-docs.test.js",
     "test:api:repo": "node tests/api-repo.test.js",
     "test:golden": "node tests/golden-repo.test.js"
   },

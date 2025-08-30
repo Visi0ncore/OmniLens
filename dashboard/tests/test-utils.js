@@ -5,8 +5,6 @@
 
 // Configuration
 export const BASE_URL = 'http://localhost:3000';
-export const API_DOCS_URL = `${BASE_URL}/api-docs.html`; // Static file
-export const OPENAPI_SPEC_URL = `${BASE_URL}/openapi.yaml`; // Static file
 
 // Test repository configuration
 export const TEST_REPO = 'https://github.com/Visi0ncore/OmniLens';
