@@ -1,0 +1,119 @@
+name: Test All
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'dashboard/**'
+      - '.github/workflows/test-all.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'dashboard/**'
+      - '.github/workflows/test-all.yml'
+  workflow_dispatch:
+
+jobs:
+  test-all:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: omnilens
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'bun'
+
+    - name: Install dependencies
+      working-directory: ./dashboard
+      run: bun install
+
+    - name: Setup database
+      working-directory: ./dashboard
+      run: |
+        # Wait for PostgreSQL to be ready
+        sleep 10
+        
+        # Create database schema
+        psql -h localhost -U postgres -d omnilens -c "
+        CREATE TABLE IF NOT EXISTS repositories (
+          id SERIAL PRIMARY KEY,
+          slug VARCHAR(255) UNIQUE NOT NULL,
+          repo_path VARCHAR(255) NOT NULL,
+          display_name VARCHAR(255) NOT NULL,
+          html_url TEXT NOT NULL,
+          default_branch VARCHAR(100) NOT NULL,
+          added_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_repositories_slug ON repositories(slug);
+        
+        CREATE OR REPLACE FUNCTION update_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = CURRENT_TIMESTAMP;
+            RETURN NEW;
+        END;
+        $$ language 'plpgsql';
+        
+        CREATE TRIGGER update_repositories_updated_at
+            BEFORE UPDATE ON repositories
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+        "
+      env:
+        PGPASSWORD: postgres
+
+    - name: Start development server
+      working-directory: ./dashboard
+      run: |
+        # Set environment variables
+        echo "DB_USER=postgres" >> .env.local
+        echo "DB_HOST=localhost" >> .env.local
+        echo "DB_NAME=omnilens" >> .env.local
+        echo "DB_PASSWORD=postgres" >> .env.local
+        echo "DB_PORT=5432" >> .env.local
+        echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env.local
+        
+        # Start server in background
+        bun run dev &
+        sleep 10
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Run all tests
+      working-directory: ./dashboard
+      run: bun run test
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: all-test-results
+        path: |
+          dashboard/test-results/
+          dashboard/coverage/
+        retention-days: 7

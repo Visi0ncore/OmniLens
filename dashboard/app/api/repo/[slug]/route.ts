@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRepo, removeUserRepo } from '@/lib/storage';
+import { getUserRepo, removeUserRepo } from '@/lib/db-storage';
 
 // GET /api/repo/{slug} - Get a specific repository
 export async function GET(
@@ -13,7 +13,7 @@ export async function GET(
       return NextResponse.json({ error: 'Repository slug is required' }, { status: 400 });
     }
 
-    const repo = getUserRepo(slug);
+    const repo = await getUserRepo(slug);
 
     if (!repo) {
       return NextResponse.json({ error: 'Repository not found' }, { status: 404 });
@@ -42,12 +42,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Repository slug is required' }, { status: 400 });
     }
 
-    const deletedRepo = removeUserRepo(slug);
+    const deletedRepo = await removeUserRepo(slug);
 
     if (!deletedRepo) {
       return NextResponse.json({ error: 'Repository not found' }, { status: 404 });
     }
-
+    
     return NextResponse.json({
       success: true,
       message: 'Repository removed from dashboard successfully',

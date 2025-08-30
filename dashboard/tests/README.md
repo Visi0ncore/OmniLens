@@ -1,142 +1,126 @@
-# OmniLens API Test Suite
+# API Test Suite
 
-This directory contains comprehensive tests for the OmniLens API endpoints.
+This directory contains automated tests for the OmniLens Dashboard API.
 
-## Quick Start
+## Test Files
 
-Make sure your development server is running:
+### `test-utils.js` ⭐ NEW
+Shared utilities and configuration for all test files:
+- Common configuration (URLs, test data)
+- Color-coded logging functions
+- HTTP request utilities
+- Server health checks
+- Test result summaries
+- Re-exports test cases from test-cases.js
+
+### `test-cases.js` ⭐ NEW
+Predefined test cases and test data:
+- Repository test data (OmniLens, VSCode)
+- Validation test cases (for validation endpoint)
+- Non-existent repository validation test cases
+- Zod validation test cases (for schema validation)
+- Slug generation test cases
+- Repository add test cases (valid and invalid data)
+- Non-existent repository add test cases
+- CRUD test sequence definitions
+- API endpoint test definitions
+
+### `api-repo.test.js`
+Comprehensive test suite for all API endpoints including:
+- Server health check
+- OpenAPI specification validation
+- API documentation page
+- All repository endpoints (individual testing)
+- Zod validation integration
+- Slug generation
+- Multiple test cases per endpoint (valid, invalid, edge cases)
+
+**Run with:** `bun run test:api`
+
+### `golden-repo.test.js`
+Golden repository test suite for the complete user journey:
+- Repository validation
+- Adding repositories to dashboard
+- Getting all repositories
+- Getting specific repository by slug
+- Deleting repositories
+- Error handling for non-existent resources
+- Tests the complete workflow: validate → add → get → delete
+- Uses https://github.com/Visi0ncore/OmniLens as the golden test repository
+
+**Run with:** `bun run test:golden`
+
+## Prerequisites
+
+1. **Development server running**: `bun run dev`
+2. **PostgreSQL database**: Set up and running
+3. **GitHub token**: Configured in `.env.local`
+
+## Running Tests
+
+### Local Development
+
 ```bash
-bun run dev
-```
+# Run all tests
+bun run test
 
-Then run the test suite:
-```bash
+# Run API repository tests only
 bun run test:api
+
+# Run golden repository tests only
+bun run test:golden
+
+# Run both test suites
+bun run test:api && bun run test:golden
 ```
 
-## What's Tested
+### GitHub Actions
 
-The test suite validates:
+The following workflows are available for automated testing:
 
-### ✅ **Server Health**
-- Ensures the development server is running and responding
+- **`test-api-repo.yml`** - Runs API repository tests only
+- **`test-golden-repo.yml`** - Runs golden repository tests only  
+- **`test-all.yml`** - Runs both test suites (recommended)
 
-### ✅ **OpenAPI Specification**
-- Validates that the OpenAPI spec is accessible at `/openapi.yaml`
-- Checks for proper YAML structure
-- Counts available endpoints
+**Triggers:**
+- Push to `main` or `develop` branches
+- Pull requests to `main` or `develop` branches
+- Manual dispatch via GitHub Actions UI
 
-### ✅ **API Documentation**
-- Tests the Swagger UI page at `/api-docs.html`
-- Verifies Swagger UI is properly loaded
+**Requirements:**
+- PostgreSQL 15 service container
+- GitHub token for API access
+- Bun runtime environment
 
-### ✅ **GET /api/repo**
-- Tests the repository listing endpoint
-- Validates response structure
-- Counts available repositories
+## Test Coverage
 
-### ✅ **POST /api/repo/validate**
-- Tests repository validation with multiple scenarios:
-  - Valid repositories (OmniLens, VSCode)
-  - Empty repository URLs
-  - Missing repository URLs
-- Validates `displayName` returns just the repo name (not owner/repo)
-- Tests Zod validation integration
+### API Endpoints Tested
+- ✅ `GET /api/repo` - List repositories
+- ✅ `POST /api/repo/validate` - Validate repository
+- ✅ `POST /api/repo/add` - Add repository to dashboard
+- ✅ `GET /api/repo/{slug}` - Get specific repository
+- ✅ `DELETE /api/repo/{slug}` - Delete repository
 
-### ✅ **Slug Generation**
-- Validates clean URL generation (no more ugly `local-` prefix!)
-- Tests slash-to-dash conversion
+### Test Coverage
+- ✅ **API Repository Testing**: Individual endpoint testing with multiple test cases
+- ✅ **Golden Repository Testing**: Complete user journey testing with OmniLens repo
+- ✅ **Error Handling**: Non-existent resources, validation errors
+- ✅ **Data Integrity**: Database persistence and cleanup
 
-### ✅ **Zod Validation**
-- Tests Zod schema validation for request bodies
-- Validates proper error responses for invalid data
+## Test Results
 
-## Test Output
-
-The test suite provides colorful, detailed output:
-
-- 🧪 **Test sections** with clear descriptions
-- ✅ **Success indicators** for passing tests
-- ❌ **Error indicators** for failing tests
-- ℹ️ **Info messages** with additional details
-- 📊 **Summary** with overall pass/fail count
-
-## Example Output
-
-```
-🚀 Starting OmniLens API Test Suite
-==================================================
-
-🧪 Testing: Server Health Check
-✅ Server is running and responding
-
-🧪 Testing: POST /api/repo/validate
-ℹ️    Testing: Valid repository (OmniLens)
-✅     ✅ Valid repository (OmniLens) - Valid response
-✅     ✅ displayName is correct: "OmniLens"
-
-📊 Test Results Summary
-==================================================
-✅ Server Health
-✅ OpenAPI Specification
-✅ API Documentation Page
-✅ GET /api/repo
-✅ POST /api/repo/validate
-✅ Slug Generation
-✅ Zod Validation
-
-🎯 Overall: 7/7 tests passed
-🎉 All tests passed! Your API is working perfectly!
-```
-
-## Adding New Tests
-
-To add new tests:
-
-1. Create a new test function in `api-endpoints.test.js`
-2. Add it to the `tests` array in `runAllTests()`
-3. Export it from the module
-
-Example:
-```javascript
-async function testNewEndpoint() {
-  logTest('New Endpoint Test');
-  
-  const response = await makeRequest(`${BASE_URL}/api/new-endpoint`);
-  
-  if (response.ok) {
-    logSuccess('New endpoint is working');
-    return true;
-  } else {
-    logError(`New endpoint failed: ${response.status}`);
-    return false;
-  }
-}
-```
+Both test suites should show:
+- ✅ Server connectivity
+- ✅ All endpoints responding correctly
+- ✅ Proper error handling
+- ✅ Database persistence
+- ✅ Zod validation working
+- ✅ Clean test environment (no leftover data)
 
 ## Troubleshooting
 
-### Server Not Running
-If you get "Server is not running!" error:
-```bash
-bun run dev
-```
-
-### Test Failures
-- Check the server logs for any errors
-- Verify the API endpoints are working manually
-- Check that all dependencies are installed
-
-### Permission Issues
-If you get permission errors:
-```bash
-chmod +x tests/api-endpoints.test.js
-```
-
-## Continuous Integration
-
-This test suite is designed to be run in CI/CD pipelines. It exits with:
-- `0` if all tests pass
-- `1` if any tests fail
-
-Perfect for automated testing! 🚀
+If tests fail:
+1. Ensure development server is running (`bun run dev`)
+2. Check PostgreSQL is running (`brew services list | grep postgresql`)
+3. Verify GitHub token is configured
+4. Check database connection in `lib/db.ts`

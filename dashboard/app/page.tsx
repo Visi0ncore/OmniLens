@@ -271,25 +271,7 @@ export default function HomePage() {
   } | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
 
-  const loadUserAddedRepos = React.useCallback(() => {
-    try {
-      const stored = localStorage.getItem('userAddedRepos');
-      if (!stored) return [] as any[];
-      const parsed = JSON.parse(stored);
-      if (!Array.isArray(parsed)) return [] as any[];
-      return parsed as Array<any>;
-    } catch {
-      return [] as any[];
-    }
-  }, []);
 
-  const saveUserAddedRepos = React.useCallback((repos: any[]) => {
-    try {
-      localStorage.setItem('userAddedRepos', JSON.stringify(repos));
-    } catch {
-      // ignore storage failures
-    }
-  }, []);
 
   // Remove all locally persisted state for a given repo slug
   const clearRepoLocalState = React.useCallback((repoSlug: string) => {
@@ -322,16 +304,25 @@ export default function HomePage() {
     } catch {}
   }, []);
 
-  // Build repositories list from user-added repos only (no env-configured repos on this branch)
+  // Build repositories list from API (includes both env-configured and user-added repos)
   const hydrateUserRepos = React.useCallback(async () => {
     try {
-      const userRepos = loadUserAddedRepos();
-      const mappedUserRepos = userRepos.map((r: any) => ({
+      // Fetch all repositories from the API
+      const response = await fetch('/api/repo', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error('Failed to fetch repositories');
+      }
+      
+      const data = await response.json();
+      const allRepos = data.repositories || [];
+      
+      // Map to the expected format
+      const mappedRepos = allRepos.map((r: any) => ({
         slug: r.slug,
-        repoPath: r.repoPath,
-        envKey: 'LOCAL',
-        displayName: r.displayName || r.repoPath,
-        hasConfig: false,
+        repoPath: r.repoPath || r.slug.replace(/-/g, '/'), // Convert slug back to repoPath if needed
+        envKey: r.envKey || 'LOCAL',
+        displayName: r.displayName,
+        hasConfig: r.hasConfig || false,
         hasWorkflows: false,
         metrics: null,
       }));
@@ -339,7 +330,7 @@ export default function HomePage() {
       const todayStr = new Date().toISOString().slice(0, 10);
 
       const enhanced = await Promise.all(
-        mappedUserRepos.map(async (repo: any) => {
+        mappedRepos.map(async (repo: any) => {
           try {
             const raw = localStorage.getItem(`localRepoConfig-${repo.slug}`);
             const localCfg = raw ? JSON.parse(raw) : null;
@@ -378,7 +369,7 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [loadUserAddedRepos]);
+  }, []);
 
   React.useEffect(() => {
     hydrateUserRepos();
@@ -521,12 +512,19 @@ export default function HomePage() {
                       if (!repoToDelete) return;
                       setIsDeleting(true);
                       try {
-                        setAvailableRepos(prev => prev.filter(r => r.slug !== repoToDelete.slug));
-                        const stored = loadUserAddedRepos();
-                        const updated = stored.filter((r: any) => r.slug !== repoToDelete.slug);
-                        saveUserAddedRepos(updated);
-                        clearRepoLocalState(repoToDelete.slug);
-                        setRepoToDelete(null);
+                        // Delete from API
+                        const response = await fetch(`/api/repo/${repoToDelete.slug}`, {
+                          method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                          // Remove from local state
+                          setAvailableRepos(prev => prev.filter(r => r.slug !== repoToDelete.slug));
+                          clearRepoLocalState(repoToDelete.slug);
+                          setRepoToDelete(null);
+                        } else {
+                          console.error('Failed to delete repository');
+                        }
                       } finally {
                         setIsDeleting(false);
                       }
@@ -638,12 +636,19 @@ export default function HomePage() {
                     if (!repoToDelete) return;
                     setIsDeleting(true);
                     try {
-                      setAvailableRepos(prev => prev.filter(r => r.slug !== repoToDelete.slug));
-                      const stored = loadUserAddedRepos();
-                      const updated = stored.filter((r: any) => r.slug !== repoToDelete.slug);
-                      saveUserAddedRepos(updated);
-                      clearRepoLocalState(repoToDelete.slug);
-                      setRepoToDelete(null);
+                      // Delete from API
+                      const response = await fetch(`/api/repo/${repoToDelete.slug}`, {
+                        method: 'DELETE'
+                      });
+                      
+                      if (response.ok) {
+                        // Remove from local state
+                        setAvailableRepos(prev => prev.filter(r => r.slug !== repoToDelete.slug));
+                        clearRepoLocalState(repoToDelete.slug);
+                        setRepoToDelete(null);
+                      } else {
+                        console.error('Failed to delete repository');
+                      }
                     } finally {
                       setIsDeleting(false);
                     }

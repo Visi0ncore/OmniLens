@@ -1,98 +1,34 @@
 #!/usr/bin/env node
 
 /**
- * OmniLens API Endpoint Test Suite
+ * OmniLens API Repository Test Suite
  * 
- * This test suite validates all our API endpoints to ensure they're working correctly
- * and returning the expected responses.
+ * This test suite validates all our API endpoints individually to ensure they're working correctly
+ * and returning the expected responses. Tests each endpoint in isolation with various test cases.
  * 
- * Run with: node tests/api-endpoints.test.js
+ * Run with: node tests/api-repo.test.js
  */
 
-import { execSync } from 'child_process';
-import fs from 'fs';
-import path from 'path';
-
-// Configuration
-const BASE_URL = 'http://localhost:3000';
-const API_DOCS_URL = `${BASE_URL}/api-docs.html`;
-const OPENAPI_SPEC_URL = `${BASE_URL}/openapi.yaml`;
-
-// Colors for console output
-const colors = {
-  reset: '\x1b[0m',
-  bright: '\x1b[1m',
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  magenta: '\x1b[35m',
-  cyan: '\x1b[36m'
-};
-
-// Test utilities
-function log(message, color = 'reset') {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
-
-function logTest(testName) {
-  log(`\n🧪 Testing: ${testName}`, 'cyan');
-}
-
-function logSuccess(message) {
-  log(`✅ ${message}`, 'green');
-}
-
-function logError(message) {
-  log(`❌ ${message}`, 'red');
-}
-
-function logWarning(message) {
-  log(`🚨  ${message}`, 'yellow');
-}
-
-function logInfo(message) {
-  log(`ℹ️  ${message}`, 'blue');
-}
-
-// HTTP request utility
-async function makeRequest(url, options = {}) {
-  const defaultOptions = {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
-    }
-  };
-
-  const finalOptions = { ...defaultOptions, ...options };
-  
-  try {
-    const response = await fetch(url, finalOptions);
-    const text = await response.text();
-    
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = text;
-    }
-    
-    return {
-      status: response.status,
-      ok: response.ok,
-      data,
-      headers: Object.fromEntries(response.headers.entries())
-    };
-  } catch (error) {
-    return {
-      status: 0,
-      ok: false,
-      error: error.message,
-      data: null
-    };
-  }
-}
+import {
+  BASE_URL,
+  API_DOCS_URL,
+  OPENAPI_SPEC_URL,
+  log,
+  logTest,
+  logSuccess,
+  logError,
+  logWarning,
+  logInfo,
+  makeRequest,
+  checkServer,
+  VALIDATION_TEST_CASES,
+  ZOD_VALIDATION_TEST_CASES,
+  SLUG_TEST_CASES,
+  ADD_REPO_TEST_CASES,
+  NON_EXISTENT_REPO_TEST_CASES,
+  ADD_NON_EXISTENT_REPO_TEST_CASES,
+  REPO_TEST_DATA
+} from './test-utils.js';
 
 // Test functions
 async function testServerHealth() {
@@ -186,28 +122,7 @@ async function testGetRepositories() {
 async function testValidateRepository() {
   logTest('POST /api/repo/validate');
   
-  const testCases = [
-    {
-      name: 'Valid repository (OmniLens)',
-      data: { repoUrl: 'https://github.com/Visi0ncore/OmniLens' },
-      expectedValid: true
-    },
-    {
-      name: 'Valid repository (VSCode)',
-      data: { repoUrl: 'https://github.com/microsoft/vscode' },
-      expectedValid: true
-    },
-    {
-      name: 'Empty repoUrl',
-      data: { repoUrl: '' },
-      expectedValid: false
-    },
-    {
-      name: 'Missing repoUrl',
-      data: {},
-      expectedValid: false
-    }
-  ];
+  const testCases = VALIDATION_TEST_CASES;
   
   let allPassed = true;
   
@@ -251,13 +166,41 @@ async function testValidateRepository() {
   return allPassed;
 }
 
+async function testValidateNonExistentRepository() {
+  logTest('POST /api/repo/validate (Non-existent)');
+  
+  let allPassed = true;
+  
+  for (const testCase of NON_EXISTENT_REPO_TEST_CASES) {
+    logInfo(`  Testing: ${testCase.name}`);
+    
+    const response = await makeRequest(`${BASE_URL}/api/repo/validate`, {
+      method: 'POST',
+      body: JSON.stringify(testCase.data)
+    });
+    
+    if (response.status === testCase.expectedStatus || !response.ok) {
+      logSuccess(`    ✅ ${testCase.name} - Correctly rejected (${response.status})`);
+    } else {
+      logError(`    ❌ ${testCase.name} - Expected ${testCase.expectedStatus} but got ${response.status}`);
+      allPassed = false;
+    }
+  }
+  
+  if (allPassed) {
+    logSuccess('All non-existent repository validation test cases passed');
+  }
+  
+  return allPassed;
+}
+
 async function testAddRepository() {
   logTest('POST /api/repo/add');
   
   // First validate a repo to get the data
   const validateResponse = await makeRequest(`${BASE_URL}/api/repo/validate`, {
     method: 'POST',
-    body: JSON.stringify({ repoUrl: 'https://github.com/Visi0ncore/OmniLens' })
+    body: JSON.stringify({ repoUrl: REPO_TEST_DATA.omniLens.url })
   });
   
   if (!validateResponse.ok || !validateResponse.data.valid) {
@@ -265,36 +208,20 @@ async function testAddRepository() {
     return false;
   }
   
-  const testCases = [
-    {
-      name: 'Valid repository data',
-      data: {
-        repoPath: validateResponse.data.repoPath,
-        displayName: validateResponse.data.displayName,
-        htmlUrl: validateResponse.data.htmlUrl,
-        defaultBranch: validateResponse.data.defaultBranch
-      },
-      shouldPass: true
-    },
-    {
-      name: 'Missing required fields',
-      data: {
-        repoPath: 'Visi0ncore/OmniLens'
-        // Missing other required fields
-      },
-      shouldPass: false
-    },
-    {
-      name: 'Invalid HTML URL',
-      data: {
-        repoPath: 'Visi0ncore/OmniLens',
-        displayName: 'OmniLens',
-        htmlUrl: 'not-a-url',
-        defaultBranch: 'main'
-      },
-      shouldPass: false
+  const testCases = ADD_REPO_TEST_CASES.map(testCase => {
+    if (testCase.name === 'Valid repository data') {
+      return {
+        ...testCase,
+        data: {
+          repoPath: validateResponse.data.repoPath,
+          displayName: validateResponse.data.displayName,
+          htmlUrl: validateResponse.data.htmlUrl,
+          defaultBranch: validateResponse.data.defaultBranch
+        }
+      };
     }
-  ];
+    return testCase;
+  });
   
   let allPassed = true;
   let addedSlug = null;
@@ -331,6 +258,34 @@ async function testAddRepository() {
   // Clean up: remove the added repo so it doesn't interfere with other tests
   if (addedSlug) {
     await makeRequest(`${BASE_URL}/api/repo/${addedSlug}`, { method: 'DELETE' });
+  }
+  
+  return allPassed;
+}
+
+async function testAddNonExistentRepository() {
+  logTest('POST /api/repo/add (Non-existent)');
+  
+  let allPassed = true;
+  
+  for (const testCase of ADD_NON_EXISTENT_REPO_TEST_CASES) {
+    logInfo(`  Testing: ${testCase.name}`);
+    
+    const response = await makeRequest(`${BASE_URL}/api/repo/add`, {
+      method: 'POST',
+      body: JSON.stringify(testCase.data)
+    });
+    
+    if (response.status === testCase.expectedStatus) {
+      logSuccess(`    ✅ ${testCase.name} - Correctly rejected (${response.status})`);
+    } else {
+      logError(`    ❌ ${testCase.name} - Expected ${testCase.expectedStatus} but got ${response.status}`);
+      allPassed = false;
+    }
+  }
+  
+  if (allPassed) {
+    logSuccess('All non-existent repository add test cases passed');
   }
   
   return allPassed;
@@ -404,6 +359,11 @@ async function testGetSpecificRepository() {
     }
   }
   
+  // Clean up: remove the added repo so it doesn't interfere with other tests
+  if (slug) {
+    await makeRequest(`${BASE_URL}/api/repo/${slug}`, { method: 'DELETE' });
+  }
+  
   return allPassed;
 }
 
@@ -431,12 +391,13 @@ async function testDeleteRepository() {
     })
   });
   
-  if (!addResponse.ok) {
+  if (!addResponse.ok && addResponse.status !== 409) {
     logError('Add failed, cannot test delete endpoint');
     return false;
   }
   
-  const slug = addResponse.data.repo.slug;
+  // If repository already exists (409), we can still test deletion
+  const slug = addResponse.ok ? addResponse.data.repo.slug : addResponse.data.slug;
   
   const testCases = [
     {
@@ -484,18 +445,7 @@ async function testSlugGeneration() {
   logTest('Slug Generation (Clean URLs)');
   
   // Test the slug generation logic
-  const testCases = [
-    {
-      repoPath: 'Visi0ncore/OmniLens',
-      expectedSlug: 'Visi0ncore-OmniLens',
-      description: 'Should generate clean slug without local- prefix'
-    },
-    {
-      repoPath: 'microsoft/vscode',
-      expectedSlug: 'microsoft-vscode',
-      description: 'Should replace slashes with dashes'
-    }
-  ];
+  const testCases = SLUG_TEST_CASES;
   
   let allPassed = true;
   
@@ -516,23 +466,7 @@ async function testSlugGeneration() {
 async function testZodValidation() {
   logTest('Zod Validation Integration');
   
-  const testCases = [
-    {
-      name: 'Valid request with repoUrl',
-      data: { repoUrl: 'https://github.com/Visi0ncore/OmniLens' },
-      shouldPass: true
-    },
-    {
-      name: 'Empty repoUrl',
-      data: { repoUrl: '' },
-      shouldPass: false
-    },
-    {
-      name: 'Missing repoUrl',
-      data: {},
-      shouldPass: false
-    }
-  ];
+  const testCases = ZOD_VALIDATION_TEST_CASES;
   
   let allPassed = true;
   
@@ -575,7 +509,9 @@ async function runAllTests() {
     { name: 'API Documentation Page', fn: testAPIDocsPage },
     { name: 'GET /api/repo', fn: testGetRepositories },
     { name: 'POST /api/repo/validate', fn: testValidateRepository },
+    { name: 'POST /api/repo/validate (Non-existent)', fn: testValidateNonExistentRepository },
     { name: 'POST /api/repo/add', fn: testAddRepository },
+    { name: 'POST /api/repo/add (Non-existent)', fn: testAddNonExistentRepository },
     { name: 'GET /api/repo/{slug}', fn: testGetSpecificRepository },
     { name: 'DELETE /api/repo/{slug}', fn: testDeleteRepository },
     { name: 'Slug Generation', fn: testSlugGeneration },
@@ -594,10 +530,7 @@ async function runAllTests() {
     }
   }
   
-  // Summary
-  log('\n📊 Test Results Summary', 'bright');
-  log('=' .repeat(50), 'bright');
-  
+  // Use shared summary function
   const passed = results.filter(r => r.passed).length;
   const total = results.length;
   
@@ -614,34 +547,23 @@ async function runAllTests() {
   
   if (passed === total) {
     log('\n🎉 All tests passed! Your API is working perfectly!', 'green');
-    process.exit(0);
+    return true;
   } else {
     log('\n🚨 Some tests failed. Please check the errors above.', 'yellow');
-    process.exit(1);
+    return false;
   }
-}
-
-// Check if server is running before starting tests
-async function checkServerRunning() {
-  log('🔍 Checking if server is running...', 'blue');
-  
-  const response = await makeRequest(BASE_URL);
-  
-  if (!response.ok) {
-    logError('❌ Server is not running!');
-    logInfo('Please start the development server with: bun run dev');
-    logInfo('Then run this test suite again.');
-    process.exit(1);
-  }
-  
-  logSuccess('✅ Server is running!');
 }
 
 // Main execution
 async function main() {
   try {
-    await checkServerRunning();
-    await runAllTests();
+    const serverRunning = await checkServer();
+    if (!serverRunning) {
+      process.exit(1);
+    }
+    
+    const success = await runAllTests();
+    process.exit(success ? 0 : 1);
   } catch (error) {
     logError(`Test suite failed: ${error.message}`);
     process.exit(1);
@@ -660,7 +582,9 @@ export {
   testAPIDocsPage,
   testGetRepositories,
   testValidateRepository,
+  testValidateNonExistentRepository,
   testAddRepository,
+  testAddNonExistentRepository,
   testGetSpecificRepository,
   testDeleteRepository,
   testSlugGeneration,

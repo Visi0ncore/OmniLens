@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { addUserRepo } from '@/lib/storage';
+import { addUserRepo } from '@/lib/db-storage';
 
 // Zod schema for adding a repository
 const addRepoSchema = z.object({
@@ -17,7 +17,44 @@ export async function POST(request: NextRequest) {
     // Validate request body with Zod
     const { repoPath, displayName, htmlUrl, defaultBranch } = addRepoSchema.parse(body);
 
-    // Generate slug from repoPath
+    // Validate repository exists on GitHub before adding
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) {
+      return NextResponse.json({ error: 'Missing GITHUB_TOKEN environment variable' }, { status: 500 });
+    }
+
+    const API_BASE = 'https://api.github.com';
+    const res = await fetch(`${API_BASE}/repos/${repoPath}`, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      cache: 'no-store',
+    });
+
+    if (res.status === 404) {
+      return NextResponse.json({ 
+        error: 'Repository not found or does not exist',
+        repoPath 
+      }, { status: 404 });
+    }
+    
+    if (res.status === 403) {
+      return NextResponse.json({ 
+        error: 'Repository access denied. Check token permissions.',
+        repoPath 
+      }, { status: 403 });
+    }
+    
+    if (!res.ok) {
+      return NextResponse.json({ 
+        error: `GitHub API error: ${res.status} ${res.statusText}`,
+        repoPath 
+      }, { status: 500 });
+    }
+
+    // Repository exists, proceed with adding to database
     const slug = repoPath.replace(/\//g, '-');
 
     // Create new repo object
@@ -31,7 +68,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Add to storage
-    const success = addUserRepo(newRepo);
+    const success = await addUserRepo(newRepo);
     if (!success) {
       return NextResponse.json({ 
         error: 'Repository already exists in dashboard',

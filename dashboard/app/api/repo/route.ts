@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAvailableRepositories, getRepoNameFromEnv } from '@/lib/github';
 import { getRepoConfig } from '@/lib/utils';
-import { loadUserAddedRepos } from '@/lib/storage';
+import { loadUserAddedRepos } from '@/lib/db-storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +20,7 @@ const repositoriesResponseSchema = z.object({
 export async function GET() {
   try {
     const availableRepos = getAvailableRepositories();
-    const userAddedRepos = loadUserAddedRepos();
+    const userAddedRepos = await loadUserAddedRepos();
     
     // Enhance env-configured repos with config data
     const reposWithConfig = availableRepos.map(repo => {
@@ -33,7 +33,7 @@ export async function GET() {
     });
 
     // Convert user-added repos to the expected format
-    const userReposFormatted = userAddedRepos.map(repo => ({
+    const userReposFormatted = userAddedRepos.map((repo: any) => ({
       slug: repo.slug,
       displayName: repo.displayName,
       hasConfig: false // User-added repos don't have config files initially

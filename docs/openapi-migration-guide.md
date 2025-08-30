@@ -352,21 +352,66 @@ curl -X POST http://localhost:3000/api/repositories/validate \
 
 **That's it!** No complex setup, no weeks of work.
 
+## Database Integration ✅
+
+### PostgreSQL Setup
+We've successfully migrated from in-memory storage to PostgreSQL:
+
+- [x] **Installed PostgreSQL client**: `bun add pg @types/pg`
+- [x] **Created database**: `createdb omnilens`
+- [x] **Created schema**: `lib/schema.sql` with repositories table
+- [x] **Database connection**: `lib/db.ts` with connection pool
+- [x] **Database storage**: `lib/db-storage.ts` with async functions
+- [x] **Updated API endpoints**: All endpoints now use database
+- [x] **Tested persistence**: Data persists across server restarts
+
+### API-Level Validation ✅
+
+We've implemented API-level validation to ensure data integrity:
+
+- [x] **Enhanced `POST /api/repo/add`**: Now validates repository existence before adding
+- [x] **GitHub API integration**: Checks if repository exists and is accessible
+- [x] **Proper error handling**: Returns 404 for non-existent repos, 403 for access denied
+- [x] **Updated test cases**: All tests now reflect the new validation behavior
+- [x] **Updated OpenAPI spec**: Added new response codes (403, 404) for add endpoint
+- [x] **Data integrity**: No more invalid repositories in the dashboard
+
+### Database Schema
+```sql
+CREATE TABLE repositories (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(255) UNIQUE NOT NULL,
+  repo_path VARCHAR(255) NOT NULL,
+  display_name VARCHAR(255) NOT NULL,
+  html_url TEXT NOT NULL,
+  default_branch VARCHAR(100) NOT NULL,
+  added_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Benefits Achieved
+✅ **Persistence**: Data survives server restarts  
+✅ **Scalability**: Can handle multiple users  
+✅ **Reliability**: ACID compliance  
+✅ **Performance**: Indexed queries  
+✅ **Type Safety**: Full TypeScript support  
+
 ## Next Steps
 
-1. **Revert your changes** (you're doing this now)
-2. **Add simple Zod validation** to `/api/repositories/validate`
-3. **Test it works**
-4. **Repeat for other endpoints** if you want
+1. **Test the dashboard UI** with the new database backend
+2. **Add validation to remaining endpoints** if needed
+3. **Consider adding user authentication** for multi-user support
+4. **Add database migrations** for future schema changes
 
 ### Quick Start
 ```bash
-# You already have Zod installed
+# Database is already set up and working
 cd dashboard
+bun run dev
 
-# Add validation to your endpoint
-# Test it works
-# Done!
+# Test the API endpoints
+bun run test:api
 ```
 
-**Goal**: Add validation without breaking your working API. Keep it simple!
+**Goal**: Robust, persistent storage for your dashboard repositories. Mission accomplished! 🎉
