@@ -35,11 +35,11 @@ Health and infrastructure test suite including:
 **Run with:** `bun run test:health`
 
 ### `api-docs.test.js` ⭐ NEW
-Comprehensive API documentation test suite including:
-- OpenAPI specification endpoint testing
-- API documentation page endpoint testing
-- Content validation for both endpoints
-- Endpoint structure verification
+Comprehensive static documentation test suite including:
+- OpenAPI specification file testing (`/openapi.yaml`)
+- API documentation page file testing (`/api-docs.html`)
+- Content validation for both static files
+- File structure verification
 
 **Run with:** `bun run test:api:docs`
 
@@ -127,7 +127,7 @@ The following workflows are available for automated testing:
 
 ### Test Coverage
 - ✅ **Health & Infrastructure Testing**: System health, Zod validation, slug generation
-- ✅ **API Documentation Testing**: OpenAPI spec and documentation endpoints
+- ✅ **Static Documentation Testing**: OpenAPI spec and documentation files
 - ✅ **API Repository Testing**: Individual endpoint testing with multiple test cases
 - ✅ **Golden Repository Testing**: Complete user journey testing with OmniLens repo
 - ✅ **Error Handling**: Non-existent resources, validation errors

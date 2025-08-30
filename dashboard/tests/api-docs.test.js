@@ -3,7 +3,7 @@
 /**
  * OmniLens API Documentation Test Suite
  * 
- * This test suite validates the API documentation endpoints that serve
+ * This test suite validates the static documentation files that serve
  * the OpenAPI specification and API documentation page.
  * 
  * Run with: node tests/api-docs.test.js
@@ -23,12 +23,12 @@ import {
 
 // Test functions
 async function testOpenAPISpecEndpoint() {
-  logTest('GET /api/openapi');
+  logTest('GET /openapi.yaml (static file)');
   
-  const response = await makeRequest(`${BASE_URL}/api/openapi`);
+  const response = await makeRequest(`${BASE_URL}/openapi.yaml`);
   
   if (response.ok && response.data) {
-    logSuccess('GET /api/openapi endpoint is working');
+    logSuccess('GET /openapi.yaml static file is accessible');
     
     // Check for key content - handle both text and parsed JSON
     const specText = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
@@ -42,7 +42,7 @@ async function testOpenAPISpecEndpoint() {
       logInfo(`Found ${endpoints.length} endpoints: ${endpoints.join(', ')}`);
       
       // Check for our specific endpoints
-      const expectedEndpoints = ['/api/openapi', '/api/docs', '/api/repo', '/api/repo/add', '/api/repo/{slug}', '/api/repo/validate'];
+      const expectedEndpoints = ['/api/repo', '/api/repo/add', '/api/repo/{slug}', '/api/repo/validate'];
       const missingEndpoints = expectedEndpoints.filter(endpoint => !endpoints.includes(endpoint));
       
       if (missingEndpoints.length === 0) {
@@ -57,25 +57,25 @@ async function testOpenAPISpecEndpoint() {
       return false;
     }
   } else {
-    logError(`GET /api/openapi failed: ${response.status}`);
+    logError(`GET /openapi.yaml failed: ${response.status}`);
     return false;
   }
 }
 
 async function testAPIDocsEndpoint() {
-  logTest('GET /api/docs');
+  logTest('GET /api-docs.html (static file)');
   
-  const response = await makeRequest(`${BASE_URL}/api/docs`);
+  const response = await makeRequest(`${BASE_URL}/api-docs.html`);
   
   if (response.ok && response.data) {
-    logSuccess('GET /api/docs endpoint is working');
+    logSuccess('GET /api-docs.html static file is accessible');
     
     // Check for Swagger UI content
     if (response.data.includes('swagger-ui') || response.data.includes('SwaggerUI')) {
       logSuccess('Swagger UI is properly loaded');
       
       // Check for OpenAPI spec reference
-      if (response.data.includes('/api/openapi') || response.data.includes('openapi.yaml')) {
+      if (response.data.includes('openapi.yaml')) {
         logSuccess('API docs references OpenAPI spec correctly');
       } else {
         logWarning('API docs may not reference OpenAPI spec correctly');
@@ -87,7 +87,7 @@ async function testAPIDocsEndpoint() {
       return true; // Still accessible, just might not be fully loaded
     }
   } else {
-    logError(`GET /api/docs failed: ${response.status}`);
+    logError(`GET /api-docs.html failed: ${response.status}`);
     return false;
   }
 }
@@ -95,7 +95,7 @@ async function testAPIDocsEndpoint() {
 async function testOpenAPISpecContent() {
   logTest('OpenAPI Spec Content Validation');
   
-  const response = await makeRequest(`${BASE_URL}/api/openapi`);
+  const response = await makeRequest(`${BASE_URL}/openapi.yaml`);
   
   if (!response.ok || !response.data) {
     logError('Cannot validate OpenAPI spec content - endpoint not accessible');
@@ -145,7 +145,7 @@ async function testOpenAPISpecContent() {
 async function testAPIDocsContent() {
   logTest('API Docs Content Validation');
   
-  const response = await makeRequest(`${BASE_URL}/api/docs`);
+  const response = await makeRequest(`${BASE_URL}/api-docs.html`);
   
   if (!response.ok || !response.data) {
     logError('Cannot validate API docs content - endpoint not accessible');
@@ -178,12 +178,12 @@ async function testAPIDocsContent() {
 
 // Main test runner
 async function runApiDocsTests() {
-  log('\n📚 Starting OmniLens API Documentation Test Suite', 'bright');
+  log('\n📚 Starting OmniLens Static Documentation Test Suite', 'bright');
   log('=' .repeat(60), 'bright');
   
   const tests = [
-    { name: 'GET /api/openapi', fn: testOpenAPISpecEndpoint },
-    { name: 'GET /api/docs', fn: testAPIDocsEndpoint },
+    { name: 'GET /openapi.yaml', fn: testOpenAPISpecEndpoint },
+    { name: 'GET /api-docs.html', fn: testAPIDocsEndpoint },
     { name: 'OpenAPI Spec Content', fn: testOpenAPISpecContent },
     { name: 'API Docs Content', fn: testAPIDocsContent }
   ];
@@ -204,7 +204,7 @@ async function runApiDocsTests() {
   const passed = results.filter(r => r.passed).length;
   const total = results.length;
   
-  log('\n📊 API Documentation Test Results:', 'bright');
+  log('\n📊 Static Documentation Test Results:', 'bright');
   results.forEach(result => {
     if (result.passed) {
       logSuccess(`${result.name}`);
@@ -214,13 +214,13 @@ async function runApiDocsTests() {
   });
   
   log('\n' + '=' .repeat(60), 'bright');
-  log(`🎯 Overall: ${passed}/${total} API documentation tests passed`, passed === total ? 'green' : 'red');
+  log(`🎯 Overall: ${passed}/${total} static documentation tests passed`, passed === total ? 'green' : 'red');
   
   if (passed === total) {
-    log('\n🎉 All API documentation tests passed! Documentation endpoints are working!', 'green');
+    log('\n🎉 All static documentation tests passed! Documentation files are accessible!', 'green');
     return true;
   } else {
-    log('\n🚨 Some API documentation tests failed. Please check the errors above.', 'yellow');
+    log('\n🚨 Some static documentation tests failed. Please check the errors above.', 'yellow');
     return false;
   }
 }
@@ -236,7 +236,7 @@ async function main() {
     const success = await runApiDocsTests();
     process.exit(success ? 0 : 1);
   } catch (error) {
-    logError(`API documentation test suite failed: ${error.message}`);
+    logError(`Static documentation test suite failed: ${error.message}`);
     process.exit(1);
   }
 }
