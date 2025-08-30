@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const availableRepos = [];
+    const availableRepos: Array<{ slug: string; displayName: string }> = [];
     const today = new Date();
     
     // Enhance with config data and basic metrics

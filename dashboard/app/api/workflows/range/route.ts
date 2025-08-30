@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isValidRepoSlug } from '@/lib/github';
+
 
 // Simple in-memory cache (per server instance)
 const rangeCache = new Map<string, { ts: number; data: any }>();

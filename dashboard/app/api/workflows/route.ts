@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // In-memory cache for daily requests (per server instance)
 const dailyCache = new Map<string, { ts: number; data: any }>();
 const DAILY_TTL_MS = 60 * 1000; // 60 seconds (short TTL to keep near-real-time while speeding refreshes)
-import { calculateOverviewData, getWorkflowRunsForDate, isValidRepoSlug } from '@/lib/github';
+import { calculateOverviewData, getWorkflowRunsForDate } from '@/lib/github';
 
 // Force this route to be dynamic since it uses search parameters
 export const dynamic = 'force-dynamic';
@@ -150,12 +150,8 @@ export async function GET(request: NextRequest) {
         missingWorkflows: [],
       };
     } else {
-      // Existing slug-based path (env repos)
-      if (!repo || !isValidRepoSlug(repo)) {
-        return NextResponse.json({ error: 'Invalid repo slug or repo not configured' }, { status: 400 });
-      }
-      workflowRuns = await getWorkflowRunsForDate(targetDate, repo);
-      overviewData = calculateOverviewData(workflowRuns, repo);
+      // If no repoPath provided, we can't proceed
+      return NextResponse.json({ error: 'Repository path is required' }, { status: 400 });
     }
 
     const payload = { workflowRuns, overviewData };
