@@ -43,6 +43,15 @@ Comprehensive test suite for API endpoints including:
 
 **Run with:** `bun run test:api:recon`
 
+### `api-workflow.test.js`
+Comprehensive test suite for workflow API endpoints including:
+- Workflow retrieval for valid repositories
+- Error handling for non-existent repositories
+- Response structure validation
+- GitHub workflows integration testing
+
+**Run with:** `bun run test:workflow`
+
 ### `golden-repo.test.js`
 Golden repository test suite for the complete user journey:
 - Repository validation
@@ -76,11 +85,14 @@ bun run test:health
 # Run API repository tests only
 bun run test:api:recon
 
+# Run workflow API tests only
+bun run test:api:workflow
+
 # Run golden repository tests only
 bun run test:golden
 
 # Run specific test suites
-bun run test:health && bun run test:api:recon && bun run test:golden
+bun run test:health && bun run test:api:recon && bun run test:api:workflow && bun run test:golden
 ```
 
 ### GitHub Actions
@@ -89,6 +101,7 @@ The following workflows are available for automated testing:
 
 - **`test-health.yml`** - Runs health and infrastructure tests only
 - **`test-api-repo.yml`** - Runs API repository tests only
+- **`test-api-workflow.yml`** - Runs workflow API tests only
 - **`test-golden-repo.yml`** - Runs golden repository tests only
 
 **Triggers:**
@@ -116,6 +129,7 @@ The following workflows are available for automated testing:
 - ✅ **Health & Infrastructure Testing**: System health, Zod validation, slug generation
 
 - ✅ **API Repository Testing**: Individual endpoint testing with multiple test cases
+- ✅ **Workflow API Testing**: GitHub workflows integration and validation
 - ✅ **Golden Repository Testing**: Complete user journey testing with OmniLens repo
 - ✅ **Error Handling**: Non-existent resources, validation errors
 - ✅ **Data Integrity**: Database persistence and cleanup
