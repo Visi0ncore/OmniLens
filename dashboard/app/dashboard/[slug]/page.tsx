@@ -255,72 +255,13 @@ export default function DashboardPage({ params }: PageProps) {
   // Show empty state for new repositories (no API calls)
   if (!todayData && !yesterdayData) {
     return (
-      <div className="container mx-auto p-6 space-y-8">
-        <header className="space-y-2">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{formatRepoDisplayName(repoDisplayName)}</h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link href={`/dashboard/${repoSlug}/report`}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  Report
-                </Button>
-              </Link>
-              <Button
-                variant={isSelectedDateToday ? "default" : "outline"}
-                size="sm"
-                onClick={handleSetToday}
-                className="flex items-center gap-2"
-              >
-                <Calendar className="h-4 w-4" />
-                Today
-              </Button>
-              <DatePicker
-                date={selectedDate}
-                onDateChange={(date) => {
-                  if (date) {
-                    setSelectedDate(date);
-                    setHoverState({ metricType: null, workflowIds: new Set() });
-                  }
-                }}
-                placeholder="Select Date"
-              />
-            </div>
-          </div>
-        </header>
-        
-        <NoWorkflowsFound repoName={formatRepoDisplayName(repoDisplayName)} />
-      </div>
-    );
-  }
-
-  // Show error state
-  if (todayError) {
-    return <ErrorState />;
-  }
-
-  return (
-    <div className="container mx-auto p-6 space-y-8">
-      <header className="space-y-2">
+      <div className="px-6 py-8 space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-5 w-5" />
             </Link>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{formatRepoDisplayName(repoDisplayName)}</h1>
-            </div>
+            <h1 className="text-3xl font-bold tracking-tight">{repoDisplayName}</h1>
           </div>
           <div className="flex items-center gap-3">
             <Link href={`/dashboard/${repoSlug}/report`}>
@@ -347,7 +288,6 @@ export default function DashboardPage({ params }: PageProps) {
               onDateChange={(date) => {
                 if (date) {
                   setSelectedDate(date);
-                  // Clear hover state when changing dates
                   setHoverState({ metricType: null, workflowIds: new Set() });
                 }
               }}
@@ -355,7 +295,58 @@ export default function DashboardPage({ params }: PageProps) {
             />
           </div>
         </div>
-      </header>
+        
+        <NoWorkflowsFound repoName={formatRepoDisplayName(repoDisplayName)} />
+      </div>
+    );
+  }
+
+  // Show error state
+  if (todayError) {
+    return <ErrorState />;
+  }
+
+  return (
+    <div className="container mx-auto p-6 space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href={`/dashboard/${repoSlug}/report`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Report
+            </Button>
+          </Link>
+          <Button
+            variant={isSelectedDateToday ? "default" : "outline"}
+            size="sm"
+            onClick={handleSetToday}
+            className="flex items-center gap-2"
+          >
+            <Calendar className="h-4 w-4" />
+            Today
+          </Button>
+          <DatePicker
+            date={selectedDate}
+            onDateChange={(date) => {
+              if (date) {
+                setSelectedDate(date);
+                // Clear hover state when changing dates
+                setHoverState({ metricType: null, workflowIds: new Set() });
+              }
+            }}
+            placeholder="Select Date"
+          />
+        </div>
+      </div>
 
       {/* Show no workflows found if no data */}
       {!workflowData || workflowData.length === 0 ? (
