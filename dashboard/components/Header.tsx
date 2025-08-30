@@ -29,6 +29,15 @@ export default function Header() {
           {/* Right side - Social links */}
           <div className="flex items-center gap-4">
             <Link 
+              href="https://github.com/Visi0ncore/OmniLens" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="GitHub"
+            >
+              <Github className="h-6 w-6" />
+            </Link>
+            <Link 
               href="https://omnilens.mintlify.app/" 
               target="_blank" 
               rel="noopener noreferrer"
@@ -41,18 +50,6 @@ export default function Header() {
                 <path d="M802.999 420.871V206C802.999 201.582 799.417 198 794.999 198H580.128C550.857 197.971 521.869 203.725 494.829 214.932C467.789 226.139 443.229 242.578 422.562 263.305L420.998 264.869C393.755 292.526 374.264 326.86 364.479 364.427C382.192 359.841 400.394 357.415 418.689 357.204C467.594 356.629 515.318 372.231 554.438 401.585C589.596 427.805 616.205 463.845 630.912 505.165C645.9 547.397 647.872 593.155 636.572 636.519C674.146 626.751 708.484 607.258 736.13 580.001L737.694 578.512C758.43 557.835 774.874 533.264 786.081 506.21C797.289 479.156 803.038 450.154 802.999 420.871Z" fill="currentColor"/>
               </svg>
             </Link>
-            <Link 
-              href="https://github.com/Visi0ncore/OmniLens" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="GitHub"
-            >
-              <Github className="h-6 w-6" />
-            </Link>
-            
-
-            
             <Link 
               href="https://x.com/OmniLensApp" 
               target="_blank" 

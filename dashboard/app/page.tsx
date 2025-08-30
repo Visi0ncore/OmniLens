@@ -520,9 +520,14 @@ export default function HomePage() {
                   value={newRepoUrl}
                   onChange={(e) => setNewRepoUrl(e.target.value)}
                   placeholder="owner/repo or GitHub URL"
-                  className={`w-80 px-3 py-2 rounded-md bg-background border text-sm outline-none focus:ring-2 focus:ring-primary ${
-                    addError ? 'border-red-500' : 'border-input'
+                  className={`w-80 px-3 py-2 rounded-md bg-background border border-input text-sm outline-none focus:ring-2 focus:ring-primary ${
+                    addError ? 'animate-shake' : ''
                   }`}
+                  onAnimationEnd={() => {
+                    if (addError) {
+                      setNewRepoUrl("");
+                    }
+                  }}
                   autoFocus
                   onFocus={() => {
                     if (addError) {
@@ -538,7 +543,7 @@ export default function HomePage() {
                     }
                   }}
                 />
-                <Button type="submit" size="sm" disabled={isValidating} onMouseDown={(e) => e.preventDefault()}>
+                <Button type="submit" size="sm" disabled={isValidating} onMouseDown={(e) => e.preventDefault()} className="z-0">
                   <Plus className="h-4 w-4 mr-2" />
                   {isValidating ? 'Validating…' : 'Add Repo'}
                 </Button>
