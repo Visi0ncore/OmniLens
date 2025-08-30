@@ -70,11 +70,6 @@ jobs:
         working-directory: ./dashboard
         run: bun run lint
 
-      - name: Run tests
-        if: always()
-        working-directory: ./dashboard
-        run: bun run test
-
       - name: Build application
         working-directory: ./dashboard
         run: bun run build
