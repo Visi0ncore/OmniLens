@@ -80,13 +80,3 @@ jobs:
     - name: Run golden repository tests
       working-directory: ./dashboard
       run: bun run test:golden
-
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: golden-repo-test-results
-        path: |
-          dashboard/test-results/
-          dashboard/coverage/
-        retention-days: 7
