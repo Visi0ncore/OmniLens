@@ -1,0 +1,57 @@
+name: Test Documentation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'dashboard/**'
+      - '.github/workflows/test-docs.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'dashboard/**'
+      - '.github/workflows/test-docs.yml'
+  workflow_dispatch:
+
+jobs:
+  test-docs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      working-directory: ./dashboard
+      run: bun install
+
+    - name: Start development server
+      working-directory: ./dashboard
+      run: |
+        # Set environment variables
+        echo "DB_USER=postgres" >> .env.local
+        echo "DB_HOST=localhost" >> .env.local
+        echo "DB_NAME=omnilens" >> .env.local
+        echo "DB_PASSWORD=postgres" >> .env.local
+        echo "DB_PORT=5432" >> .env.local
+        echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env.local
+        
+        # Start server in background
+        bun run dev &
+        sleep 10
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Run documentation tests
+      working-directory: ./dashboard
+      run: bun run test:docs
