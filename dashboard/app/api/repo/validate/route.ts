@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
     const htmlUrl: string = json.html_url;
     const defaultBranch: string = json.default_branch;
     const repoName: string = json.name; // just the repo name
+    const owner: string = json.owner.login;
+    const avatarUrl: string = json.owner.avatar_url;
 
     return NextResponse.json({
       valid: true,
@@ -82,6 +84,8 @@ export async function POST(request: NextRequest) {
       htmlUrl,
       defaultBranch,
       displayName: repoName,
+      owner,
+      avatarUrl,
     });
   } catch (error: unknown) {
     // Handle Zod validation errors

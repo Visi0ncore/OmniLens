@@ -7,6 +7,7 @@ export interface Repository {
   displayName: string;
   htmlUrl: string;
   defaultBranch: string;
+  avatarUrl?: string;
   addedAt?: string;
   updatedAt?: string;
 }
@@ -15,7 +16,7 @@ export interface Repository {
 export async function loadUserAddedRepos(): Promise<Repository[]> {
   try {
     const result = await pool.query(
-      'SELECT id, slug, repo_path as "repoPath", display_name as "displayName", html_url as "htmlUrl", default_branch as "defaultBranch", added_at as "addedAt", updated_at as "updatedAt" FROM repositories ORDER BY added_at DESC'
+      'SELECT id, slug, repo_path as "repoPath", display_name as "displayName", html_url as "htmlUrl", default_branch as "defaultBranch", avatar_url as "avatarUrl", added_at as "addedAt", updated_at as "updatedAt" FROM repositories ORDER BY added_at DESC'
     );
     return result.rows;
   } catch (error) {
@@ -28,8 +29,8 @@ export async function loadUserAddedRepos(): Promise<Repository[]> {
 export async function addUserRepo(repo: Repository): Promise<boolean> {
   try {
     const result = await pool.query(
-      'INSERT INTO repositories (slug, repo_path, display_name, html_url, default_branch) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (slug) DO NOTHING RETURNING id',
-      [repo.slug, repo.repoPath, repo.displayName, repo.htmlUrl, repo.defaultBranch]
+      'INSERT INTO repositories (slug, repo_path, display_name, html_url, default_branch, avatar_url) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (slug) DO NOTHING RETURNING id',
+      [repo.slug, repo.repoPath, repo.displayName, repo.htmlUrl, repo.defaultBranch, repo.avatarUrl]
     );
     return (result.rowCount ?? 0) > 0;
   } catch (error) {
@@ -42,7 +43,7 @@ export async function addUserRepo(repo: Repository): Promise<boolean> {
 export async function removeUserRepo(slug: string): Promise<Repository | null> {
   try {
     const result = await pool.query(
-      'DELETE FROM repositories WHERE slug = $1 RETURNING id, slug, repo_path as "repoPath", display_name as "displayName", html_url as "htmlUrl", default_branch as "defaultBranch", added_at as "addedAt", updated_at as "updatedAt"',
+      'DELETE FROM repositories WHERE slug = $1 RETURNING id, slug, repo_path as "repoPath", display_name as "displayName", html_url as "htmlUrl", default_branch as "defaultBranch", avatar_url as "avatarUrl", added_at as "addedAt", updated_at as "updatedAt"',
       [slug]
     );
     return result.rows[0] || null;
@@ -56,7 +57,7 @@ export async function removeUserRepo(slug: string): Promise<Repository | null> {
 export async function getUserRepo(slug: string): Promise<Repository | null> {
   try {
     const result = await pool.query(
-      'SELECT id, slug, repo_path as "repoPath", display_name as "displayName", html_url as "htmlUrl", default_branch as "defaultBranch", added_at as "addedAt", updated_at as "updatedAt" FROM repositories WHERE slug = $1',
+      'SELECT id, slug, repo_path as "repoPath", display_name as "displayName", html_url as "htmlUrl", default_branch as "defaultBranch", avatar_url as "avatarUrl", added_at as "addedAt", updated_at as "updatedAt" FROM repositories WHERE slug = $1',
       [slug]
     );
     return result.rows[0] || null;

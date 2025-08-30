@@ -79,6 +79,7 @@ interface RepositoryCardProps {
   repoSlug: string;
   repoPath: string;
   displayName: string;
+  avatarUrl?: string;
   hasError: boolean;
   errorMessage?: string;
   hasWorkflows?: boolean;
@@ -94,9 +95,9 @@ interface RepositoryCardProps {
   onRequestDelete?: () => void;
 }
 
-function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessage, hasWorkflows, metrics, isUserRepo = false, onRequestDelete }: RepositoryCardProps) {
+function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, hasError, errorMessage, hasWorkflows, metrics, isUserRepo = false, onRequestDelete }: RepositoryCardProps) {
+  // Get avatar URL from the repository data if available, otherwise fallback to GitHub API
   const owner = (repoPath || displayName || '').split('/')[0] || '';
-  const avatarUrl = owner ? `https://github.com/${owner}.png?size=48` : null;
   const cardContent = (
     <Card className={`relative h-full transition-all duration-200 ${
       hasError 
@@ -141,9 +142,6 @@ function RepositoryCard({ repoSlug, repoPath, displayName, hasError, errorMessag
             )}
           </div>
         </div>
-        <p className="text-sm text-muted-foreground font-mono">
-          {displayName}
-        </p>
       </CardHeader>
       <CardContent>
         {hasError ? (
@@ -248,6 +246,7 @@ export default function HomePage() {
     repoPath: string;
     envKey: string;
     displayName: string;
+    avatarUrl?: string;
     hasConfig: boolean;
     hasWorkflows?: boolean;
     metrics?: {
@@ -322,6 +321,7 @@ export default function HomePage() {
         repoPath: r.repoPath || r.slug.replace(/-/g, '/'), // Convert slug back to repoPath if needed
         envKey: r.envKey || 'LOCAL',
         displayName: r.displayName,
+        avatarUrl: r.avatarUrl,
         hasConfig: r.hasConfig || false,
         hasWorkflows: false,
         metrics: null,
@@ -416,7 +416,8 @@ export default function HomePage() {
           repoPath: validateJson.repoPath,
           displayName: validateJson.displayName,
           htmlUrl: validateJson.htmlUrl,
-          defaultBranch: validateJson.defaultBranch
+          defaultBranch: validateJson.defaultBranch,
+          avatarUrl: validateJson.avatarUrl
         }),
       });
       const addJson = await addRes.json();
@@ -602,6 +603,7 @@ export default function HomePage() {
               repoSlug={repo.slug}
               repoPath={repo.repoPath}
               displayName={repo.displayName}
+              avatarUrl={repo.avatarUrl}
               hasError={repo.hasError}
               errorMessage={repo.errorMessage}
               hasWorkflows={repo.hasWorkflows}
