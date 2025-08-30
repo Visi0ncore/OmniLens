@@ -7,7 +7,8 @@ const addRepoSchema = z.object({
   repoPath: z.string().min(1, 'Repository path is required'),
   displayName: z.string().min(1, 'Display name is required'),
   htmlUrl: z.string().url('Valid HTML URL is required'),
-  defaultBranch: z.string().min(1, 'Default branch is required')
+  defaultBranch: z.string().min(1, 'Default branch is required'),
+  avatarUrl: z.string().url('Valid avatar URL is required').optional()
 });
 
 export async function POST(request: NextRequest) {
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Validate request body with Zod
-    const { repoPath, displayName, htmlUrl, defaultBranch } = addRepoSchema.parse(body);
+    const { repoPath, displayName, htmlUrl, defaultBranch, avatarUrl } = addRepoSchema.parse(body);
 
     // Validate repository exists on GitHub before adding
     const token = process.env.GITHUB_TOKEN;
@@ -55,7 +56,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Repository exists, proceed with adding to database
-    const slug = repoPath.replace(/\//g, '-');
+    // Generate slug from just the repository name (not the full path)
+    const slug = repoPath.split('/').pop() || repoPath;
 
     // Create new repo object
     const newRepo = {
@@ -64,6 +66,7 @@ export async function POST(request: NextRequest) {
       displayName,
       htmlUrl,
       defaultBranch,
+      avatarUrl,
       addedAt: new Date().toISOString()
     };
 

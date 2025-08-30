@@ -10,7 +10,8 @@ export const dynamic = 'force-dynamic';
 const repositorySchema = z.object({
   slug: z.string(),
   displayName: z.string(),
-  hasConfig: z.boolean()
+  hasConfig: z.boolean(),
+  avatarUrl: z.string().optional()
 });
 
 const repositoriesResponseSchema = z.object({
@@ -36,7 +37,8 @@ export async function GET() {
     const userReposFormatted = userAddedRepos.map((repo: any) => ({
       slug: repo.slug,
       displayName: repo.displayName,
-      hasConfig: false // User-added repos don't have config files initially
+      hasConfig: false, // User-added repos don't have config files initially
+      avatarUrl: repo.avatarUrl
     }));
 
     // Combine both types of repositories

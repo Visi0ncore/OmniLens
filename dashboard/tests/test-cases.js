@@ -80,13 +80,13 @@ export const ZOD_VALIDATION_TEST_CASES = [
 export const SLUG_TEST_CASES = [
   {
     repoPath: 'Visi0ncore/OmniLens',
-    expectedSlug: 'Visi0ncore-OmniLens',
+    expectedSlug: 'OmniLens',
     description: 'Should generate clean slug without local- prefix'
   },
   {
     repoPath: 'microsoft/vscode',
-    expectedSlug: 'microsoft-vscode',
-    description: 'Should replace slashes with dashes'
+    expectedSlug: 'vscode',
+    description: 'Should extract just the repository name'
   }
 ];
 

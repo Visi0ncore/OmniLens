@@ -38,7 +38,7 @@ async function testGetWorkflowsForValidRepository() {
     body: JSON.stringify(repoData)
   });
   
-  const slug = 'Visi0ncore-OmniLens';
+  const slug = 'OmniLens';
   
   // Test getting workflows for this repository
   const response = await makeRequest(`${BASE_URL}/api/workflow/${slug}`);
@@ -128,7 +128,7 @@ async function testGetWorkflowsResponseStructure() {
     body: JSON.stringify(repoData)
   });
   
-  const slug = 'Visi0ncore-OmniLens';
+  const slug = 'OmniLens';
   
   // Get workflows
   const response = await makeRequest(`${BASE_URL}/api/workflow/${slug}`);
