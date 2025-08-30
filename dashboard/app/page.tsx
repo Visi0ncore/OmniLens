@@ -8,8 +8,8 @@ import {
   Plus,
   Trash2,
   Package,
-  CheckCircle,
   X,
+  Github,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CompactMetricsOverview from "@/components/CompactMetricsOverview";
@@ -76,6 +76,22 @@ function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, hasError, 
           </div>
           <div className="flex items-center gap-2">
             {hasError && <AlertCircle className="h-5 w-5 text-red-500" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              asChild
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              title="View on GitHub"
+              aria-label="View on GitHub"
+            >
+              <Link href={`https://github.com/${repoPath}`} target="_blank" rel="noopener noreferrer">
+                <Github className="h-4 w-4" />
+              </Link>
+            </Button>
             {isUserRepo && (
               <Button
                 variant="ghost"
