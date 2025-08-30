@@ -1,16 +1,16 @@
-name: Test Documentation
+name: Test API Documentation
 
 on:
   push:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-docs.yml'
+      - '.github/workflows/test-api-docs.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-docs.yml'
+      - '.github/workflows/test-api-docs.yml'
   workflow_dispatch:
 
 jobs:
@@ -52,6 +52,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Run documentation tests
+    - name: Run API documentation tests
       working-directory: ./dashboard
-      run: bun run test:docs
+      run: bun run test:api:docs
