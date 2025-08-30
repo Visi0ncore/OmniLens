@@ -55,8 +55,21 @@ jobs:
         # Wait for PostgreSQL to be ready
         sleep 10
         
+        # Test database connection
+        echo "Testing database connection..."
+        psql -h localhost -U postgres -d omnilens -c "SELECT 1;"
+        
         # Create database schema using the SQL file
+        echo "Creating database schema..."
         psql -h localhost -U postgres -d omnilens -f lib/schema.sql
+        
+        # Verify the schema was applied correctly
+        echo "Verifying database schema..."
+        psql -h localhost -U postgres -d omnilens -c "\d repositories"
+        
+        # Check if table is empty
+        echo "Checking table contents..."
+        psql -h localhost -U postgres -d omnilens -c "SELECT COUNT(*) FROM repositories;"
       env:
         PGPASSWORD: postgres
 
@@ -71,9 +84,17 @@ jobs:
         echo "DB_PORT=5432" >> .env.local
         echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env.local
         
+        # Test API before starting server
+        echo "Testing API endpoint..."
+        curl -s "http://localhost:3000/api/repo" || echo "API not ready yet"
+        
         # Start server in background
         bun run dev &
-        sleep 10
+        sleep 15
+        
+        # Test API after starting server
+        echo "Testing API endpoint after server start..."
+        curl -s "http://localhost:3000/api/repo" | jq '.'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

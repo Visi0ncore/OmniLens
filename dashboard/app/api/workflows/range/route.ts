@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRepoNameFromEnv, isValidRepoSlug } from '@/lib/github';
+import { isValidRepoSlug } from '@/lib/github';
 
 // Simple in-memory cache (per server instance)
 const rangeCache = new Map<string, { ts: number; data: any }>();
@@ -22,12 +22,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'repoPath or repo (slug), start and end are required' }, { status: 400 });
     }
 
-    // If repoPath missing but repo slug provided, resolve via server env
+    // If repoPath missing but repo slug provided, we can't proceed
     if (!repoPath && repoSlug) {
-      if (!isValidRepoSlug(repoSlug)) {
-        return NextResponse.json({ error: 'Invalid repo slug or repo not configured' }, { status: 400 });
-      }
-      repoPath = getRepoNameFromEnv(repoSlug);
+      return NextResponse.json({ error: 'Repository path is required' }, { status: 400 });
     }
 
     // Normalize to full-day UTC range

@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
-import { getAvailableRepositories, getRepoNameFromEnv, calculateOverviewData, getWorkflowRunsForDate } from '@/lib/github';
+import { calculateOverviewData, getWorkflowRunsForDate } from '@/lib/github';
 import { getRepoConfig } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const availableRepos = getAvailableRepositories();
+    const availableRepos = [];
     const today = new Date();
     
     // Enhance with config data and basic metrics
     const reposWithMetrics = await Promise.all(
       availableRepos.map(async (repo) => {
         const config = getRepoConfig(repo.slug);
-        const displayName = getRepoNameFromEnv(repo.slug);
+        const displayName = repo.displayName;
         
         let metrics = null;
         let hasWorkflows = false;

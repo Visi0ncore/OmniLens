@@ -64,44 +64,9 @@ function getEnvVars(repoSlug: string) {
   return { token, repo };
 }
 
-// Helper function to get all available repositories from environment variables
-export function getAvailableRepositories(): Array<{
-  slug: string;
-  repoPath: string;
-  envKey: string;
-}> {
-  const repos = [];
-  
-  for (let i = 1; i <= 3; i++) {
-    const envKey = `GITHUB_REPO_${i}`;
-    const repo = process.env[envKey];
-    if (repo) {
-      repos.push({
-        slug: `repo${i}`,
-        repoPath: repo,
-        envKey
-      });
-    }
-  }
-  
-  return repos;
-}
 
-// Helper function to validate if a repo slug is available
-export function isValidRepoSlug(repoSlug: string): boolean {
-  const availableRepos = getAvailableRepositories();
-  return availableRepos.some(repo => repo.slug === repoSlug);
-}
 
-// Helper function to get repository name from environment variables
-export function getRepoNameFromEnv(repoSlug: string): string {
-  const envMap: Record<string, string> = {
-    'repo1': 'GITHUB_REPO_1',
-    'repo2': 'GITHUB_REPO_2',
-    'repo3': 'GITHUB_REPO_3'
-  };
-  return process.env[envMap[repoSlug]] || repoSlug;
-}
+
 
 // Helper function to find which configured workflow file a run corresponds to
 function getConfiguredWorkflowFile(run: WorkflowRun, repoSlug: string): string | null {

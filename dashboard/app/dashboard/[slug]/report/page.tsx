@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format, subDays } from "date-fns";
 import { ArrowLeft, BarChart3 } from "lucide-react";
 import { getRepoConfig } from "@/lib/utils";
-import { getRepoNameFromEnv } from "@/lib/github";
+
 // no need for env-mapped repo name here; use same transformation as dashboard
 import DailyReportCard from "@/components/DailyReportCard";
 import ThirtyDayHealthCard from "@/components/ThirtyDayHealthCard";
@@ -167,7 +167,7 @@ export default function ReportPage({ params }: PageProps) {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
                 <BarChart3 className="h-6 w-6" /> {(() => {
-                  const base = formatRepoDisplayName(getRepoNameFromEnv(repoSlug));
+                  const base = formatRepoDisplayName(repoSlug);
                   const noLocal = base.replace(/^Local\s+/i, '').trim();
                   return /central\s+testing/i.test(noLocal) ? 'Central Testing' : noLocal;
                 })()} Report

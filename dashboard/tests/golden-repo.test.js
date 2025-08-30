@@ -51,7 +51,8 @@ async function testAddRepository(validationData) {
       repoPath: validationData.repoPath,
       displayName: validationData.displayName,
       htmlUrl: validationData.htmlUrl,
-      defaultBranch: validationData.defaultBranch
+      defaultBranch: validationData.defaultBranch,
+      avatarUrl: validationData.avatarUrl
     })
   });
   
@@ -72,6 +73,11 @@ async function testGetAllRepositories() {
   log('\n🧪 Testing: Get All Repositories', 'cyan');
   
   const { response, data, ok, status } = await makeRequest(`${BASE_URL}/api/repo`);
+  
+  // Debug: Log the actual response in CI
+  if (process.env.CI) {
+    log(`Debug: Status: ${status}, Response: ${JSON.stringify(data)}`, 'yellow');
+  }
   
   if (ok && data.repositories) {
     const testRepo = data.repositories.find(repo => repo.slug === TEST_SLUG);
