@@ -51,7 +51,7 @@ export default function Header() {
               </svg>
             </Link>
             <Link 
-              href="/api-docs.html" 
+              href="/api.html" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground transition-colors"

@@ -287,13 +287,72 @@ export default function HomePage() {
 
       const todayStr = new Date().toISOString().slice(0, 10);
 
-      const enhanced = mappedRepos.map((repo: any) => {
-        // Since we removed API calls that aren't in OpenAPI spec, just return basic repo info
-        return { ...repo, hasWorkflows: false, metrics: { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
-      });
+      // Fetch workflow data for each repository
+      const enhanced = await Promise.all(
+        mappedRepos.map(async (repo: any) => {
+          try {
+            // Fetch workflows for this repository
+            const workflowResponse = await fetch(`/api/workflow/${repo.slug}`, { cache: 'no-store' });
+            let hasWorkflows = false;
+            let metrics = {
+              totalWorkflows: 0,
+              passedRuns: 0,
+              failedRuns: 0,
+              inProgressRuns: 0,
+              successRate: 0,
+              hasActivity: false
+            };
+
+            if (workflowResponse.ok) {
+              const workflowData = await workflowResponse.json();
+              hasWorkflows = workflowData.workflows && workflowData.workflows.length > 0;
+              
+              if (hasWorkflows) {
+                // Fetch today's workflow runs to calculate metrics
+                const runsResponse = await fetch(`/api/workflows?date=${todayStr}&repo=${repo.slug}`, { cache: 'no-store' });
+                if (runsResponse.ok) {
+                  const runsData = await runsResponse.json();
+                  const overviewData = runsData.overviewData;
+                  
+                  metrics = {
+                    totalWorkflows: overviewData.totalWorkflows || 0,
+                    passedRuns: overviewData.passedRuns || 0,
+                    failedRuns: overviewData.failedRuns || 0,
+                    inProgressRuns: overviewData.inProgressRuns || 0,
+                    successRate: overviewData.completedRuns > 0 
+                      ? Math.round((overviewData.passedRuns / overviewData.completedRuns) * 100) 
+                      : 0,
+                    hasActivity: (overviewData.completedRuns > 0 || overviewData.inProgressRuns > 0)
+                  };
+                }
+              }
+            }
+
+            return { 
+              ...repo, 
+              hasWorkflows, 
+              metrics 
+            };
+          } catch (error) {
+            console.error(`Error fetching workflow data for ${repo.slug}:`, error);
+            return { 
+              ...repo, 
+              hasWorkflows: false, 
+              metrics: {
+                totalWorkflows: 0,
+                passedRuns: 0,
+                failedRuns: 0,
+                inProgressRuns: 0,
+                successRate: 0,
+                hasActivity: false
+              }
+            };
+          }
+        })
+      );
 
       setAvailableRepos(enhanced);
-      console.log(`✅ Loaded ${enhanced.length} repositories`);
+      console.log(`✅ Loaded ${enhanced.length} repositories with workflow data`);
     } finally {
       setIsLoading(false);
     }

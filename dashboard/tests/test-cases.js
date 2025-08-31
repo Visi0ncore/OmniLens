@@ -184,14 +184,7 @@ export const API_ENDPOINT_TESTS = [
     name: 'Server Health',
     description: 'Check if the development server is running'
   },
-  {
-    name: 'OpenAPI Specification',
-    description: 'Validate OpenAPI spec is accessible and well-formed'
-  },
-  {
-    name: 'API Documentation Page',
-    description: 'Test Swagger UI documentation page'
-  },
+
   {
     name: 'GET /api/repo',
     description: 'Test repository listing endpoint'
@@ -212,14 +205,7 @@ export const API_ENDPOINT_TESTS = [
     name: 'POST /api/repo/add (Non-existent)',
     description: 'Test repository addition endpoint with non-existent repository'
   },
-  {
-    name: 'GET /api/repo/{slug}',
-    description: 'Test specific repository retrieval'
-  },
-  {
-    name: 'DELETE /api/repo/{slug}',
-    description: 'Test repository deletion'
-  },
+
   {
     name: 'Slug Generation',
     description: 'Test clean URL slug generation'

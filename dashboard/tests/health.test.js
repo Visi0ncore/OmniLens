@@ -141,7 +141,7 @@ async function runHealthTests() {
     return true;
   } else {
     log('\n🚨 Some health tests failed. Please check the errors above.', 'yellow');
-    log('Note: OpenAPI and API docs tests are optional in CI environment', 'blue');
+
     return false;
   }
 }
