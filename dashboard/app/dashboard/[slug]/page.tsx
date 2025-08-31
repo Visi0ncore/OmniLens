@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { format, isToday } from "date-fns";
 import { DatePicker } from "@/components/DatePicker";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, ArrowLeft, Settings, BarChart3 } from "lucide-react";
 import Link from "next/link";
@@ -19,6 +21,60 @@ function formatRepoDisplayName(repoName: string): string {
     .trim();
 }
 
+// Workflow Definition Card Component
+function WorkflowDefinitionCard({ workflow }: { workflow: any }) {
+  return (
+    <Card className="relative h-full transition-all duration-200 border-border bg-card hover:border-border/80 hover:shadow-md">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-lg font-semibold">
+              {workflow.name}
+            </CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={workflow.state === 'active' ? 'default' : 'secondary'}>
+              {workflow.state}
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            {workflow.path}
+          </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Updated: {new Date(workflow.updatedAt).toLocaleDateString()}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Workflow Card Skeleton Component
+function WorkflowCardSkeleton() {
+  return (
+    <Card className="relative h-full animate-pulse">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-6 bg-muted rounded w-32" />
+          </div>
+          <div className="h-5 bg-muted rounded w-16" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="h-4 bg-muted rounded w-full" />
+          <div className="h-3 bg-muted rounded w-24" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 interface PageProps {
   params: { slug: string };
 }
@@ -26,6 +82,8 @@ interface PageProps {
 export default function DashboardPage({ params }: PageProps) {
   const { slug: repoSlug } = params;
   const [addedRepoPath, setAddedRepoPath] = useState<string | null>(null);
+  const [workflows, setWorkflows] = useState<any[]>([]);
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true);
 
   // Initialize with today's date explicitly  
   const today = new Date();
@@ -33,10 +91,33 @@ export default function DashboardPage({ params }: PageProps) {
 
   // Load workflows when component mounts
   useEffect(() => {
-    // Since we removed localStorage, we'll set addedRepoPath to null
-    // This will be handled by the API endpoints that check the database
-    setAddedRepoPath(null);
-  }, []);
+    const loadWorkflows = async () => {
+      setIsLoadingWorkflows(true);
+      try {
+        const response = await fetch(`/api/workflow/${repoSlug}`);
+        if (response.ok) {
+          const data = await response.json();
+          const sortedWorkflows = (data.workflows || []).sort((a: any, b: any) => {
+            const filenameA = a.path.split('/').pop() || a.path;
+            const filenameB = b.path.split('/').pop() || b.path;
+            return filenameA.localeCompare(filenameB);
+          });
+          setWorkflows(sortedWorkflows);
+          console.log(`📋 Loaded ${sortedWorkflows.length} workflows`);
+        } else {
+          console.error('Failed to load workflows');
+          setWorkflows([]);
+        }
+      } catch (error) {
+        console.error('Error loading workflows:', error);
+        setWorkflows([]);
+      } finally {
+        setIsLoadingWorkflows(false);
+      }
+    };
+
+    loadWorkflows();
+  }, [repoSlug]);
 
   const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
   const isSelectedDateToday = isToday(selectedDate);
@@ -96,13 +177,25 @@ export default function DashboardPage({ params }: PageProps) {
         <div className="flex items-center gap-2">
           <Settings className="h-6 w-6" />
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
-            Available Workflows
+            Workflows
           </h2>
+          {!isLoadingWorkflows && (
+            <Badge variant="secondary" className="text-xs">
+              {workflows.length}
+            </Badge>
+          )}
         </div>
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">
-            Workflow functionality is being migrated to OpenAPI format.
-          </p>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {isLoadingWorkflows ? (
+            // Show 3 rows of skeleton cards (9 total)
+            Array.from({ length: 9 }).map((_, index) => (
+              <WorkflowCardSkeleton key={index} />
+            ))
+          ) : (
+            workflows.map((workflow: any) => (
+              <WorkflowDefinitionCard key={workflow.id} workflow={workflow} />
+            ))
+          )}
         </div>
       </div>
     </div>

@@ -253,7 +253,7 @@ export default function HomePage() {
   }, []);
 
   // Build repositories list from API (includes both env-configured and user-added repos)
-  const hydrateUserRepos = React.useCallback(async () => {
+  const hydrateUserRepos = async () => {
     try {
       console.log('📋 Fetching repositories from API...');
       
@@ -297,7 +297,7 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  };
 
   // Load repositories on mount and set up polling
   React.useEffect(() => {
@@ -318,7 +318,7 @@ export default function HomePage() {
       console.log('🏠 Home page unmounting - clearing interval');
       window.clearInterval(intervalId);
     };
-  }, [hydrateUserRepos]);
+  }, []); // Empty dependency array - only run once on mount
 
   async function handleAddRepo(e: React.FormEvent) {
     e.preventDefault();
