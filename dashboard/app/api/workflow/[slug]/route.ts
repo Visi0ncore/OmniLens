@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getUserRepo } from '@/lib/db-storage';
+import { getUserRepo, saveWorkflows, getWorkflows } from '@/lib/db-storage';
 
 // Validation schema for the slug parameter
 const slugSchema = z.string().min(1, 'Repository slug is required');
@@ -37,6 +37,29 @@ export async function GET(
         { status: 404 }
       );
     }
+    
+    // First, try to get workflows from database
+    try {
+      const savedWorkflows = await getWorkflows(validatedSlug);
+      if (savedWorkflows.length > 0) {
+        console.log(`📋 Returning ${savedWorkflows.length} workflows from database for ${validatedSlug}`);
+        return NextResponse.json({
+          repository: {
+            slug: validatedSlug,
+            displayName: repo.displayName,
+            repoPath: repo.repoPath
+          },
+          workflows: savedWorkflows,
+          totalCount: savedWorkflows.length
+        });
+      }
+    } catch (error) {
+      console.error('Error getting saved workflows:', error);
+      // Continue to fetch from GitHub if database lookup fails
+    }
+    
+    // If no saved workflows, fetch from GitHub
+    console.log(`📋 No saved workflows found for ${validatedSlug}, fetching from GitHub...`);
     
     // Extract owner and repo name from the repository path
     const [owner, repoName] = repo.repoPath.split('/');
@@ -101,6 +124,14 @@ export async function GET(
       updatedAt: workflow.updated_at,
       deletedAt: workflow.deleted_at
     }));
+    
+    // Save workflows to database for persistence
+    try {
+      await saveWorkflows(validatedSlug, workflows);
+    } catch (error) {
+      console.error('Error saving workflows to database:', error);
+      // Continue with the response even if saving fails
+    }
     
     return NextResponse.json({
       repository: {

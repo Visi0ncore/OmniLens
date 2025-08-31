@@ -4,7 +4,7 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Clock, XCircle, ArrowDown, ArrowUp } from "lucide-react";
 import type { WorkflowRun } from "@/lib/github";
-import { getRepoConfig } from "@/lib/utils";
+
 
 type OverviewData = {
   completedRuns: number;
@@ -174,16 +174,17 @@ function compareDaily(todayRuns: WorkflowRun[], yesterdayRuns: WorkflowRun[]) {
 }
 
 function CategoryBars({ runs, repoSlug }: { runs: WorkflowRun[]; repoSlug: string }) {
-  const repo = getRepoConfig(repoSlug);
-  if (!repo) return null;
-  const entries = Object.entries(repo.categories);
-  const rows = entries.map(([key, cat]) => {
-    const count = runs.filter((r) => {
-      const base = (r.path || r.name || '').toLowerCase();
-      return cat.workflows.some((f) => base.includes(f.toLowerCase()));
-    }).length;
-    return { label: cat.name || key, value: count };
-  });
+  // Since we removed categorization, show a simple summary
+  const totalWorkflows = runs.length;
+  const completedWorkflows = runs.filter(r => r.status === 'completed').length;
+  const failedWorkflows = runs.filter(r => r.conclusion === 'failure').length;
+  
+  const rows = [
+    { label: 'Total Workflows', value: totalWorkflows },
+    { label: 'Completed', value: completedWorkflows },
+    { label: 'Failed', value: failedWorkflows }
+  ];
+  
   const max = Math.max(1, ...rows.map((r) => r.value));
   return (
     <div className="space-y-2">

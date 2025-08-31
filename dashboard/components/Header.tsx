@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Github } from 'lucide-react';
+import { Github, FileText } from 'lucide-react';
 
 export default function Header() {
   return (
@@ -51,7 +51,16 @@ export default function Header() {
               </svg>
             </Link>
             <Link 
-              href="https://x.com/OmniLensApp" 
+              href="/api-docs.html" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="API Documentation"
+            >
+              <FileText className="h-6 w-6" />
+            </Link>
+            <Link 
+              href="https://x.com/Omni_Lens" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground transition-colors"

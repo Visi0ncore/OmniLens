@@ -2,7 +2,7 @@ import { Pool } from 'pg';
 
 // Database connection pool
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
+  user: process.env.DB_USER || 'chris',
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'omnilens',
   password: process.env.DB_PASSWORD || '',

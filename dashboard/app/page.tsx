@@ -2,14 +2,15 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertCircle,
   Plus,
   Trash2,
   Package,
-  CheckCircle,
   X,
+  Github,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CompactMetricsOverview from "@/components/CompactMetricsOverview";
@@ -32,6 +33,7 @@ interface RepositoryCardProps {
   repoPath: string;
   displayName: string;
   avatarUrl?: string;
+  htmlUrl?: string;
   hasError: boolean;
   errorMessage?: string;
   hasWorkflows?: boolean;
@@ -47,7 +49,7 @@ interface RepositoryCardProps {
   onRequestDelete?: () => void;
 }
 
-function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, hasError, errorMessage, hasWorkflows, metrics, isUserRepo = false, onRequestDelete }: RepositoryCardProps) {
+function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, htmlUrl, hasError, errorMessage, hasWorkflows, metrics, isUserRepo = false, onRequestDelete }: RepositoryCardProps) {
   // Get avatar URL from the repository data if available, otherwise fallback to GitHub API
   const owner = (repoPath || displayName || '').split('/')[0] || '';
   const cardContent = (
@@ -60,14 +62,13 @@ function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, hasError, 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {avatarUrl && (
-              <img
+              <Image
                 src={avatarUrl}
                 alt={`${owner} avatar`}
                 className="h-6 w-6 rounded-full border border-border"
                 width={24}
                 height={24}
-                loading="lazy"
-                decoding="async"
+                unoptimized
               />
             )}
             <CardTitle className="text-lg font-semibold">
@@ -76,6 +77,20 @@ function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, hasError, 
           </div>
           <div className="flex items-center gap-2">
             {hasError && <AlertCircle className="h-5 w-5 text-red-500" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(htmlUrl || `https://github.com/${repoPath}`, '_blank', 'noopener,noreferrer');
+              }}
+              title="View on GitHub"
+              aria-label="View on GitHub"
+            >
+              <Github className="h-4 w-4" />
+            </Button>
             {isUserRepo && (
               <Button
                 variant="ghost"
@@ -132,9 +147,9 @@ function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, hasError, 
   }
 
   return (
-    <Link href={`/dashboard/${repoSlug}`} className="block transition-all duration-200 hover:scale-[1.02]">
+    <div className="block transition-all duration-200 hover:scale-[1.02] cursor-pointer" onClick={() => window.location.href = `/dashboard/${repoSlug}`}>
       {cardContent}
-    </Link>
+    </div>
   );
 }
 
@@ -199,6 +214,7 @@ export default function HomePage() {
     envKey: string;
     displayName: string;
     avatarUrl?: string;
+    htmlUrl?: string;
     hasConfig: boolean;
     hasWorkflows?: boolean;
     metrics?: {
@@ -226,29 +242,8 @@ export default function HomePage() {
 
 
 
-  // Remove all locally persisted state for a given repo slug
+  // Clear any in-memory trigger map cache for this repo
   const clearRepoLocalState = React.useCallback((repoSlug: string) => {
-    try {
-      // Remove repo-specific config
-      localStorage.removeItem(`localRepoConfig-${repoSlug}`);
-
-      // Remove per-date UI state (reviewed, collapsed, testing-reviewed)
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i += 1) {
-        const key = localStorage.key(i);
-        if (!key) continue;
-        if (
-          key.startsWith(`reviewedWorkflows-${repoSlug}-`) ||
-          key.startsWith(`collapsedCategories-${repoSlug}-`) ||
-          key.startsWith(`reviewedTestingWorkflows-${repoSlug}-`)
-        ) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach((k) => localStorage.removeItem(k));
-    } catch {}
-
-    // Clear any in-memory trigger map cache for this repo
     try {
       const cache = (globalThis as any).__triggerMaps as Record<string, any> | undefined;
       if (cache && cache[repoSlug]) {
@@ -258,8 +253,10 @@ export default function HomePage() {
   }, []);
 
   // Build repositories list from API (includes both env-configured and user-added repos)
-  const hydrateUserRepos = React.useCallback(async () => {
+  const hydrateUserRepos = async () => {
     try {
+      console.log('📋 Fetching repositories from API...');
+      
       // Fetch all repositories from the API
       const response = await fetch('/api/repo', { cache: 'no-store' });
       if (!response.ok) {
@@ -273,6 +270,7 @@ export default function HomePage() {
       const mappedRepos = allRepos.map((r: any) => ({
         slug: r.slug,
         repoPath: r.repoPath || r.slug.replace(/-/g, '/'), // Convert slug back to repoPath if needed
+        htmlUrl: r.htmlUrl,
         envKey: r.envKey || 'LOCAL',
         displayName: r.displayName,
         avatarUrl: r.avatarUrl,
@@ -281,63 +279,46 @@ export default function HomePage() {
         metrics: null,
       }));
 
+      // Only fetch workflow data if we have repositories
+      if (mappedRepos.length === 0) {
+        setAvailableRepos([]);
+        return;
+      }
+
       const todayStr = new Date().toISOString().slice(0, 10);
 
-      const enhanced = await Promise.all(
-        mappedRepos.map(async (repo: any) => {
-          try {
-            const raw = localStorage.getItem(`localRepoConfig-${repo.slug}`);
-            const localCfg = raw ? JSON.parse(raw) : null;
-            const configuredFiles: string[] = localCfg
-              ? Object.values(localCfg.categories || {}).flatMap((c: any) => c?.workflows || [])
-              : [];
-
-            const hasLocalWorkflows = configuredFiles.length > 0;
-            if (!hasLocalWorkflows || !repo.repoPath) {
-              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: hasLocalWorkflows ? { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } : { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
-            }
-
-            const resRuns = await fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repo.repoPath)}&date=${encodeURIComponent(todayStr)}`, { cache: 'no-store' });
-            if (!resRuns.ok) {
-              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
-            }
-            const json = await resRuns.json();
-            const runs = (json.workflow_runs || []).filter((r: any) => {
-              const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
-              return file && configuredFiles.some((cfg) => file.includes(cfg));
-            });
-            const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
-            const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
-            const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
-            const failedRuns = runs.filter((r: any) => r.conclusion === 'failure').length;
-            const successRate = completedRuns > 0 ? Math.round((passedRuns / completedRuns) * 100) : 0;
-            const hasActivity = completedRuns > 0 || inProgressRuns > 0;
-            return { ...repo, hasWorkflows: true, metrics: { totalWorkflows: configuredFiles.length, passedRuns, failedRuns, inProgressRuns, successRate, hasActivity } };
-          } catch {
-            return repo;
-          }
-        })
-      );
+      const enhanced = mappedRepos.map((repo: any) => {
+        // Since we removed API calls that aren't in OpenAPI spec, just return basic repo info
+        return { ...repo, hasWorkflows: false, metrics: { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
+      });
 
       setAvailableRepos(enhanced);
+      console.log(`✅ Loaded ${enhanced.length} repositories`);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  };
 
+  // Load repositories on mount and set up polling
   React.useEffect(() => {
+    console.log('🏠 Home page mounted - loading repositories...');
+    
+    // Initial load
     hydrateUserRepos();
-  }, [hydrateUserRepos]);
-
-  // Poll in the background to reflect new runs without manual refresh
-  React.useEffect(() => {
+    
+    // Set up polling interval (starts after initial load)
     const intervalId = window.setInterval(() => {
       if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        console.log('🔄 Polling repositories (10s interval)...');
         hydrateUserRepos();
       }
     }, 10000); // 10s
-    return () => window.clearInterval(intervalId);
-  }, [hydrateUserRepos]);
+    
+    return () => {
+      console.log('🏠 Home page unmounting - clearing interval');
+      window.clearInterval(intervalId);
+    };
+  }, []); // Empty dependency array - only run once on mount
 
   async function handleAddRepo(e: React.FormEvent) {
     e.preventDefault();
@@ -567,6 +548,7 @@ export default function HomePage() {
               repoPath={repo.repoPath}
               displayName={repo.displayName}
               avatarUrl={repo.avatarUrl}
+              htmlUrl={repo.htmlUrl}
               hasError={repo.hasError}
               errorMessage={repo.errorMessage}
               hasWorkflows={repo.hasWorkflows}

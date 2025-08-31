@@ -1,22 +1,36 @@
-name: 🫀 Test Health
+name: 🗃️ API - Repo
 
 on:
   push:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-health.yml'
+      - '.github/workflows/api-repo.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-health.yml'
+      - '.github/workflows/api-repo.yml'
   workflow_dispatch:
 
 jobs:
-  test-health:
+  api-repo:
     runs-on: ubuntu-latest
     
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: omnilens
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -35,6 +49,17 @@ jobs:
       working-directory: ./dashboard
       run: bun install
 
+    - name: Setup database
+      working-directory: ./dashboard
+      run: |
+        # Wait for PostgreSQL to be ready
+        sleep 10
+        
+        # Create database schema using the SQL file
+        psql -h localhost -U postgres -d omnilens -f lib/schema.sql
+      env:
+        PGPASSWORD: postgres
+
     - name: Start development server
       working-directory: ./dashboard
       run: |
@@ -52,6 +77,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Run health tests
+    - name: Run API Repo tests
       working-directory: ./dashboard
-      run: bun run test:health
+      run: bun run test:api:repo

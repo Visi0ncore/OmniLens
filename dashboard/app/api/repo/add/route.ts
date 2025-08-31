@@ -54,19 +54,21 @@ export async function POST(request: NextRequest) {
         repoPath 
       }, { status: 500 });
     }
-
+    // Get repository data from GitHub API response
+    const repoData = await res.json();
+    
     // Repository exists, proceed with adding to database
     // Generate slug from just the repository name (not the full path)
     const slug = repoPath.split('/').pop() || repoPath;
 
-    // Create new repo object
+    // Create new repo object with avatar URL from GitHub API
     const newRepo = {
       slug,
       repoPath,
       displayName,
       htmlUrl,
       defaultBranch,
-      avatarUrl,
+      avatarUrl: avatarUrl || repoData.owner?.avatar_url || null,
       addedAt: new Date().toISOString()
     };
 

@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format, subDays } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { WorkflowRun } from "@/lib/github";
-import { getRepoConfig } from "@/lib/utils";
+
 import { CheckCircle, XCircle, Clock, ArrowDown, ArrowUp } from "lucide-react";
 
 interface Props {
@@ -55,7 +55,7 @@ function Bars({ segments }: { segments: Segment[] }) {
 }
 
 export default function ThirtyDayHealthCard({ repoSlug, repoPath }: Props) {
-  const repoConfigured = !!getRepoConfig(repoSlug) || !!repoPath;
+  const repoConfigured = !!repoPath;
   const endForKey = format(new Date(), 'yyyy-MM-dd');
   const storageKey = React.useMemo(() => {
     const id = repoPath || repoSlug;
@@ -67,18 +67,7 @@ export default function ThirtyDayHealthCard({ repoSlug, repoPath }: Props) {
     enabled: repoConfigured,
     staleTime: 60 * 1000, // 60s - aligns with API cache
     cacheTime: 5 * 60 * 1000,
-    initialData: (() => {
-      if (typeof window === 'undefined') return undefined;
-      try {
-        const raw = localStorage.getItem(storageKey);
-        if (!raw) return undefined;
-        const parsed = JSON.parse(raw) as { ts: number; payload: any };
-        if (parsed && parsed.payload && Date.now() - parsed.ts < 10 * 60 * 1000) {
-          return parsed.payload;
-        }
-      } catch {}
-      return undefined;
-    })(),
+    initialData: undefined,
     queryFn: async () => {
       const end = new Date();
       const start = subDays(end, 30);
@@ -130,7 +119,7 @@ export default function ThirtyDayHealthCard({ repoSlug, repoPath }: Props) {
       }
 
       const payload = { consistent, improved, regressed, regressing, passCount, failCount, dailyAvgRuntime };
-      try { if (typeof window !== 'undefined') localStorage.setItem(storageKey, JSON.stringify({ ts: Date.now(), payload })); } catch {}
+      // No longer caching in localStorage since we moved to database persistence
       return payload;
     }
   });
