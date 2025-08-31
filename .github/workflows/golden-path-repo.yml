@@ -79,4 +79,4 @@ jobs:
 
     - name: Run Golden Path Repo tests
       working-directory: ./dashboard
-      run: bun run test:golden
+      run: bun run test:golden:repo

@@ -114,7 +114,7 @@ export async function saveWorkflows(repoSlug: string, workflows: Array<{
 export async function getWorkflows(repoSlug: string) {
   try {
     const result = await pool.query(
-      'SELECT workflow_id, workflow_name, workflow_path, workflow_state FROM workflows WHERE repo_slug = $1 ORDER BY workflow_name',
+      'SELECT workflow_id, workflow_name, workflow_path, workflow_state, created_at, updated_at FROM workflows WHERE repo_slug = $1 ORDER BY workflow_name',
       [repoSlug]
     );
     
@@ -122,7 +122,9 @@ export async function getWorkflows(repoSlug: string) {
       id: row.workflow_id,
       name: row.workflow_name,
       path: row.workflow_path,
-      state: row.workflow_state
+      state: row.workflow_state,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
     }));
   } catch (error) {
     console.error('Error getting workflows:', error);
