@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, ArrowLeft, Settings, BarChart3 } from "lucide-react";
 import Link from "next/link";
+import { removeEmojiFromWorkflowName } from "@/lib/utils";
 
 // Helper function to format repository name for display
 function formatRepoDisplayName(repoName: string): string {
@@ -92,9 +93,10 @@ export default function DashboardPage({ params }: PageProps) {
         if (response.ok) {
           const data = await response.json();
           const sortedWorkflows = (data.workflows || []).sort((a: any, b: any) => {
-            const filenameA = a.path.split('/').pop() || a.path;
-            const filenameB = b.path.split('/').pop() || b.path;
-            return filenameA.localeCompare(filenameB);
+            // Sort by workflow name without emojis
+            const nameA = removeEmojiFromWorkflowName(a.name || '');
+            const nameB = removeEmojiFromWorkflowName(b.name || '');
+            return nameA.localeCompare(nameB);
           });
           setWorkflows(sortedWorkflows);
           console.log(`📋 Loaded ${sortedWorkflows.length} workflows`);

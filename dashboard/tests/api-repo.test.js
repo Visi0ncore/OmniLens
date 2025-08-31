@@ -19,12 +19,7 @@ import {
   logWarning,
   logInfo,
   makeRequest,
-  checkServer,
-  VALIDATION_TEST_CASES,
-  ADD_REPO_TEST_CASES,
-  NON_EXISTENT_REPO_TEST_CASES,
-  ADD_NON_EXISTENT_REPO_TEST_CASES,
-  REPO_TEST_DATA
+  checkServer
 } from './test-utils.js';
 
 // Test functions
@@ -40,7 +35,21 @@ async function testGetRepositories() {
     if (response.data && response.data.repositories) {
       logSuccess('Response has correct structure with repositories array');
       logInfo(`Found ${response.data.repositories.length} repositories`);
-      return true;
+      
+      // Validate each repository has required fields
+      const requiredFields = ['slug', 'displayName', 'hasConfig'];
+      let allValid = true;
+      
+      for (const repo of response.data.repositories) {
+        for (const field of requiredFields) {
+          if (!repo.hasOwnProperty(field)) {
+            logError(`Repository missing required field: ${field}`);
+            allValid = false;
+          }
+        }
+      }
+      
+      return allValid;
     } else {
       logError('Response missing repositories array');
       return false;
@@ -54,7 +63,28 @@ async function testGetRepositories() {
 async function testValidateRepository() {
   logTest('POST /api/repo/validate');
   
-  const testCases = VALIDATION_TEST_CASES;
+  const testCases = [
+    {
+      name: 'Valid repository (Visi0ncore/OmniLens)',
+      data: { repoUrl: 'https://github.com/Visi0ncore/OmniLens' },
+      expectedValid: true
+    },
+    {
+      name: 'Valid repository (microsoft/vscode)',
+      data: { repoUrl: 'https://github.com/microsoft/vscode' },
+      expectedValid: true
+    },
+    {
+      name: 'Empty repoUrl',
+      data: { repoUrl: '' },
+      expectedValid: false
+    },
+    {
+      name: 'Missing repoUrl',
+      data: {},
+      expectedValid: false
+    }
+  ];
   
   let allPassed = true;
   
@@ -77,8 +107,22 @@ async function testValidateRepository() {
           logError(`    ❌ displayName is incorrect: "${response.data.displayName}"`);
           allPassed = false;
         }
+        
+        // Check for required fields
+        const requiredFields = ['repoPath', 'htmlUrl', 'defaultBranch', 'owner', 'avatarUrl'];
+        for (const field of requiredFields) {
+          if (response.data.hasOwnProperty(field)) {
+            logSuccess(`    ✅ Contains ${field}`);
+          } else {
+            logError(`    ❌ Missing ${field}`);
+            allPassed = false;
+          }
+        }
       } else {
         logError(`    ❌ ${testCase.name} - Expected valid but got: ${response.status}`);
+        if (response.data && response.data.error) {
+          logError(`    ❌ Error: ${response.data.error}`);
+        }
         allPassed = false;
       }
     } else {
@@ -101,9 +145,22 @@ async function testValidateRepository() {
 async function testValidateNonExistentRepository() {
   logTest('POST /api/repo/validate (Non-existent)');
   
+  const testCases = [
+    {
+      name: 'Non-existent repository',
+      data: { repoUrl: 'https://github.com/non-existent-user/non-existent-repo' },
+      expectedStatus: 404
+    },
+    {
+      name: 'Invalid GitHub URL format',
+      data: { repoUrl: 'https://github.com/invalid-format' },
+      expectedStatus: 400
+    }
+  ];
+  
   let allPassed = true;
   
-  for (const testCase of NON_EXISTENT_REPO_TEST_CASES) {
+  for (const testCase of testCases) {
     logInfo(`  Testing: ${testCase.name}`);
     
     const response = await makeRequest(`${BASE_URL}/api/repo/validate`, {
@@ -132,7 +189,7 @@ async function testAddRepository() {
   // First validate a repo to get the data
   const validateResponse = await makeRequest(`${BASE_URL}/api/repo/validate`, {
     method: 'POST',
-    body: JSON.stringify({ repoUrl: REPO_TEST_DATA.omniLens.url })
+    body: JSON.stringify({ repoUrl: 'https://github.com/Visi0ncore/OmniLens' })
   });
   
   if (!validateResponse.ok || !validateResponse.data.valid) {
@@ -140,20 +197,36 @@ async function testAddRepository() {
     return false;
   }
   
-  const testCases = ADD_REPO_TEST_CASES.map(testCase => {
-    if (testCase.name === 'Valid repository data') {
-      return {
-        ...testCase,
-        data: {
-          repoPath: validateResponse.data.repoPath,
-          displayName: validateResponse.data.displayName,
-          htmlUrl: validateResponse.data.htmlUrl,
-          defaultBranch: validateResponse.data.defaultBranch
-        }
-      };
+  const testCases = [
+    {
+      name: 'Valid repository data',
+      data: {
+        repoPath: validateResponse.data.repoPath,
+        displayName: validateResponse.data.displayName,
+        htmlUrl: validateResponse.data.htmlUrl,
+        defaultBranch: validateResponse.data.defaultBranch
+      },
+      shouldPass: true
+    },
+    {
+      name: 'Missing required fields',
+      data: {
+        repoPath: 'Visi0ncore/OmniLens'
+        // Missing other required fields
+      },
+      shouldPass: false
+    },
+    {
+      name: 'Invalid HTML URL',
+      data: {
+        repoPath: 'Visi0ncore/OmniLens',
+        displayName: 'OmniLens',
+        htmlUrl: 'not-a-url',
+        defaultBranch: 'main'
+      },
+      shouldPass: false
     }
-    return testCase;
-  });
+  ];
   
   let allPassed = true;
   let addedSlug = null;
@@ -170,11 +243,25 @@ async function testAddRepository() {
       if (response.ok && response.data && response.data.success) {
         logSuccess(`    ✅ ${testCase.name} - Repository added successfully`);
         addedSlug = response.data.repo.slug; // Store the slug for cleanup
+        
+        // Validate response structure
+        const requiredFields = ['slug', 'repoPath', 'displayName', 'htmlUrl', 'defaultBranch'];
+        for (const field of requiredFields) {
+          if (response.data.repo.hasOwnProperty(field)) {
+            logSuccess(`    ✅ Response contains ${field}`);
+          } else {
+            logError(`    ❌ Response missing ${field}`);
+            allPassed = false;
+          }
+        }
       } else if (response.status === 409) {
         logSuccess(`    ✅ ${testCase.name} - Repository already exists (expected for duplicate test)`);
         addedSlug = response.data.slug; // Store the slug for cleanup
       } else {
         logError(`    ❌ ${testCase.name} - Expected success but got: ${response.status}`);
+        if (response.data && response.data.error) {
+          logError(`    ❌ Error: ${response.data.error}`);
+        }
         allPassed = false;
       }
     } else {
@@ -189,7 +276,12 @@ async function testAddRepository() {
   
   // Clean up: remove the added repo so it doesn't interfere with other tests
   if (addedSlug) {
-    await makeRequest(`${BASE_URL}/api/repo/${addedSlug}`, { method: 'DELETE' });
+    const deleteResponse = await makeRequest(`${BASE_URL}/api/repo/${addedSlug}`, { method: 'DELETE' });
+    if (deleteResponse.ok) {
+      logSuccess(`    ✅ Cleaned up test repository: ${addedSlug}`);
+    } else {
+      logWarning(`    ⚠️ Failed to clean up test repository: ${addedSlug}`);
+    }
   }
   
   return allPassed;
@@ -198,9 +290,34 @@ async function testAddRepository() {
 async function testAddNonExistentRepository() {
   logTest('POST /api/repo/add (Non-existent)');
   
+  const testCases = [
+    {
+      name: 'Non-existent repository data',
+      data: {
+        repoPath: 'non-existent-user/non-existent-repo',
+        displayName: 'Non-existent Repo',
+        htmlUrl: 'https://github.com/non-existent-user/non-existent-repo',
+        defaultBranch: 'main'
+      },
+      shouldPass: false,
+      expectedStatus: 404
+    },
+    {
+      name: 'Invalid repository path format',
+      data: {
+        repoPath: 'invalid-format',
+        displayName: 'Invalid Format',
+        htmlUrl: 'https://github.com/invalid-format',
+        defaultBranch: 'main'
+      },
+      shouldPass: false,
+      expectedStatus: 404
+    }
+  ];
+  
   let allPassed = true;
   
-  for (const testCase of ADD_NON_EXISTENT_REPO_TEST_CASES) {
+  for (const testCase of testCases) {
     logInfo(`  Testing: ${testCase.name}`);
     
     const response = await makeRequest(`${BASE_URL}/api/repo/add`, {
@@ -247,12 +364,12 @@ async function testGetSpecificRepository() {
     })
   });
   
-  if (!addResponse.ok) {
+  if (!addResponse.ok && addResponse.status !== 409) {
     logError('Add failed, cannot test specific repo endpoint');
     return false;
   }
   
-  const slug = addResponse.data.repo.slug;
+  const slug = addResponse.ok ? addResponse.data.repo.slug : addResponse.data.slug;
   
   const testCases = [
     {
@@ -277,6 +394,17 @@ async function testGetSpecificRepository() {
     if (testCase.shouldPass) {
       if (response.ok && response.data && response.data.success) {
         logSuccess(`    ✅ ${testCase.name} - Repository retrieved successfully`);
+        
+        // Validate response structure
+        const requiredFields = ['id', 'slug', 'repoPath', 'displayName', 'htmlUrl', 'defaultBranch'];
+        for (const field of requiredFields) {
+          if (response.data.repo.hasOwnProperty(field)) {
+            logSuccess(`    ✅ Response contains ${field}`);
+          } else {
+            logError(`    ❌ Response missing ${field}`);
+            allPassed = false;
+          }
+        }
       } else {
         logError(`    ❌ ${testCase.name} - Expected success but got: ${response.status}`);
         allPassed = false;
@@ -293,7 +421,12 @@ async function testGetSpecificRepository() {
   
   // Clean up: remove the added repo so it doesn't interfere with other tests
   if (slug) {
-    await makeRequest(`${BASE_URL}/api/repo/${slug}`, { method: 'DELETE' });
+    const deleteResponse = await makeRequest(`${BASE_URL}/api/repo/${slug}`, { method: 'DELETE' });
+    if (deleteResponse.ok) {
+      logSuccess(`    ✅ Cleaned up test repository: ${slug}`);
+    } else {
+      logWarning(`    ⚠️ Failed to clean up test repository: ${slug}`);
+    }
   }
   
   return allPassed;
@@ -356,6 +489,17 @@ async function testDeleteRepository() {
     if (testCase.shouldPass) {
       if (response.ok && response.data && response.data.success) {
         logSuccess(`    ✅ ${testCase.name} - Repository deleted successfully`);
+        
+        // Validate response structure
+        const requiredFields = ['message', 'deletedRepo'];
+        for (const field of requiredFields) {
+          if (response.data.hasOwnProperty(field)) {
+            logSuccess(`    ✅ Response contains ${field}`);
+          } else {
+            logError(`    ❌ Response missing ${field}`);
+            allPassed = false;
+          }
+        }
       } else {
         logError(`    ❌ ${testCase.name} - Expected success but got: ${response.status}`);
         allPassed = false;

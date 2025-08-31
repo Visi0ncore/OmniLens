@@ -65,14 +65,27 @@ export default function WorkflowCard({
   // Determine card height - use natural sizing
   const cardHeightClass = 'h-auto';
 
-  // Prefer workflow file name when available; fall back to API-provided name
+  // Use workflow name directly, with fallback to cleaned name
   const getDisplayName = (): string => {
-    const source = (run.workflow_name || run.path || run.name || '').toString();
-    const last = source.split('/').pop() || source;
-    const noExt = last.replace(/\.ya?ml$/i, '');
-    const cleaned = noExt.replace(/[-_]/g, ' ').trim();
-    if (!cleaned) return cleanWorkflowName(run.name || '');
-    return cleaned.replace(/\b\w/g, (l) => l.toUpperCase());
+    // Use the workflow name directly from the API
+    if (run.name) {
+      return cleanWorkflowName(run.name);
+    }
+    
+    // Fallback to workflow_name if available
+    if ((run as any).workflow_name) {
+      return cleanWorkflowName((run as any).workflow_name);
+    }
+    
+    // Last resort: extract from path
+    if (run.path) {
+      const last = run.path.split('/').pop() || run.path;
+      const noExt = last.replace(/\.ya?ml$/i, '');
+      const cleaned = noExt.replace(/[-_]/g, ' ').trim();
+      return cleaned.replace(/\b\w/g, (l) => l.toUpperCase());
+    }
+    
+    return 'Unknown Workflow';
   };
 
   return (
