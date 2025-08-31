@@ -309,7 +309,7 @@ export default function HomePage() {
               
               if (hasWorkflows) {
                 // Fetch today's workflow runs to calculate metrics
-                const runsResponse = await fetch(`/api/workflows?date=${todayStr}&repo=${repo.slug}`, { cache: 'no-store' });
+                const runsResponse = await fetch(`/api/workflow/${repo.slug}?date=${todayStr}`, { cache: 'no-store' });
                 if (runsResponse.ok) {
                   const runsData = await runsResponse.json();
                   const overviewData = runsData.overviewData;

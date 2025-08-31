@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getUserRepo, removeUserRepo } from '@/lib/db-storage';
+import { getUserRepo, removeUserRepo, deleteWorkflows } from '@/lib/db-storage';
 
 // Zod schema for slug parameter validation
 const slugSchema = z.string().min(1, 'Repository slug is required');
@@ -16,8 +16,8 @@ const repositoryResponseSchema = z.object({
     htmlUrl: z.string(),
     defaultBranch: z.string(),
     avatarUrl: z.string().nullable().optional(),
-    addedAt: z.string().optional(),
-    updatedAt: z.string().optional()
+    addedAt: z.any().optional(),
+    updatedAt: z.any().optional()
   })
 });
 
@@ -33,8 +33,8 @@ const deleteResponseSchema = z.object({
     htmlUrl: z.string(),
     defaultBranch: z.string(),
     avatarUrl: z.string().nullable().optional(),
-    addedAt: z.string().optional(),
-    updatedAt: z.string().optional()
+    addedAt: z.any().optional(),
+    updatedAt: z.any().optional()
   })
 });
 
@@ -82,10 +82,24 @@ export async function DELETE(
     // Validate the slug parameter
     const validatedSlug = slugSchema.parse(params.slug);
     
+    // First check if the repository exists
+    const existingRepo = await getUserRepo(validatedSlug);
+    if (!existingRepo) {
+      return NextResponse.json({ error: 'Repository not found' }, { status: 404 });
+    }
+    
+    // Delete associated workflows first
+    try {
+      await deleteWorkflows(validatedSlug);
+    } catch (error) {
+      console.error('Error deleting workflows for repo:', validatedSlug, error);
+      // Continue with repository deletion even if workflow deletion fails
+    }
+    
     const deletedRepo = await removeUserRepo(validatedSlug);
 
     if (!deletedRepo) {
-      return NextResponse.json({ error: 'Repository not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Failed to delete repository' }, { status: 500 });
     }
     
     // Validate response with Zod
@@ -101,6 +115,7 @@ export async function DELETE(
   } catch (error: unknown) {
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
+      console.error('Zod validation error:', error.issues);
       return NextResponse.json({ 
         error: 'Invalid repository slug',
         details: error.issues.map((issue: z.ZodIssue) => `${issue.path.join('.')}: ${issue.message}`)
