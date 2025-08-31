@@ -33,21 +33,16 @@ function WorkflowDefinitionCard({ workflow }: { workflow: any }) {
             </CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={workflow.state === 'active' ? 'default' : 'secondary'}>
-              {workflow.state}
+            <Badge variant="secondary" className="text-xs">
+              -
+            </Badge>
+            <Badge variant={workflow.state === 'active' ? 'success' : 'secondary'}>
+              {workflow.state === 'active' ? 'Active' : 'Disabled'}
             </Badge>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            {workflow.path}
-          </p>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Updated: {new Date(workflow.updatedAt).toLocaleDateString()}</span>
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
@@ -62,14 +57,13 @@ function WorkflowCardSkeleton() {
           <div className="flex items-center gap-3">
             <div className="h-6 bg-muted rounded w-32" />
           </div>
-          <div className="h-5 bg-muted rounded w-16" />
+          <div className="flex items-center gap-2">
+            <div className="h-5 bg-muted rounded w-8" />
+            <div className="h-5 bg-muted rounded w-16" />
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2">
-          <div className="h-4 bg-muted rounded w-full" />
-          <div className="h-3 bg-muted rounded w-24" />
-        </div>
       </CardContent>
     </Card>
   );
