@@ -6,7 +6,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, ArrowLeft, Settings, BarChart3, RefreshCw } from "lucide-react";
+import { Calendar, ArrowLeft, Settings, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { removeEmojiFromWorkflowName } from "@/lib/utils";
 import type { WorkflowRun } from "@/lib/github";
@@ -84,13 +84,28 @@ export default function DashboardPage({ params }: PageProps) {
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true);
   const [isLoadingRuns, setIsLoadingRuns] = useState(false);
 
-  // Initialize with today's date using useMemo to prevent re-creation on every render
+  // Initialize with today's date - static reference
   const today = useMemo(() => new Date(), []);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
 
+  // Helper function to compare workflow runs for changes
+  const hasWorkflowRunsChanged = useCallback((oldRuns: WorkflowRun[], newRuns: WorkflowRun[]): boolean => {
+    if (oldRuns.length !== newRuns.length) return true;
+    
+    // Create a simple hash of the runs for comparison
+    const oldHash = oldRuns.map(run => `${run.id}-${run.status}-${run.conclusion}`).join('|');
+    const newHash = newRuns.map(run => `${run.id}-${run.status}-${run.conclusion}`).join('|');
+    
+    return oldHash !== newHash;
+  }, []);
+
   // Load workflow runs for the selected date
-  const loadWorkflowRuns = useCallback(async (date: Date) => {
-    setIsLoadingRuns(true);
+  const loadWorkflowRuns = useCallback(async (date: Date, isPolling: boolean = false) => {
+    // Only show loading state for initial loads, not polling
+    if (!isPolling) {
+      setIsLoadingRuns(true);
+    }
+    
     try {
       const dateStr = format(date, "yyyy-MM-dd");
       const response = await fetch(`/api/workflow/${repoSlug}?date=${dateStr}`, { 
@@ -103,19 +118,36 @@ export default function DashboardPage({ params }: PageProps) {
       });
       if (response.ok) {
         const data = await response.json();
-        setWorkflowRuns(data.workflowRuns || []);
-        console.log(`📊 Loaded ${data.workflowRuns?.length || 0} workflow runs for ${dateStr}`);
+        const newRuns = data.workflowRuns || [];
+        
+        // Only update state if data has actually changed
+        if (!isPolling || hasWorkflowRunsChanged(workflowRuns, newRuns)) {
+          setWorkflowRuns(newRuns);
+          if (isPolling) {
+            console.log(`🔄 Data updated: ${newRuns.length} workflow runs for ${dateStr}`);
+          } else {
+            console.log(`📊 Loaded ${newRuns.length} workflow runs for ${dateStr}`);
+          }
+        } else if (isPolling) {
+          console.log(`🔄 No changes detected for ${dateStr}`);
+        }
       } else {
         console.error('Failed to load workflow runs');
-        setWorkflowRuns([]);
+        if (!isPolling) {
+          setWorkflowRuns([]);
+        }
       }
     } catch (error) {
       console.error('Error loading workflow runs:', error);
-      setWorkflowRuns([]);
+      if (!isPolling) {
+        setWorkflowRuns([]);
+      }
     } finally {
-      setIsLoadingRuns(false);
+      if (!isPolling) {
+        setIsLoadingRuns(false);
+      }
     }
-  }, [repoSlug]);
+  }, [repoSlug, hasWorkflowRunsChanged]);
 
   // Load workflows when component mounts
   useEffect(() => {
@@ -155,25 +187,39 @@ export default function DashboardPage({ params }: PageProps) {
     loadWorkflows();
   }, [repoSlug]);
 
-  // Load workflow runs when date changes
+  // Load workflow runs when date changes and set up smart polling
   useEffect(() => {
+    console.log(`📊 Dashboard mounted - loading workflow runs for ${format(selectedDate, "yyyy-MM-dd")}...`);
+    
+    // Initial load
     loadWorkflowRuns(selectedDate);
+    
+    // Only poll if we're looking at today's data
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
+    const isToday = selectedDateStr === todayStr;
+    
+    if (isToday) {
+      console.log(`🔄 Setting up polling for today's data (${format(selectedDate, "yyyy-MM-dd")})`);
+      
+      // Set up polling interval (10s, same as main page)
+      const intervalId = window.setInterval(() => {
+        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+          console.log(`🔄 Polling today's workflow runs (10s interval)...`);
+          loadWorkflowRuns(selectedDate, true); // Pass isPolling=true
+        }
+      }, 10000); // 10s
+      
+      return () => {
+        console.log(`📊 Dashboard unmounting - clearing polling interval`);
+        window.clearInterval(intervalId);
+      };
+    } else {
+      console.log(`📊 No polling for historical data (${format(selectedDate, "yyyy-MM-dd")})`);
+    }
   }, [selectedDate, loadWorkflowRuns]);
 
-  // Refresh data when page becomes visible (user navigates back)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log('🔄 Page became visible, refreshing workflow runs...');
-        loadWorkflowRuns(selectedDate);
-      }
-    };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [selectedDate, loadWorkflowRuns]);
 
   const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
   const isSelectedDateToday = isToday(selectedDate);
@@ -201,19 +247,6 @@ export default function DashboardPage({ params }: PageProps) {
           <h1 className="text-3xl font-bold tracking-tight">{repoDisplayName}</h1>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-            onClick={() => {
-              console.log('🔄 Manual refresh triggered');
-              loadWorkflowRuns(selectedDate);
-            }}
-            disabled={isLoadingRuns}
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoadingRuns ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
           <Button
             variant="outline"
             size="sm"

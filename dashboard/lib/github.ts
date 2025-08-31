@@ -105,14 +105,7 @@ export function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[
     }
   });
 
-  // Log workflows that had multiple runs (only if more than 1)
-  const multipleRunsWorkflows = Array.from(duplicateCount.entries())
-    .filter(([_, count]) => count > 1)
-    .map(([workflow, count]) => `${workflow}(${count})`);
-  
-  if (multipleRunsWorkflows.length > 0) {
-    console.log(`📊 Multiple runs: ${multipleRunsWorkflows.join(', ')}`);
-  }
+
 
   // Add run count and all runs to each workflow run for the UI
   const result = Array.from(latestRuns.values()).map(run => {
@@ -137,33 +130,14 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
     // Format date to ISO string for GitHub API
     const dateStr = format(date, "yyyy-MM-dd");
 
-        // Use broader time range to account for timezone differences (extend by 2 hours each side)
+    // Get workflow runs from midnight of the target date until now
     const startOfDay = `${dateStr}T00:00:00Z`;
-    const endOfDay = `${dateStr}T23:59:59Z`;
+    const now = new Date().toISOString();
     
-    // For debugging, let's also try a broader range
-    const broaderStart = new Date(date);
-    broaderStart.setDate(broaderStart.getDate() - 1);
-    broaderStart.setHours(22, 0, 0, 0); // 10 PM previous day UTC
+    const startTime = startOfDay;
+    const endTime = now;
     
-    const broaderEnd = new Date(date);
-    broaderEnd.setDate(broaderEnd.getDate() + 1);
-    broaderEnd.setHours(2, 0, 0, 0); // 2 AM next day UTC
-    
-    const broaderStartStr = broaderStart.toISOString();
-    const broaderEndStr = broaderEnd.toISOString();
-    
-    // Add clear visual separator for this API call
-    const timestamp = new Date().toISOString();
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`🚀 NEW API CALL - ${timestamp}`);
-    console.log(`${'='.repeat(80)}`);
-    
-    console.log(`🔍 GitHub API Query: ${API_BASE}/repos/${repo}/actions/runs?created=${broaderStartStr}..${broaderEndStr}&per_page=100&page=1`);
-    console.log(`🔍 Broader date range: ${broaderStartStr} to ${broaderEndStr}`);
-    console.log(`🔍 Original date range: ${startOfDay} to ${endOfDay}`);
-    console.log(`🔍 Target date: ${dateStr} (${date.toISOString()})`);
-    console.log(`⏰ API call timestamp: ${timestamp}`);
+
     
     // Fetch all workflow runs for the date, handling pagination
     let allRuns: WorkflowRun[] = [];
@@ -172,9 +146,9 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
     let pagesFetched = 0;
 
     while (hasMorePages) {
-          // Use broader time range to account for timezone differences
+          // Use the correct time range: from midnight of target date until now
     const res = await fetch(
-      `${API_BASE}/repos/${repo}/actions/runs?created=${broaderStartStr}..${broaderEndStr}&per_page=100&page=${page}&_t=${Date.now()}`,
+      `${API_BASE}/repos/${repo}/actions/runs?created=${startTime}..${endTime}&per_page=100&page=${page}&_t=${Date.now()}`,
       {
         headers: {
           Accept: "application/vnd.github+json",
@@ -190,14 +164,12 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
 
       // Handle 304 Not Modified response
       if (res.status === 304) {
-        console.log(`📄 Page ${page}: No changes detected (304 Not Modified)`);
         break; // No need to fetch more pages if data hasn't changed
       }
 
       if (!res.ok) {
         // Handle specific GitHub API errors gracefully
         if (res.status === 404) {
-          console.log(`📄 Repository not found or no workflows exist: ${repo}`);
           return []; // Return empty array for repositories with no workflows
         }
         if (res.status === 403) {
@@ -209,11 +181,6 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
       const json = await res.json();
       const pageRuns = json.workflow_runs as WorkflowRun[];
 
-      // Log summary of runs found on this page
-      if (pageRuns.length > 0) {
-        console.log(`📄 Page ${page}: ${pageRuns.length} runs found`);
-      }
-
       allRuns = allRuns.concat(pageRuns);
       pagesFetched++;
 
@@ -223,29 +190,24 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
 
       // Safety break to avoid infinite loops
       if (page > 10) {
-        console.warn('Breaking pagination after 10 pages to avoid infinite loop');
         break;
       }
     }
 
-    // Group by workflow and collect all run data for the UI
-    // This shows one card per workflow but includes run_count and all_runs data
-    const latestRuns = getLatestWorkflowRuns(allRuns);
-
-    console.log(`\n🔍 === WORKFLOW RUN ANALYSIS FOR ${dateStr} ===`);
-    console.log(`📊 GitHub API returned ${allRuns.length} total runs`);
-    console.log(`🎯 Final result: ${latestRuns.length} cards (representing ${allRuns.length} total runs)`);
-
-    // Log final card data with run counts
-    console.log('\n🃏 Cards created with run counts:');
-    latestRuns.forEach((run, index) => {
-      console.log(`  ${index + 1}. Card: "${run.name}", Run Count: ${run.run_count || 1}, All Runs: ${run.all_runs?.length || 0}`);
+    // Filter runs to only include those that actually started on the target date
+    const targetDateStart = new Date(date);
+    targetDateStart.setHours(0, 0, 0, 0);
+    const targetDateEnd = new Date(date);
+    targetDateEnd.setHours(23, 59, 59, 999);
+    
+    const filteredRuns = allRuns.filter(run => {
+      const runStartTime = new Date(run.run_started_at);
+      return runStartTime >= targetDateStart && runStartTime <= targetDateEnd;
     });
 
-    // Add closing separator
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`✅ API CALL COMPLETED - ${new Date().toISOString()}`);
-    console.log(`${'='.repeat(80)}\n`);
+    // Group by workflow and collect all run data for the UI
+    // This shows one card per workflow but includes run_count and all_runs data
+    const latestRuns = getLatestWorkflowRuns(filteredRuns);
 
     return latestRuns;
 
