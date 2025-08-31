@@ -9,7 +9,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Calendar, ArrowLeft, Settings, Loader2, BarChart3, Package } from "lucide-react";
+import { Zap, Calendar, ArrowLeft, Settings, BarChart3 } from "lucide-react";
 import Link from "next/link";
 
 // Helper function to format repository name for display
@@ -59,42 +59,26 @@ function WorkflowDefinitionCard({ workflow }: { workflow: any }) {
   );
 }
 
-function NoWorkflowsFound({ repoName, repoSlug, onConfigureWorkflows, isConfiguringWorkflows }: { 
-  repoName: string; 
-  repoSlug: string;
-  onConfigureWorkflows: () => void;
-  isConfiguringWorkflows: boolean;
-}) {
+// Workflow Card Skeleton Component
+function WorkflowCardSkeleton() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="w-full max-w-xl">
-        <div className="border rounded-lg bg-card/60 backdrop-blur-sm p-8 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-            <Package className="h-8 w-8 text-muted-foreground" />
+    <Card className="relative h-full animate-pulse">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-6 w-6 bg-muted rounded" />
+            <div className="h-6 bg-muted rounded w-32" />
           </div>
-          <h2 className="text-2xl font-semibold mb-4">
-            No workflows configured
-          </h2>
-          <p className="text-sm text-muted-foreground mb-6">
-            Add workflow files to start monitoring.
-          </p>
-          <div className="flex justify-center">
-            <Button 
-              onClick={onConfigureWorkflows} 
-              disabled={isConfiguringWorkflows}
-              className="flex items-center gap-2"
-            >
-              {isConfiguringWorkflows ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Settings className="h-4 w-4" />
-              )}
-              {isConfiguringWorkflows ? 'Loading...' : 'Configure Workflows'}
-            </Button>
-          </div>
+          <div className="h-5 bg-muted rounded w-16" />
         </div>
-      </div>
-    </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="h-4 bg-muted rounded w-full" />
+          <div className="h-3 bg-muted rounded w-24" />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -155,8 +139,8 @@ export default function DashboardPage({ params }: PageProps) {
   const [addedRepoPath, setAddedRepoPath] = useState<string | null>(null);
   const [reviewedWorkflows, setReviewedWorkflows] = useState<Record<number, boolean>>({});
   const [hoverState, setHoverState] = useState<HoverState>({ metricType: null, workflowIds: new Set() });
-  const [configuredWorkflows, setConfiguredWorkflows] = useState<any[]>([]);
-  const [isConfiguringWorkflows, setIsConfiguringWorkflows] = useState(false);
+  const [workflows, setWorkflows] = useState<any[]>([]);
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true);
 
   // Initialize with today's date explicitly  
   const today = new Date();
@@ -205,6 +189,32 @@ export default function DashboardPage({ params }: PageProps) {
     const storedReviewed = loadReviewedWorkflows(selectedDate);
     setReviewedWorkflows(storedReviewed);
   }, [selectedDate, loadReviewedWorkflows]);
+
+  // Load workflows when component mounts
+  useEffect(() => {
+    const loadWorkflows = async () => {
+      setIsLoadingWorkflows(true);
+      try {
+        const response = await fetch(`/api/workflow/${repoSlug}`);
+        if (response.ok) {
+          const data = await response.json();
+          const sortedWorkflows = (data.workflows || []).sort((a: any, b: any) => {
+            const filenameA = a.path.split('/').pop() || a.path;
+            const filenameB = b.path.split('/').pop() || b.path;
+            return filenameA.localeCompare(filenameB);
+          });
+          setWorkflows(sortedWorkflows);
+          console.log(`📋 Loaded ${sortedWorkflows.length} workflows`);
+        }
+      } catch (error) {
+        console.error('Error loading workflows:', error);
+      } finally {
+        setIsLoadingWorkflows(false);
+      }
+    };
+
+    loadWorkflows();
+  }, [repoSlug]);
 
   const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
   const isSelectedDateToday = isToday(selectedDate);
@@ -270,28 +280,7 @@ export default function DashboardPage({ params }: PageProps) {
     setHoverState({ metricType: null, workflowIds: new Set() });
   }, [today]);
 
-  // Handle configuring workflows
-  const handleConfigureWorkflows = useCallback(async () => {
-    setIsConfiguringWorkflows(true);
-    try {
-      const response = await fetch(`/api/workflow/${repoSlug}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch workflows');
-      }
-      const data = await response.json();
-      
-      // Sort workflows by name
-      const sortedWorkflows = (data.workflows || []).sort((a: any, b: any) => 
-        a.name.localeCompare(b.name)
-      );
-      
-      setConfiguredWorkflows(sortedWorkflows);
-    } catch (error) {
-      console.error('Error configuring workflows:', error);
-    } finally {
-      setIsConfiguringWorkflows(false);
-    }
-  }, [repoSlug]);
+
 
   // Toggle reviewed state for a workflow
   const toggleReviewed = useCallback((workflowId: number) => {
@@ -370,32 +359,32 @@ export default function DashboardPage({ params }: PageProps) {
           </div>
         </div>
 
-      {/* Show configured workflows or no workflows found */}
-      {configuredWorkflows.length > 0 ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Settings className="h-6 w-6" />
-            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
-              Available Workflows
-            </h2>
+      {/* Show workflows or loading skeleton */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Settings className="h-6 w-6" />
+          <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
+            Available Workflows
+          </h2>
+          {!isLoadingWorkflows && (
             <Badge variant="secondary" className="text-xs">
-              {configuredWorkflows.length} workflows
+              {workflows.length} workflows
             </Badge>
-          </div>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {configuredWorkflows.map((workflow: any) => (
-              <WorkflowDefinitionCard key={workflow.id} workflow={workflow} />
-            ))}
-          </div>
+          )}
         </div>
-      ) : (
-        <NoWorkflowsFound 
-          repoName={formatRepoDisplayName(repoDisplayName)} 
-          repoSlug={repoSlug}
-          onConfigureWorkflows={handleConfigureWorkflows}
-          isConfiguringWorkflows={isConfiguringWorkflows}
-        />
-      )}
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {isLoadingWorkflows ? (
+            // Show 3 rows of skeleton cards (9 total)
+            Array.from({ length: 9 }).map((_, index) => (
+              <WorkflowCardSkeleton key={index} />
+            ))
+          ) : (
+            workflows.map((workflow: any) => (
+              <WorkflowDefinitionCard key={workflow.id} workflow={workflow} />
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
   }
@@ -448,32 +437,32 @@ export default function DashboardPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Show configured workflows or no workflows found */}
-      {configuredWorkflows.length > 0 ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Settings className="h-6 w-6" />
-            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
-              Available Workflows
-            </h2>
+      {/* Show workflows or loading skeleton */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Settings className="h-6 w-6" />
+          <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
+            Available Workflows
+          </h2>
+          {!isLoadingWorkflows && (
             <Badge variant="secondary" className="text-xs">
-              {configuredWorkflows.length} workflows
+              {workflows.length} workflows
             </Badge>
-          </div>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {configuredWorkflows.map((workflow: any) => (
-              <WorkflowDefinitionCard key={workflow.id} workflow={workflow} />
-            ))}
-          </div>
+          )}
         </div>
-      ) : (
-        <NoWorkflowsFound 
-          repoName={formatRepoDisplayName(repoDisplayName)} 
-          repoSlug={repoSlug}
-          onConfigureWorkflows={handleConfigureWorkflows}
-          isConfiguringWorkflows={isConfiguringWorkflows}
-        />
-      )}
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {isLoadingWorkflows ? (
+            // Show 3 rows of skeleton cards (9 total)
+            Array.from({ length: 9 }).map((_, index) => (
+              <WorkflowCardSkeleton key={index} />
+            ))
+          ) : (
+            workflows.map((workflow: any) => (
+              <WorkflowDefinitionCard key={workflow.id} workflow={workflow} />
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 } 

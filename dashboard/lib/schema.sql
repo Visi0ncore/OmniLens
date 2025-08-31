@@ -27,3 +27,26 @@ CREATE TRIGGER update_repositories_updated_at
     BEFORE UPDATE ON repositories 
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Create workflows table to store workflow IDs per repository
+CREATE TABLE IF NOT EXISTS workflows (
+  id SERIAL PRIMARY KEY,
+  repo_slug VARCHAR(255) NOT NULL,
+  workflow_id INTEGER NOT NULL,
+  workflow_name VARCHAR(255) NOT NULL,
+  workflow_path VARCHAR(500) NOT NULL,
+  workflow_state VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(repo_slug, workflow_id)
+);
+
+-- Create indexes for workflows table
+CREATE INDEX IF NOT EXISTS idx_workflows_repo_slug ON workflows(repo_slug);
+CREATE INDEX IF NOT EXISTS idx_workflows_workflow_id ON workflows(workflow_id);
+
+-- Create trigger for workflows updated_at
+CREATE TRIGGER update_workflows_updated_at 
+    BEFORE UPDATE ON workflows 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();

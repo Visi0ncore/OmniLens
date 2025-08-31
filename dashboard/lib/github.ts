@@ -1,5 +1,4 @@
 import { format, startOfDay, endOfDay } from "date-fns";
-import { filterWorkflowsByCategories, calculateMissingWorkflows, getAllConfiguredWorkflows } from "./utils";
 
 export interface WorkflowRun {
   id: number;
@@ -68,25 +67,10 @@ function getEnvVars(repoSlug: string) {
 
 
 
-// Helper function to find which configured workflow file a run corresponds to
-function getConfiguredWorkflowFile(run: WorkflowRun, repoSlug: string): string | null {
-  const configuredWorkflows = getAllConfiguredWorkflows(repoSlug);
-
-  // Extract just the filename from the run path (e.g., ".github/workflows/build-workflow.yml" -> "build-workflow.yml")
-  const workflowPath = run.path || run.workflow_name;
-  if (!workflowPath) return null;
-
-  const filename = workflowPath.split('/').pop();
-  if (!filename) return null;
-
-  // Only return exact matches from workflows.json - no partial matching
-  return configuredWorkflows.includes(filename) ? filename : null;
-}
-
 // Helper function to get one card per workflow but collect all run data
 // This shows one card per workflow (latest run) but the card displays total run count
 // and clicking the count shows all individual runs
-function getLatestWorkflowRuns(workflowRuns: WorkflowRun[], repoSlug: string): WorkflowRun[] {
+function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
   const latestRuns = new Map<string, WorkflowRun>();
   const duplicateCount = new Map<string, number>();
   const allRunsForWorkflow = new Map<string, Array<{
@@ -102,19 +86,14 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[], repoSlug: string): W
     new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime()
   );
 
-  // Use configured workflow file name as the key (from workflows.json)
+  // Use workflow name as the key
   sortedRuns.forEach(run => {
-    const configuredWorkflowFile = getConfiguredWorkflowFile(run, repoSlug);
+    const workflowKey = run.name || `workflow-${run.workflow_id}`;
 
-    // Skip runs that don't match any configured workflow (should not happen after filtering)
-    if (!configuredWorkflowFile) {
-      return;
-    }
-
-    if (!latestRuns.has(configuredWorkflowFile)) {
-      latestRuns.set(configuredWorkflowFile, run);
-      duplicateCount.set(configuredWorkflowFile, 1);
-      allRunsForWorkflow.set(configuredWorkflowFile, [{
+    if (!latestRuns.has(workflowKey)) {
+      latestRuns.set(workflowKey, run);
+      duplicateCount.set(workflowKey, 1);
+      allRunsForWorkflow.set(workflowKey, [{
         id: run.id,
         conclusion: run.conclusion,
         status: run.status,
@@ -123,9 +102,9 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[], repoSlug: string): W
       }]);
     } else {
       // Count duplicates for the total run count
-      duplicateCount.set(configuredWorkflowFile, (duplicateCount.get(configuredWorkflowFile) || 0) + 1);
+      duplicateCount.set(workflowKey, (duplicateCount.get(workflowKey) || 0) + 1);
       // Add this run to the all_runs collection
-      const existingRuns = allRunsForWorkflow.get(configuredWorkflowFile) || [];
+      const existingRuns = allRunsForWorkflow.get(workflowKey) || [];
       existingRuns.push({
         id: run.id,
         conclusion: run.conclusion,
@@ -133,7 +112,7 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[], repoSlug: string): W
         html_url: run.html_url,
         run_started_at: run.run_started_at
       });
-      allRunsForWorkflow.set(configuredWorkflowFile, existingRuns);
+      allRunsForWorkflow.set(workflowKey, existingRuns);
     }
   });
 
@@ -148,11 +127,11 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[], repoSlug: string): W
 
   // Add run count and all runs to each workflow run for the UI
   const result = Array.from(latestRuns.values()).map(run => {
-    const configuredWorkflowFile = getConfiguredWorkflowFile(run, repoSlug);
+    const workflowKey = run.name || `workflow-${run.workflow_id}`;
     return {
       ...run,
-      run_count: duplicateCount.get(configuredWorkflowFile!) || 1,
-      all_runs: allRunsForWorkflow.get(configuredWorkflowFile!) || []
+      run_count: duplicateCount.get(workflowKey) || 1,
+      all_runs: allRunsForWorkflow.get(workflowKey) || []
     };
   });
 
@@ -260,17 +239,13 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
       }
     }
 
-    // Filter to only include workflows that are configured in workflows.json
-    const filteredRuns = filterWorkflowsByCategories(allRuns, repoSlug);
-
     // Group by workflow and collect all run data for the UI
     // This shows one card per workflow but includes run_count and all_runs data
-    const latestRuns = getLatestWorkflowRuns(filteredRuns, repoSlug);
+    const latestRuns = getLatestWorkflowRuns(allRuns);
 
     console.log(`\n🔍 === WORKFLOW RUN ANALYSIS FOR ${dateStr} ===`);
     console.log(`📊 GitHub API returned ${allRuns.length} total runs`);
-    console.log(`✅ After filtering by configured workflows: ${filteredRuns.length} runs`);
-    console.log(`🎯 Final result: ${latestRuns.length} cards (representing ${filteredRuns.length} total runs)`);
+    console.log(`🎯 Final result: ${latestRuns.length} cards (representing ${allRuns.length} total runs)`);
 
     // Log final card data with run counts
     console.log('\n🃏 Cards created with run counts:');
@@ -292,19 +267,16 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
 }
 
 // Calculate overview data from workflow runs
-export function calculateOverviewData(workflowRuns: WorkflowRun[], repoSlug: string): OverviewData {
-  // Filter to only include workflows that are configured in categories
-  const filteredRuns = filterWorkflowsByCategories(workflowRuns, repoSlug);
-
-  const completedRuns = filteredRuns.filter(run => run.status === 'completed').length;
-  const inProgressRuns = filteredRuns.filter(run =>
+export function calculateOverviewData(workflowRuns: WorkflowRun[]): OverviewData {
+  const completedRuns = workflowRuns.filter((run: WorkflowRun) => run.status === 'completed').length;
+  const inProgressRuns = workflowRuns.filter((run: WorkflowRun) =>
     run.status === 'in_progress' || run.status === 'queued'
   ).length;
-  const passedRuns = filteredRuns.filter(run => run.conclusion === 'success').length;
-  const failedRuns = filteredRuns.filter(run => run.conclusion === 'failure').length;
+  const passedRuns = workflowRuns.filter((run: WorkflowRun) => run.conclusion === 'success').length;
+  const failedRuns = workflowRuns.filter((run: WorkflowRun) => run.conclusion === 'failure').length;
 
   // Calculate total runtime (this is an approximation - GitHub doesn't provide exact runtime in the list API)
-  const totalRuntime = filteredRuns.reduce((total, run) => {
+  const totalRuntime = workflowRuns.reduce((total: number, run: WorkflowRun) => {
     if (run.status === 'completed') {
       // Estimate runtime based on update time vs start time
       const start = new Date(run.run_started_at).getTime();
@@ -314,11 +286,10 @@ export function calculateOverviewData(workflowRuns: WorkflowRun[], repoSlug: str
     return total;
   }, 0);
 
-  // Calculate how many configured workflows didn't run (using original workflowRuns, not filtered)
-  const missingWorkflows = calculateMissingWorkflows(workflowRuns, repoSlug);
-  const didntRunCount = missingWorkflows.length;
-  // Total configured workflows should reflect configuration, not how many ran
-  const totalWorkflows = getAllConfiguredWorkflows(repoSlug).length;
+  // For now, we don't track missing workflows since we removed categorization
+  const didntRunCount = 0;
+  const totalWorkflows = workflowRuns.length;
+  const missingWorkflows: string[] = [];
 
   return {
     completedRuns,
@@ -335,7 +306,7 @@ export function calculateOverviewData(workflowRuns: WorkflowRun[], repoSlug: str
 // Get overview data for a specific date and repository
 export async function getOverviewDataForDate(date: Date, repoSlug: string): Promise<OverviewData> {
   const workflowRuns = await getWorkflowRunsForDate(date, repoSlug);
-  return calculateOverviewData(workflowRuns, repoSlug);
+  return calculateOverviewData(workflowRuns);
 }
 
 // Legacy functions for backward compatibility - now require repo parameter

@@ -75,3 +75,70 @@ export async function clearAllRepos(): Promise<void> {
     console.error('Error clearing repositories:', error);
   }
 }
+
+// Workflow persistence functions
+export async function saveWorkflows(repoSlug: string, workflows: Array<{
+  id: number;
+  name: string;
+  path: string;
+  state: string;
+}>) {
+  try {
+    // Delete existing workflows for this repo
+    await pool.query(
+      'DELETE FROM workflows WHERE repo_slug = $1',
+      [repoSlug]
+    );
+    
+    // Insert new workflows
+    for (const workflow of workflows) {
+      await pool.query(
+        `INSERT INTO workflows (repo_slug, workflow_id, workflow_name, workflow_path, workflow_state)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (repo_slug, workflow_id) DO UPDATE SET
+         workflow_name = EXCLUDED.workflow_name,
+         workflow_path = EXCLUDED.workflow_path,
+         workflow_state = EXCLUDED.workflow_state,
+         updated_at = CURRENT_TIMESTAMP`,
+        [repoSlug, workflow.id, workflow.name, workflow.path, workflow.state]
+      );
+    }
+    
+    console.log(`✅ Saved ${workflows.length} workflows for repo: ${repoSlug}`);
+  } catch (error) {
+    console.error('Error saving workflows:', error);
+    throw error;
+  }
+}
+
+export async function getWorkflows(repoSlug: string) {
+  try {
+    const result = await pool.query(
+      'SELECT workflow_id, workflow_name, workflow_path, workflow_state FROM workflows WHERE repo_slug = $1 ORDER BY workflow_name',
+      [repoSlug]
+    );
+    
+    return result.rows.map((row: any) => ({
+      id: row.workflow_id,
+      name: row.workflow_name,
+      path: row.workflow_path,
+      state: row.workflow_state
+    }));
+  } catch (error) {
+    console.error('Error getting workflows:', error);
+    throw error;
+  }
+}
+
+export async function deleteWorkflows(repoSlug: string) {
+  try {
+    await pool.query(
+      'DELETE FROM workflows WHERE repo_slug = $1',
+      [repoSlug]
+    );
+    console.log(`✅ Deleted workflows for repo: ${repoSlug}`);
+  } catch (error) {
+    console.error('🚨 Error deleting workflows:', error);
+    throw error;
+  }
+}

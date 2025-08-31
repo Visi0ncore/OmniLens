@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { format, subDays } from "date-fns";
 import { ArrowLeft, BarChart3 } from "lucide-react";
-import { getRepoConfig } from "@/lib/utils";
+
 
 // no need for env-mapped repo name here; use same transformation as dashboard
 import DailyReportCard from "@/components/DailyReportCard";
@@ -31,7 +31,7 @@ function useDaily(repoSlug: string, date: Date, repoPath?: string | null) {
       if (!res.ok) throw new Error("Failed to fetch daily data");
       return res.json();
     },
-    enabled: !!getRepoConfig(repoSlug) || !!repoPath,
+    enabled: !!repoPath,
   });
 }
 
@@ -62,7 +62,6 @@ function SegmentedBar({ segments }: { segments: Array<{ color: string; value: nu
 
 export default function ReportPage({ params }: PageProps) {
   const repoSlug = params.slug;
-  const repoConfig = getRepoConfig(repoSlug);
   const today = new Date();
   const [now, setNow] = useState<Date>(new Date());
   const yesterday = subDays(today, 1);
@@ -95,7 +94,7 @@ export default function ReportPage({ params }: PageProps) {
   // Prefetch 30-day and 90-day range + 30-day details to make cards instant on refresh
   useEffect(() => {
     const doPrefetch = async () => {
-      const configured = !!repoConfig || !!repoPath;
+      const configured = !!repoPath;
       if (!configured) return;
       const end = new Date();
       const start30 = subDays(end, 30);
@@ -145,7 +144,7 @@ export default function ReportPage({ params }: PageProps) {
       });
     };
     doPrefetch();
-  }, [repoSlug, repoConfig, repoPath, queryClient]);
+  }, [repoSlug, repoPath, queryClient]);
 
   // Today vs Yesterday summary
   const tPassed = todayRuns.filter((r) => r.conclusion === "success").length;

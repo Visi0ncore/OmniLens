@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format, subDays } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { WorkflowRun } from "@/lib/github";
-import { getRepoConfig } from "@/lib/utils";
+
 import { CheckCircle, TrendingUp, TrendingDown, ArrowDown } from "lucide-react";
 
 interface Props {
@@ -55,7 +55,7 @@ function statusOf(run: SimpleRun | undefined): "passed" | "failed" | "running" |
 }
 
 export default function ThirtyDayWorkflowHealthDetails({ repoSlug, repoPath }: Props) {
-  const repoConfigured = !!getRepoConfig(repoSlug) || !!repoPath;
+  const repoConfigured = !!repoPath;
   const endForKey = format(new Date(), 'yyyy-MM-dd');
   const storageKey = React.useMemo(() => {
     const id = repoPath || repoSlug;
