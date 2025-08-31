@@ -276,6 +276,8 @@ export default function HomePage() {
   // Build repositories list from API (includes both env-configured and user-added repos)
   const hydrateUserRepos = React.useCallback(async () => {
     try {
+      console.log('📋 Fetching repositories from API...');
+      
       // Fetch all repositories from the API
       const response = await fetch('/api/repo', { cache: 'no-store' });
       if (!response.ok) {
@@ -297,6 +299,12 @@ export default function HomePage() {
         hasWorkflows: false,
         metrics: null,
       }));
+
+      // Only fetch workflow data if we have repositories
+      if (mappedRepos.length === 0) {
+        setAvailableRepos([]);
+        return;
+      }
 
       const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -337,23 +345,31 @@ export default function HomePage() {
       );
 
       setAvailableRepos(enhanced);
+      console.log(`✅ Loaded ${enhanced.length} repositories`);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
+  // Load repositories on mount and set up polling
   React.useEffect(() => {
+    console.log('🏠 Home page mounted - loading repositories...');
+    
+    // Initial load
     hydrateUserRepos();
-  }, [hydrateUserRepos]);
-
-  // Poll in the background to reflect new runs without manual refresh
-  React.useEffect(() => {
+    
+    // Set up polling interval (starts after initial load)
     const intervalId = window.setInterval(() => {
       if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        console.log('🔄 Polling repositories (10s interval)...');
         hydrateUserRepos();
       }
     }, 10000); // 10s
-    return () => window.clearInterval(intervalId);
+    
+    return () => {
+      console.log('🏠 Home page unmounting - clearing interval');
+      window.clearInterval(intervalId);
+    };
   }, [hydrateUserRepos]);
 
   async function handleAddRepo(e: React.FormEvent) {
