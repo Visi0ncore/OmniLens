@@ -32,8 +32,6 @@ function formatRunTime(dateString: string): string {
 
 interface WorkflowCardProps {
   run: WorkflowRun;
-  isReviewed: boolean;
-  onToggleReviewed: () => void;
   repoSlug: string; // Repository slug for config context
   isHighlighted?: boolean;
   highlightColor?: string;
@@ -42,17 +40,17 @@ interface WorkflowCardProps {
 
 export default function WorkflowCard({
   run,
-  isReviewed,
-  onToggleReviewed,
   repoSlug,
   isHighlighted = false,
   highlightColor = '',
   rightAction
 }: WorkflowCardProps) {
   const status = run.conclusion ?? run.status;
-  const isMissing = (run as any).isMissing === true || status === 'missing';
+  const isMissing = (run as any).isMissing === true || status === 'missing' || status === 'idle';
   const isSuccess = !isMissing && status === "success";
   const isInProgress = !isMissing && (status === "in_progress" || status === 'queued');
+  const isIdle = isMissing && !run.run_started_at;
+  const isDisabled = status === 'disabled';
 
   // Determine border classes
   const getBorderClass = () => {
@@ -65,16 +63,16 @@ export default function WorkflowCard({
   // Determine card height - use natural sizing
   const cardHeightClass = 'h-auto';
 
-  // Use workflow name directly, with fallback to cleaned name
+  // Use workflow name directly, preserving emojis
   const getDisplayName = (): string => {
-    // Use the workflow name directly from the API
+    // Use the workflow name directly from the API (preserve emojis)
     if (run.name) {
-      return cleanWorkflowName(run.name);
+      return run.name;
     }
     
     // Fallback to workflow_name if available
     if ((run as any).workflow_name) {
-      return cleanWorkflowName((run as any).workflow_name);
+      return (run as any).workflow_name;
     }
     
     // Last resort: extract from path
@@ -97,8 +95,10 @@ export default function WorkflowCard({
           </h3>
           <div className="flex items-center gap-2">
             {/* Show run count badge if workflow was run multiple times */}
-            {!isMissing && run.run_count && run.run_count > 1 && (
-              <Popover>
+            {(() => {
+              console.log(`🔍 WorkflowCard ${run.name}: run_count=${run.run_count}, all_runs=${run.all_runs?.length}`);
+              return run.run_count && run.run_count > 1 ? (
+                <Popover>
                 <PopoverTrigger asChild>
                   <Badge variant="secondary" className="shrink-0 text-xs cursor-pointer hover:opacity-80">
                     {run.run_count}
@@ -143,50 +143,53 @@ export default function WorkflowCard({
                   </div>
                 </PopoverContent>
               </Popover>
-            )}
+            ) : null;
+            })()}
             <Badge
-              variant={isMissing ? "secondary" : isSuccess ? "success" : isInProgress ? "destructive" : "destructive"}
+              variant={
+                isIdle ? "secondary" : 
+                isDisabled ? "secondary" :
+                isSuccess ? "success" : 
+                isInProgress ? "destructive" : 
+                "destructive"
+              }
               className={`shrink-0 ${isInProgress ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
             >
-              {isMissing ? "Didn't Run" : isSuccess ? "Pass" : isInProgress ? "Running" : "Fail"}
+              {isIdle ? "Idle" : 
+               isDisabled ? "Disabled" :
+               isMissing ? "Didn't Run" : 
+               isSuccess ? "Pass" : 
+               isInProgress ? "Running" : 
+               "Fail"}
             </Badge>
             {rightAction}
           </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-
-
-
-
         <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>{isMissing ? "No runs" : isInProgress ? "Running" : (run.run_started_at && run.updated_at ? duration(run.run_started_at, run.updated_at) : "")}</span>
-            </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>
+              {isIdle ? "No runs" : 
+               isInProgress ? "Running" : 
+               (run.run_started_at && run.updated_at ? duration(run.run_started_at, run.updated_at) : "No duration")}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
-            {!isInProgress && !isMissing ? (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={run.html_url} target="_blank">
+                          {run.html_url && !isIdle ? (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={run.html_url} target="_blank">
+                    <Eye className="h-3 w-3 mr-1" />
+                    View
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
                   <Eye className="h-3 w-3 mr-1" />
-                  View
-                </Link>
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" disabled>
-                <Eye className="h-3 w-3 mr-1" />
-                View
-              </Button>
-            )}
-            <Button
-              variant={isReviewed ? "default" : "outline"}
-              size="sm"
-              onClick={onToggleReviewed}
-              className={isReviewed ? "bg-green-600 hover:bg-green-700" : ""}
-            >
-              <Check className={`h-3 w-3 ${!isReviewed ? "mr-1" : ""}`} />
-              {!isReviewed && "Review"}
-            </Button>
+                  No Run
+                </Button>
+              )}
           </div>
         </div>
       </CardContent>

@@ -307,6 +307,9 @@ export default function HomePage() {
               const workflowData = await workflowResponse.json();
               hasWorkflows = workflowData.workflows && workflowData.workflows.length > 0;
               
+              // Get total workflow count from all workflows (not just those that ran today)
+              const totalWorkflows = workflowData.workflows ? workflowData.workflows.length : 0;
+              
               if (hasWorkflows) {
                 // Fetch today's workflow runs to calculate metrics
                 const runsResponse = await fetch(`/api/workflow/${repo.slug}?date=${todayStr}`, { cache: 'no-store' });
@@ -315,7 +318,7 @@ export default function HomePage() {
                   const overviewData = runsData.overviewData;
                   
                   metrics = {
-                    totalWorkflows: overviewData.totalWorkflows || 0,
+                    totalWorkflows: totalWorkflows, // Use total workflows from all workflows
                     passedRuns: overviewData.passedRuns || 0,
                     failedRuns: overviewData.failedRuns || 0,
                     inProgressRuns: overviewData.inProgressRuns || 0,
@@ -324,7 +327,27 @@ export default function HomePage() {
                       : 0,
                     hasActivity: (overviewData.completedRuns > 0 || overviewData.inProgressRuns > 0)
                   };
+                } else {
+                  // If runs API fails, still show total workflow count
+                  metrics = {
+                    totalWorkflows: totalWorkflows,
+                    passedRuns: 0,
+                    failedRuns: 0,
+                    inProgressRuns: 0,
+                    successRate: 0,
+                    hasActivity: false
+                  };
                 }
+              } else {
+                // No workflows found
+                metrics = {
+                  totalWorkflows: 0,
+                  passedRuns: 0,
+                  failedRuns: 0,
+                  inProgressRuns: 0,
+                  successRate: 0,
+                  hasActivity: false
+                };
               }
             }
 

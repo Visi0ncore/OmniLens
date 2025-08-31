@@ -6,9 +6,11 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, ArrowLeft, Settings, BarChart3 } from "lucide-react";
+import { Calendar, ArrowLeft, Settings, BarChart3, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { removeEmojiFromWorkflowName } from "@/lib/utils";
+import type { WorkflowRun } from "@/lib/github";
+import WorkflowCard from "@/components/WorkflowCard";
 
 // Helper function to format repository name for display
 function formatRepoDisplayName(repoName: string): string {
@@ -78,18 +80,56 @@ export default function DashboardPage({ params }: PageProps) {
   const { slug: repoSlug } = params;
   const [addedRepoPath, setAddedRepoPath] = useState<string | null>(null);
   const [workflows, setWorkflows] = useState<any[]>([]);
+  const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true);
+  const [isLoadingRuns, setIsLoadingRuns] = useState(false);
 
   // Initialize with today's date using useMemo to prevent re-creation on every render
   const today = useMemo(() => new Date(), []);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+
+  // Load workflow runs for the selected date
+  const loadWorkflowRuns = useCallback(async (date: Date) => {
+    setIsLoadingRuns(true);
+    try {
+      const dateStr = format(date, "yyyy-MM-dd");
+      const response = await fetch(`/api/workflow/${repoSlug}?date=${dateStr}`, { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setWorkflowRuns(data.workflowRuns || []);
+        console.log(`📊 Loaded ${data.workflowRuns?.length || 0} workflow runs for ${dateStr}`);
+      } else {
+        console.error('Failed to load workflow runs');
+        setWorkflowRuns([]);
+      }
+    } catch (error) {
+      console.error('Error loading workflow runs:', error);
+      setWorkflowRuns([]);
+    } finally {
+      setIsLoadingRuns(false);
+    }
+  }, [repoSlug]);
 
   // Load workflows when component mounts
   useEffect(() => {
     const loadWorkflows = async () => {
       setIsLoadingWorkflows(true);
       try {
-        const response = await fetch(`/api/workflow/${repoSlug}`);
+        const response = await fetch(`/api/workflow/${repoSlug}`, { 
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         if (response.ok) {
           const data = await response.json();
           const sortedWorkflows = (data.workflows || []).sort((a: any, b: any) => {
@@ -115,6 +155,26 @@ export default function DashboardPage({ params }: PageProps) {
     loadWorkflows();
   }, [repoSlug]);
 
+  // Load workflow runs when date changes
+  useEffect(() => {
+    loadWorkflowRuns(selectedDate);
+  }, [selectedDate, loadWorkflowRuns]);
+
+  // Refresh data when page becomes visible (user navigates back)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('🔄 Page became visible, refreshing workflow runs...');
+        loadWorkflowRuns(selectedDate);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [selectedDate, loadWorkflowRuns]);
+
   const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
   const isSelectedDateToday = isToday(selectedDate);
 
@@ -122,6 +182,11 @@ export default function DashboardPage({ params }: PageProps) {
   const handleSetToday = useCallback(() => {
     setSelectedDate(today);
   }, [today]);
+
+  // Get workflow run data for a specific workflow
+  const getWorkflowRunData = useCallback((workflowId: number): WorkflowRun | null => {
+    return workflowRuns.find(run => run.workflow_id === workflowId) || null;
+  }, [workflowRuns]);
 
   // Format repository display name - use the same logic as the repo card
   const repoDisplayName = addedRepoPath ? formatRepoDisplayName(addedRepoPath) : formatRepoDisplayName(repoSlug);
@@ -136,6 +201,19 @@ export default function DashboardPage({ params }: PageProps) {
           <h1 className="text-3xl font-bold tracking-tight">{repoDisplayName}</h1>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+            onClick={() => {
+              console.log('🔄 Manual refresh triggered');
+              loadWorkflowRuns(selectedDate);
+            }}
+            disabled={isLoadingRuns}
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoadingRuns ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -182,15 +260,37 @@ export default function DashboardPage({ params }: PageProps) {
           )}
         </div>
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {isLoadingWorkflows ? (
+          {isLoadingWorkflows || isLoadingRuns ? (
             // Show 3 rows of skeleton cards (9 total)
             Array.from({ length: 9 }).map((_, index) => (
               <WorkflowCardSkeleton key={index} />
             ))
           ) : (
-            workflows.map((workflow: any) => (
-              <WorkflowDefinitionCard key={workflow.id} workflow={workflow} />
-            ))
+            workflows.map((workflow: any) => {
+              const runData = getWorkflowRunData(workflow.id);
+              
+              // If no run data, create a mock run to show the workflow as idle
+              const mockRun: WorkflowRun = {
+                id: 0,
+                name: workflow.name,
+                workflow_id: workflow.id,
+                path: workflow.path,
+                conclusion: null,
+                status: 'idle',
+                html_url: '',
+                run_started_at: '',
+                updated_at: '',
+                isMissing: true
+              };
+
+              return (
+                <WorkflowCard
+                  key={workflow.id}
+                  run={runData || mockRun}
+                  repoSlug={repoSlug}
+                />
+              );
+            })
           )}
         </div>
       </div>

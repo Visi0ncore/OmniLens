@@ -35,32 +35,21 @@ interface OverviewData {
 
 const API_BASE = "https://api.github.com";
 
-// Helper function to get environment variables for a specific repo
-function getEnvVars(repoSlug: string) {
-  const token = process.env.GITHUB_TOKEN;
+// Helper function to get repository info from database
+async function getRepoInfo(repoSlug: string) {
+  const { getUserRepo } = await import('./db-storage');
+  const repo = await getUserRepo(repoSlug);
   
+  if (!repo) {
+    throw new Error(`Repository not found: ${repoSlug}`);
+  }
+  
+  const token = process.env.GITHUB_TOKEN;
   if (!token) {
     throw new Error("Missing GITHUB_TOKEN environment variable");
   }
 
-  // Map repo slug to environment variable
-  const repoEnvMap: Record<string, string> = {
-    'repo1': 'GITHUB_REPO_1',
-    'repo2': 'GITHUB_REPO_2', 
-    'repo3': 'GITHUB_REPO_3'
-  };
-  
-  const repoEnvKey = repoEnvMap[repoSlug];
-  if (!repoEnvKey) {
-    throw new Error(`Invalid repo slug: ${repoSlug}. Must be one of: ${Object.keys(repoEnvMap).join(', ')}`);
-  }
-  
-  const repo = process.env[repoEnvKey];
-  if (!repo) {
-    throw new Error(`Missing ${repoEnvKey} environment variable for repo: ${repoSlug}`);
-  }
-
-  return { token, repo };
+  return { token, repo: repo.repoPath };
 }
 
 
@@ -70,7 +59,7 @@ function getEnvVars(repoSlug: string) {
 // Helper function to get one card per workflow but collect all run data
 // This shows one card per workflow (latest run) but the card displays total run count
 // and clicking the count shows all individual runs
-function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
+export function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
   const latestRuns = new Map<string, WorkflowRun>();
   const duplicateCount = new Map<string, number>();
   const allRunsForWorkflow = new Map<string, Array<{
@@ -143,7 +132,7 @@ function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[] {
 // Get workflow runs for a specific date and repository
 export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Promise<WorkflowRun[]> {
   try {
-    const { token, repo } = getEnvVars(repoSlug);
+    const { token, repo } = await getRepoInfo(repoSlug);
 
     // Format date to ISO string for GitHub API
     const dateStr = format(date, "yyyy-MM-dd");

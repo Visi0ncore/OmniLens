@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getUserRepo, saveWorkflows, getWorkflows } from '@/lib/db-storage';
+import { getLatestWorkflowRuns, getWorkflowRunsForDate } from '@/lib/github';
 
 // Zod schemas for validation
 const slugSchema = z.string().min(1, 'Repository slug is required');
@@ -241,76 +242,9 @@ async function handleWorkflowRunsRequest(
   date: string
 ) {
   try {
-    
-    // Extract owner and repo name from the repository path
-    const [owner, repoName] = repo.repoPath.split('/');
-    if (!owner || !repoName) {
-      return NextResponse.json(
-        { error: 'Invalid repository path format' },
-        { status: 400 }
-      );
-    }
-    
-    // Get GitHub token from environment
-    const githubToken = process.env.GITHUB_TOKEN;
-    if (!githubToken) {
-      console.error('GitHub token not configured');
-      return NextResponse.json(
-        { error: 'GitHub integration not configured' },
-        { status: 500 }
-      );
-    }
-    
-    // Fetch workflow runs from GitHub API for the specific date
-    const startTime = `${date}T00:00:00Z`;
-    const endTime = `${date}T23:59:59Z`;
-    
-    const githubResponse = await fetch(
-      `https://api.github.com/repos/${owner}/${repoName}/actions/runs?created=${startTime}..${endTime}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${githubToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'OmniLens-Dashboard'
-        }
-      }
-    );
-    
-    if (!githubResponse.ok) {
-      if (githubResponse.status === 404) {
-        return NextResponse.json(
-          { error: 'Repository not found on GitHub' },
-          { status: 404 }
-        );
-      } else if (githubResponse.status === 403) {
-        return NextResponse.json(
-          { error: 'Repository access denied. Please check your GitHub token permissions.' },
-          { status: 403 }
-        );
-      } else {
-        console.error('GitHub API error:', githubResponse.status, githubResponse.statusText);
-        return NextResponse.json(
-          { error: 'Failed to fetch workflow data' },
-          { status: 500 }
-        );
-      }
-    }
-    
-    const runsData: GitHubWorkflowRunsResponse = await githubResponse.json();
-    
-    // Transform the response to match our API format
-    const workflowRuns = runsData.workflow_runs.map(run => ({
-      id: run.id,
-      name: run.name,
-      workflow_id: run.workflow_id,
-      path: run.path,
-      conclusion: run.conclusion,
-      status: run.status,
-      html_url: run.html_url,
-      run_started_at: run.run_started_at,
-      updated_at: run.updated_at,
-      run_count: run.run_count
-    }));
+    // The getWorkflowRunsForDate function handles all GitHub API calls and error handling
+    const dateObj = new Date(date);
+    const workflowRuns = await getWorkflowRunsForDate(dateObj, slug);
     
     // Calculate overview data
     const completedRuns = workflowRuns.filter(run => run.status === 'completed').length;
