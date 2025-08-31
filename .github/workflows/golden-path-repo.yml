@@ -1,20 +1,20 @@
-name: 🏆 Golden Path - Repositories
+name: 🏆 Golden Path - Repo
 
 on:
   push:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-golden-repo.yml'
+      - '.github/workflows/golden-path-repo.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-golden-repo.yml'
+      - '.github/workflows/golden-path-repo.yml'
   workflow_dispatch:
 
 jobs:
-  test-golden-repo:
+  golden-path-repo:
     runs-on: ubuntu-latest
     
     services:
@@ -77,6 +77,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Run golden repository tests
+    - name: Run Golden Path Repo tests
       working-directory: ./dashboard
       run: bun run test:golden

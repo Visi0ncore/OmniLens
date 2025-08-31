@@ -1,20 +1,20 @@
-name: 🌊 API - Workflow
+name: 🗃️ API - Repo
 
 on:
   push:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-api-workflow.yml'
+      - '.github/workflows/api-repo.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-api-workflow.yml'
+      - '.github/workflows/api-repo.yml'
   workflow_dispatch:
 
 jobs:
-  test-workflow-api:
+  api-repo:
     runs-on: ubuntu-latest
     
     services:
@@ -77,6 +77,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Run workflow API tests
+    - name: Run API Repo tests
       working-directory: ./dashboard
-      run: bun run test:api:workflow
+      run: bun run test:api:repo
