@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { format, isToday } from "date-fns";
 import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,8 +79,8 @@ export default function DashboardPage({ params }: PageProps) {
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true);
 
-  // Initialize with today's date explicitly  
-  const today = new Date();
+  // Initialize with today's date using useMemo to prevent re-creation on every render
+  const today = useMemo(() => new Date(), []);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
 
   // Load workflows when component mounts

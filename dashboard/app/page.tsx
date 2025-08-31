@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertCircle,
@@ -61,14 +62,13 @@ function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, htmlUrl, h
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {avatarUrl && (
-              <img
+              <Image
                 src={avatarUrl}
                 alt={`${owner} avatar`}
                 className="h-6 w-6 rounded-full border border-border"
                 width={24}
                 height={24}
-                loading="lazy"
-                decoding="async"
+                unoptimized
               />
             )}
             <CardTitle className="text-lg font-semibold">

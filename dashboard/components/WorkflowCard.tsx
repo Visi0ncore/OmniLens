@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cleanWorkflowName, isTriggerWorkflow, getTestingWorkflowsForTrigger } from "@/lib/utils";
+import { cleanWorkflowName } from "@/lib/utils";
 
 function duration(start: string, end: string): string {
   const startTime = new Date(start);
@@ -37,11 +37,7 @@ interface WorkflowCardProps {
   repoSlug: string; // Repository slug for config context
   isHighlighted?: boolean;
   highlightColor?: string;
-  allWorkflowRuns?: WorkflowRun[]; // All workflow runs to find testing workflows
-  reviewedTestingWorkflows?: Set<string>;
-  onToggleTestingWorkflowReviewed?: (testingWorkflowName: string) => void;
   rightAction?: React.ReactNode; // Optional right-side action button (e.g., delete)
-  triggerMapVersion?: number; // bump to recompute testing mappings when trigger map updates
 }
 
 export default function WorkflowCard({
@@ -51,58 +47,12 @@ export default function WorkflowCard({
   repoSlug,
   isHighlighted = false,
   highlightColor = '',
-  allWorkflowRuns = [],
-  reviewedTestingWorkflows = new Set(),
-  onToggleTestingWorkflowReviewed,
   rightAction
 }: WorkflowCardProps) {
   const status = run.conclusion ?? run.status;
   const isMissing = (run as any).isMissing === true || status === 'missing';
   const isSuccess = !isMissing && status === "success";
   const isInProgress = !isMissing && (status === "in_progress" || status === 'queued');
-
-  // Check if this is a trigger workflow - try both name and workflow_name
-  const isTrigger = isTriggerWorkflow(run.name, repoSlug) || isTriggerWorkflow(run.workflow_name || '', repoSlug);
-
-  // Get testing workflows for this trigger workflow - try both name and workflow_name
-  const testingWorkflowFiles = isTrigger ?
-    (getTestingWorkflowsForTrigger(run.name, repoSlug) || getTestingWorkflowsForTrigger(run.workflow_name || '', repoSlug)) : [];
-  const testingWorkflows = testingWorkflowFiles.map(file => {
-    const workflowName = file.replace('.yml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    // Try to find the workflow run by matching the file name in the workflow name
-    const matchingRun = allWorkflowRuns.find(r => {
-      const runName = r.name.toLowerCase();
-      const fileName = file.replace('.yml', '').toLowerCase();
-      // Try multiple matching strategies
-      return runName.includes(fileName) ||
-        runName.includes(fileName.replace('-', ' ')) ||
-        runName.includes(fileName.replace('-', '')) ||
-        fileName.includes(runName.replace(/\s+/g, ''));
-    });
-    return {
-      name: workflowName,
-      file: file,
-      run: matchingRun
-    };
-  })
-  // Sort by workflow file basename (case-insensitive)
-  .sort((a, b) => {
-    const baseA = (a.file || '').toString().split('/').pop()?.toLowerCase() || '';
-    const baseB = (b.file || '').toString().split('/').pop()?.toLowerCase() || '';
-    return baseA.localeCompare(baseB);
-  }); // Keep all testing workflows, even if a matching run isn't found
-
-  // Check if all testing workflows are reviewed
-  const allTestingWorkflowsReviewed = isTrigger && testingWorkflows.length > 0 &&
-    testingWorkflows.every(wf => reviewedTestingWorkflows.has(wf.name));
-
-  // Debug logging for trigger workflows
-  if (isTrigger) {
-    console.log('Trigger workflow:', run.name);
-    console.log('Testing workflow files:', testingWorkflowFiles);
-    console.log('Found testing workflows:', testingWorkflows);
-    console.log('All reviewed:', allTestingWorkflowsReviewed);
-  }
 
   // Determine border classes
   const getBorderClass = () => {
@@ -112,13 +62,8 @@ export default function WorkflowCard({
     return 'border-2 border-border'; // Use the default border color with consistent width
   };
 
-  // Determine card height - trigger cards should only be taller when testing workflows are visible
-  const shouldShowTestingWorkflows = isTrigger && testingWorkflows.length > 0 && !isReviewed;
-  // Use a minimum height when testing workflows are shown to avoid layout jumps,
-  // otherwise allow the card to size naturally instead of stretching to the tallest row peer.
-  const cardHeightClass = shouldShowTestingWorkflows ? 'min-h-[200px]' : 'h-auto';
-
-  // Removed animated collapse/expand to ensure immediate visibility of testing workflows
+  // Determine card height - use natural sizing
+  const cardHeightClass = 'h-auto';
 
   // Prefer workflow file name when available; fall back to API-provided name
   const getDisplayName = (): string => {
@@ -199,40 +144,7 @@ export default function WorkflowCard({
       <CardContent className="pt-0">
 
 
-        {/* Testing workflows section for trigger workflows (no animation) */}
-        {shouldShowTestingWorkflows && (
-          <div className="mb-3 rounded-md">
-            <div className="p-2">
-              <div className="text-xs font-medium text-muted-foreground mb-1">Testing Workflows:</div>
-              <div className="space-y-1">
-                {testingWorkflows.map((testingWorkflow, index) => {
-                  return (
-                    <div key={index} className="flex items-center justify-between text-xs">
-                      <span className="truncate pr-2">
-                        {testingWorkflow.name}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant={reviewedTestingWorkflows.has(testingWorkflow.name) ? "default" : "outline"}
-                          size="sm"
-                          className={`h-5 px-2 text-xs ${reviewedTestingWorkflows.has(testingWorkflow.name) ? "bg-green-600 hover:bg-green-700" : ""}`}
-                          onClick={() => {
-                            if (onToggleTestingWorkflowReviewed) {
-                              onToggleTestingWorkflowReviewed(testingWorkflow.name);
-                            }
-                          }}
-                        >
-                          <Check className="h-3 w-3 mr-1" />
-                          {reviewedTestingWorkflows.has(testingWorkflow.name) ? "" : "Review"}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
+
 
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -257,11 +169,10 @@ export default function WorkflowCard({
               variant={isReviewed ? "default" : "outline"}
               size="sm"
               onClick={onToggleReviewed}
-              disabled={(!isMissing) && isTrigger && testingWorkflows.length > 0 && !allTestingWorkflowsReviewed}
               className={isReviewed ? "bg-green-600 hover:bg-green-700" : ""}
             >
               <Check className={`h-3 w-3 ${!isReviewed ? "mr-1" : ""}`} />
-              {!isReviewed && (isTrigger && testingWorkflows.length > 0 ? "Review All" : "Review")}
+              {!isReviewed && "Review"}
             </Button>
           </div>
         </div>
