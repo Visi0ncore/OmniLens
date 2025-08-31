@@ -1,4 +1,4 @@
-name: 🗃️ Test API - Repo
+name: 🗃️ API - Repositories
 
 on:
   push:

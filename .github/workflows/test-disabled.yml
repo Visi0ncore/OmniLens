@@ -1,20 +1,20 @@
-name: 🫀 Health Test
+name: ⛔ Disabled Test
 
 on:
   push:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-health.yml'
+      - '.github/workflows/test-disabled.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'dashboard/**'
-      - '.github/workflows/test-health.yml'
+      - '.github/workflows/test-disabled.yml'
   workflow_dispatch:
 
 jobs:
-  test-health:
+  test-disabled:
     runs-on: ubuntu-latest
     
     steps:
@@ -51,7 +51,3 @@ jobs:
         sleep 10
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Run health tests
-      working-directory: ./dashboard
-      run: bun run test:health

@@ -1,4 +1,4 @@
-name: 🌊 Test API - Workflow
+name: 🌊 API - Workflow
 
 on:
   push:
