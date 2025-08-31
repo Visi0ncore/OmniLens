@@ -242,29 +242,8 @@ export default function HomePage() {
 
 
 
-  // Remove all locally persisted state for a given repo slug
+  // Clear any in-memory trigger map cache for this repo
   const clearRepoLocalState = React.useCallback((repoSlug: string) => {
-    try {
-      // Remove repo-specific config
-      localStorage.removeItem(`localRepoConfig-${repoSlug}`);
-
-      // Remove per-date UI state (reviewed, collapsed, testing-reviewed)
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i += 1) {
-        const key = localStorage.key(i);
-        if (!key) continue;
-        if (
-          key.startsWith(`reviewedWorkflows-${repoSlug}-`) ||
-          key.startsWith(`collapsedCategories-${repoSlug}-`) ||
-          key.startsWith(`reviewedTestingWorkflows-${repoSlug}-`)
-        ) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach((k) => localStorage.removeItem(k));
-    } catch {}
-
-    // Clear any in-memory trigger map cache for this repo
     try {
       const cache = (globalThis as any).__triggerMaps as Record<string, any> | undefined;
       if (cache && cache[repoSlug]) {
@@ -308,41 +287,10 @@ export default function HomePage() {
 
       const todayStr = new Date().toISOString().slice(0, 10);
 
-      const enhanced = await Promise.all(
-        mappedRepos.map(async (repo: any) => {
-          try {
-            const raw = localStorage.getItem(`localRepoConfig-${repo.slug}`);
-            const localCfg = raw ? JSON.parse(raw) : null;
-            const configuredFiles: string[] = localCfg
-              ? Object.values(localCfg.categories || {}).flatMap((c: any) => c?.workflows || [])
-              : [];
-
-            const hasLocalWorkflows = configuredFiles.length > 0;
-            if (!hasLocalWorkflows || !repo.repoPath) {
-              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: hasLocalWorkflows ? { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } : { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
-            }
-
-            const resRuns = await fetch(`/api/repositories/workflow-runs?repoPath=${encodeURIComponent(repo.repoPath)}&date=${encodeURIComponent(todayStr)}`, { cache: 'no-store' });
-            if (!resRuns.ok) {
-              return { ...repo, hasWorkflows: hasLocalWorkflows, metrics: { totalWorkflows: configuredFiles.length, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
-            }
-            const json = await resRuns.json();
-            const runs = (json.workflow_runs || []).filter((r: any) => {
-              const file = (r.path || r.workflow_path || r.workflow_name || '').split('/').pop();
-              return file && configuredFiles.some((cfg) => file.includes(cfg));
-            });
-            const completedRuns = runs.filter((r: any) => r.status === 'completed').length;
-            const inProgressRuns = runs.filter((r: any) => r.status === 'in_progress' || r.status === 'queued').length;
-            const passedRuns = runs.filter((r: any) => r.conclusion === 'success').length;
-            const failedRuns = runs.filter((r: any) => r.conclusion === 'failure').length;
-            const successRate = completedRuns > 0 ? Math.round((passedRuns / completedRuns) * 100) : 0;
-            const hasActivity = completedRuns > 0 || inProgressRuns > 0;
-            return { ...repo, hasWorkflows: true, metrics: { totalWorkflows: configuredFiles.length, passedRuns, failedRuns, inProgressRuns, successRate, hasActivity } };
-          } catch {
-            return repo;
-          }
-        })
-      );
+      const enhanced = mappedRepos.map((repo: any) => {
+        // Since we removed API calls that aren't in OpenAPI spec, just return basic repo info
+        return { ...repo, hasWorkflows: false, metrics: { totalWorkflows: 0, passedRuns: 0, failedRuns: 0, inProgressRuns: 0, successRate: 0, hasActivity: false } };
+      });
 
       setAvailableRepos(enhanced);
       console.log(`✅ Loaded ${enhanced.length} repositories`);
