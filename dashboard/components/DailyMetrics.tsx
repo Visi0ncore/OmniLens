@@ -93,7 +93,7 @@ export default function DailyMetrics({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <XCircle className="h-4 w-4 text-red-500" />
-                    <span className="text-sm">Didn't run</span>
+                    <span className="text-sm">Didn&apos;t run</span>
                   </div>
                   <span className="text-sm font-medium ml-2">{didntRunCount}</span>
                 </div>
@@ -176,40 +176,47 @@ export default function DailyMetrics({
             {/* Area Chart */}
             <div className="w-full h-28 bg-muted rounded p-3">
               <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {/* Area chart path */}
+                {/* Smooth line chart */}
                 {runsByHour && runsByHour.length > 0 && (
-                  <path
-                    d={(() => {
-                      const maxCount = Math.max(...runsByHour.map(r => r.count), 1);
-                      const points = runsByHour.map((run, index) => {
-                        const x = (index / (runsByHour.length - 1)) * 100;
-                        const y = 100 - (run.count / maxCount) * 80; // Leave 20% margin at bottom
-                        return `${x},${y}`;
-                      });
-                      const areaPath = `M ${points.join(' L ')} L ${points[points.length - 1].split(',')[0]},100 L 0,100 Z`;
-                      return areaPath;
-                    })()}
-                    fill="hsl(var(--muted-foreground))"
-                    fillOpacity="0.2"
-                    stroke="hsl(var(--foreground))"
-                    strokeWidth="0.5"
-                  />
+                  <>
+                    {/* Area fill */}
+                    <path
+                      d={(() => {
+                        const maxCount = Math.max(...runsByHour.map(r => r.count), 1);
+                        const points = runsByHour.map((run, index) => {
+                          const x = (index / (runsByHour.length - 1)) * 100;
+                          const y = 100 - (run.count / maxCount) * 80; // Leave 20% margin at bottom
+                          return `${x},${y}`;
+                        });
+                        
+                        // Create area path by adding baseline
+                        const linePath = `M ${points.join(' L ')}`;
+                        const areaPath = `${linePath} L ${points[points.length - 1].split(',')[0]},100 L 0,100 Z`;
+                        return areaPath;
+                      })()}
+                      fill="hsl(var(--muted-foreground))"
+                      fillOpacity="0.2"
+                    />
+                    {/* Line stroke */}
+                    <path
+                      d={(() => {
+                        const maxCount = Math.max(...runsByHour.map(r => r.count), 1);
+                        const points = runsByHour.map((run, index) => {
+                          const x = (index / (runsByHour.length - 1)) * 100;
+                          const y = 100 - (run.count / maxCount) * 80; // Leave 20% margin at bottom
+                          return `${x},${y}`;
+                        });
+                        
+                        // Create smooth line path only
+                        return `M ${points.join(' L ')}`;
+                      })()}
+                      fill="none"
+                      stroke="hsl(var(--foreground))"
+                      strokeWidth="0.5"
+                    />
+                  </>
                 )}
               </svg>
-            </div>
-            {/* Hour Legend */}
-            <div className="text-xs text-muted-foreground text-center mt-2">
-              <div className="flex justify-between">
-                <span>0h</span>
-                <span>3h</span>
-                <span>6h</span>
-                <span>9h</span>
-                <span>12h</span>
-                <span>15h</span>
-                <span>18h</span>
-                <span>21h</span>
-                <span>23h</span>
-              </div>
             </div>
           </div>
         </div>

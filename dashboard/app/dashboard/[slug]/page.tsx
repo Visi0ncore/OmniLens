@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { format, isToday } from "date-fns";
 import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,6 +88,7 @@ export default function DashboardPage({ params }: PageProps) {
   // Initialize with today's date - static reference
   const today = useMemo(() => new Date(), []);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+  const selectedDateRef = useRef(selectedDate);
 
   // Helper function to compare workflow runs for changes
   const hasWorkflowRunsChanged = useCallback((oldRuns: WorkflowRun[], newRuns: WorkflowRun[]): boolean => {
@@ -195,6 +196,11 @@ export default function DashboardPage({ params }: PageProps) {
     loadWorkflows();
   }, [repoSlug]);
 
+  // Update ref when selectedDate changes
+  useEffect(() => {
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
+
   // Load workflow runs when date changes and set up smart polling
   useEffect(() => {
     console.log(`📊 Dashboard mounted - loading workflow runs for ${format(selectedDate, "yyyy-MM-dd")}...`);
@@ -212,9 +218,17 @@ export default function DashboardPage({ params }: PageProps) {
       
       // Set up polling interval (10s, same as main page)
       const intervalId = window.setInterval(() => {
-        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        // Check if we're still looking at today's data using the ref
+        const currentTodayStr = format(new Date(), "yyyy-MM-dd");
+        const currentSelectedDateStr = format(selectedDateRef.current, "yyyy-MM-dd");
+        const stillToday = currentSelectedDateStr === currentTodayStr;
+        
+        if (stillToday && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
           console.log(`🔄 Polling today's workflow runs (10s interval)...`);
-          loadWorkflowRuns(selectedDate, true); // Pass isPolling=true
+          loadWorkflowRuns(selectedDateRef.current, true); // Pass isPolling=true
+        } else if (!stillToday) {
+          console.log(`📊 Stopping polling - no longer looking at today's data`);
+          window.clearInterval(intervalId);
         }
       }, 10000); // 10s
       
@@ -257,6 +271,57 @@ export default function DashboardPage({ params }: PageProps) {
     });
     
     return hourlyData;
+  }, [workflowRuns]);
+
+  // Helper function to calculate overview metrics
+  const calculateOverviewMetrics = useCallback(() => {
+    const completedRuns = workflowRuns.filter(run => run.status === 'completed').length;
+    const totalRuns = workflowRuns.length;
+    const successRate = totalRuns > 0 ? Math.round((completedRuns / totalRuns) * 100) : 0;
+    
+    // Calculate total runtime
+    const totalRuntimeMs = workflowRuns.reduce((total, run) => {
+      if (run.run_started_at && run.updated_at) {
+        const start = new Date(run.run_started_at);
+        const end = new Date(run.updated_at);
+        return total + (end.getTime() - start.getTime());
+      }
+      return total;
+    }, 0);
+    
+    const hours = Math.floor(totalRuntimeMs / (1000 * 60 * 60));
+    const minutes = Math.floor((totalRuntimeMs % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((totalRuntimeMs % (1000 * 60)) / 1000);
+    const totalRuntime = `${hours}h ${minutes}m ${seconds}s`;
+    
+    // Calculate runs per hour stats
+    const runsByHour = generateRunsByHour();
+    const counts = runsByHour.map(r => r.count);
+    const avgRunsPerHour = counts.length > 0 ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length * 10) / 10 : 0;
+    const minRunsPerHour = Math.min(...counts);
+    const maxRunsPerHour = Math.max(...counts);
+    
+    return {
+      successRate,
+      completedRuns,
+      totalRuntime,
+      didntRunCount: totalRuns - completedRuns,
+      avgRunsPerHour,
+      minRunsPerHour,
+      maxRunsPerHour
+    };
+  }, [workflowRuns, generateRunsByHour]);
+
+  // Helper function to calculate health metrics
+  const calculateHealthMetrics = useCallback(() => {
+    // For now, using placeholder values - these would need more complex logic
+    // based on comparing runs between different time periods
+    return {
+      consistentCount: workflowRuns.filter(run => run.conclusion === 'success').length,
+      improvedCount: 0, // Would need comparison logic
+      regressedCount: 0, // Would need comparison logic
+      stillFailingCount: workflowRuns.filter(run => run.conclusion === 'failure').length
+    };
   }, [workflowRuns]);
 
   // Format repository display name - use the same logic as the repo card
@@ -307,23 +372,29 @@ export default function DashboardPage({ params }: PageProps) {
       </div>
 
       {/* Daily Metrics */}
-      {!isLoadingWorkflows && !isLoadingRuns && (
-        <DailyMetrics
-          successRate={47}
-          completedRuns={19}
-          totalRuntime="2h 48m 54s"
-          didntRunCount={0}
-          activeWorkflows={workflows.filter((w: any) => w.state !== 'disabled_manually').length}
-          consistentCount={8}
-          improvedCount={1}
-          regressedCount={1}
-          stillFailingCount={9}
-          avgRunsPerHour={1}
-          minRunsPerHour={0}
-          maxRunsPerHour={8}
-          runsByHour={generateRunsByHour()}
-        />
-      )}
+      {!isLoadingWorkflows && !isLoadingRuns && (() => {
+        const overviewMetrics = calculateOverviewMetrics();
+        const healthMetrics = calculateHealthMetrics();
+        
+        return (
+          <DailyMetrics
+            successRate={overviewMetrics.successRate}
+            completedRuns={overviewMetrics.completedRuns}
+            totalRuntime={overviewMetrics.totalRuntime}
+            didntRunCount={overviewMetrics.didntRunCount}
+            activeWorkflows={workflows.filter((w: any) => w.state !== 'disabled_manually').length}
+            consistentCount={healthMetrics.consistentCount}
+            improvedCount={healthMetrics.improvedCount}
+            regressedCount={healthMetrics.regressedCount}
+            stillFailingCount={healthMetrics.stillFailingCount}
+            avgRunsPerHour={overviewMetrics.avgRunsPerHour}
+            minRunsPerHour={overviewMetrics.minRunsPerHour}
+            maxRunsPerHour={overviewMetrics.maxRunsPerHour}
+            runsByHour={generateRunsByHour()}
+            selectedDate={selectedDate}
+          />
+        );
+      })()}
 
       {/* Show workflows or loading skeleton */}
       <div className="space-y-4">
