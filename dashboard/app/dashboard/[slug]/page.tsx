@@ -315,7 +315,8 @@ export default function DashboardPage({ params }: PageProps) {
       }
     });
     
-    return hourlyData;
+    // Only return hours that have actual runs
+    return hourlyData.filter(data => data.count > 0);
   }, [workflowRuns]);
 
   // Helper function to calculate overview metrics
