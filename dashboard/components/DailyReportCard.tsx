@@ -4,7 +4,7 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Clock, XCircle, ArrowDown, ArrowUp } from "lucide-react";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { RadialBar, RadialBarChart, Bar, BarChart, ResponsiveContainer } from "recharts";
+import { RadialBar, RadialBarChart, Bar, BarChart, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import type { WorkflowRun } from "@/lib/github";
 
 
@@ -68,24 +68,22 @@ function Donut({ passed, failed }: { passed: number; failed: number }) {
         config={chartConfig}
         className="h-full w-full"
       >
-        <RadialBarChart
-          cx="50%"
-          cy="50%"
-          innerRadius="60%"
-          outerRadius="90%"
-          data={chartData}
-          startAngle={90}
-          endAngle={-270}
-        >
-          <RadialBar
+        <PieChart>
+          <Pie
+            data={chartData}
+            cx="50%"
+            cy="50%"
+            innerRadius={30}
+            outerRadius={45}
             dataKey="value"
-            cornerRadius={4}
-            fill="var(--color-Passed)"
-            animationBegin={0}
-            animationDuration={1000}
-            animationEasing="ease-out"
-          />
-        </RadialBarChart>
+            startAngle={90}
+            endAngle={-270}
+          >
+            {chartData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.fill} />
+            ))}
+          </Pie>
+        </PieChart>
       </ChartContainer>
       <div className="absolute inset-0 grid place-items-center">
         <div className="text-sm font-semibold">{passedPercentage}%</div>
@@ -114,28 +112,33 @@ function MetricsHorizontalBars({ segments }: { segments: Array<{ label: string; 
   );
 }
 
-function AreaSpark({ runs, width = 420, height = 120 }: { runs: WorkflowRun[]; width?: number; height?: number }) {
+function AreaSpark({ runs }: { runs: WorkflowRun[] }) {
   const buckets = new Array(24).fill(0) as number[];
   runs.forEach((r) => {
     const h = new Date(r.run_started_at).getHours();
     buckets[h] += 1;
   });
-  const max = Math.max(1, ...buckets);
-  const pad = 8;
-  const stepX = (width - pad * 2) / 23;
-  const points = buckets.map((v, i) => {
-    const x = pad + i * stepX;
-    const y = height - pad - (v / max) * (height - pad * 2);
-    return [x, y] as const;
-  });
-  const path = points.map((p, i) => (i === 0 ? `M ${p[0]} ${p[1]}` : `L ${p[0]} ${p[1]}`)).join(' ');
-  const lastX = pad + (buckets.length - 1) * stepX;
-  const area = `${path} L ${lastX} ${height - pad} L ${pad} ${height - pad} Z`;
+  
+  const chartData = buckets.map((count, hour) => ({
+    hour: hour.toString(),
+    count
+  }));
+
+  const chartConfig = {
+    count: {
+      label: "Runs",
+    },
+  };
+
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} preserveAspectRatio="none" className="block mx-auto">
-      <path d={area} fill="rgba(255,255,255,0.15)" />
-      <path d={path} stroke="white" strokeWidth={2} fill="none" />
-    </svg>
+    <ChartContainer
+      config={chartConfig}
+      className="h-32"
+    >
+      <BarChart data={chartData}>
+        <Bar dataKey="count" fill="hsl(var(--foreground))" fillOpacity={0.7} />
+      </BarChart>
+    </ChartContainer>
   );
 }
 
@@ -292,7 +295,7 @@ export default function DailyReportCard({ repoSlug, todayRuns, yesterdayRuns, ov
             <div className="text-sm text-muted-foreground">Runs by hour</div>
             {runsChart === 'area' ? (
               <>
-                <AreaSpark runs={todayRuns} width={sparkWidth} height={sparkHeight} />
+                <AreaSpark runs={todayRuns} />
                 <HourlyLegend runs={todayRuns} />
               </>
             ) : (
@@ -315,35 +318,43 @@ function formatDuration(seconds: number): string {
 }
 
 function MiniPie({ segments }: { segments: Array<{ color: string; value: number; label: string }> }) {
-  const total = Math.max(1, segments.reduce((s, x) => s + x.value, 0));
-  const radius = 34;
-  const C = 2 * Math.PI * radius;
-  let offset = 0;
+  const chartData = segments.map((segment, index) => ({
+    name: segment.label || `Segment ${index + 1}`,
+    value: segment.value,
+    fill: segment.color
+  }));
+
+  const chartConfig = segments.reduce((config, segment, index) => {
+    const key = segment.label || `Segment${index + 1}`;
+    config[key] = {
+      label: segment.label || `Segment ${index + 1}`,
+      color: segment.color,
+    };
+    return config;
+  }, {} as any);
+
   return (
     <div className="relative w-[90px] h-[90px]">
-      <svg width="90" height="90" className="-rotate-90">
-        <circle cx="45" cy="45" r={radius} fill="none" stroke="hsl(var(--muted))" strokeWidth="10" />
-        {segments.map((s, i) => {
-          const pct = s.value / total;
-          const el = (
-            <circle
-              key={i}
-              cx="45"
-              cy="45"
-              r={radius}
-              fill="none"
-              stroke={s.color}
-              strokeWidth="10"
-              strokeDasharray={C}
-              strokeDashoffset={C - pct * C}
-              transform={`rotate(${offset * 360} 45 45)`}
-              strokeLinecap="butt"
-            />
-          );
-          offset += pct;
-          return el;
-        })}
-      </svg>
+      <ChartContainer
+        config={chartConfig}
+        className="h-full w-full"
+      >
+        <RadialBarChart
+          cx="50%"
+          cy="50%"
+          innerRadius="60%"
+          outerRadius="90%"
+          data={chartData}
+          startAngle={90}
+          endAngle={-270}
+        >
+          <RadialBar
+            dataKey="value"
+            cornerRadius={4}
+            fill="var(--color-Segment1)"
+          />
+        </RadialBarChart>
+      </ChartContainer>
     </div>
   );
 }

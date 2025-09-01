@@ -1,6 +1,6 @@
 import { CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, AlertTriangle, Workflow } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label, PolarRadiusAxis, RadialBar, RadialBarChart, Bar, BarChart, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { Label, PolarRadiusAxis, RadialBar, RadialBarChart, Bar, BarChart, PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 
@@ -63,21 +63,22 @@ function PassFailPieChart({ passed, failed }: { passed: number; failed: number }
           config={chartConfig}
           className="h-32 w-32"
         >
-          <RadialBarChart
-            cx="50%"
-            cy="50%"
-            innerRadius="60%"
-            outerRadius="90%"
-            data={chartData}
-            startAngle={90}
-            endAngle={-270}
-          >
-            <RadialBar
+          <PieChart>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              innerRadius={40}
+              outerRadius={60}
               dataKey="value"
-              cornerRadius={4}
-              fill="var(--color-Passed)"
-            />
-          </RadialBarChart>
+              startAngle={90}
+              endAngle={-270}
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.fill} />
+              ))}
+            </Pie>
+          </PieChart>
         </ChartContainer>
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-lg font-semibold">
