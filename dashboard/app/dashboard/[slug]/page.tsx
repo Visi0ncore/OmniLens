@@ -251,12 +251,10 @@ export default function DashboardPage({ params }: PageProps) {
             variant="outline"
             size="sm"
             className="flex items-center gap-2"
-            asChild
+            disabled
           >
-            <Link href={`/dashboard/${repoSlug}/report`}>
-              <BarChart3 className="h-4 w-4" />
-              Report
-            </Link>
+            <BarChart3 className="h-4 w-4" />
+            Report
           </Button>
           <Button
             variant={isSelectedDateToday ? "default" : "outline"}
@@ -270,8 +268,13 @@ export default function DashboardPage({ params }: PageProps) {
           <DatePicker
             date={selectedDate}
             onDateChange={(date) => {
+              console.log('DatePicker onDateChange called with:', date);
               if (date) {
+                console.log('Setting selected date to:', date);
                 setSelectedDate(date);
+                // Load workflow runs for the newly selected date
+                const dateStr = format(date, 'yyyy-MM-dd');
+                loadWorkflowRuns(dateStr);
               }
             }}
             placeholder="Select Date"
