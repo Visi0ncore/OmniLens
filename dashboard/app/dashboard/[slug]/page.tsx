@@ -11,6 +11,7 @@ import Link from "next/link";
 import { removeEmojiFromWorkflowName } from "@/lib/utils";
 import type { WorkflowRun } from "@/lib/github";
 import WorkflowCard from "@/components/WorkflowCard";
+import DailyMetrics from "@/components/DailyMetrics";
 
 // Helper function to format repository name for display
 function formatRepoDisplayName(repoName: string): string {
@@ -288,6 +289,24 @@ export default function DashboardPage({ params }: PageProps) {
         </div>
       </div>
 
+      {/* Daily Metrics */}
+      {!isLoadingWorkflows && !isLoadingRuns && (
+        <DailyMetrics
+          successRate={47}
+          completedRuns={19}
+          totalRuntime="2h 48m 54s"
+          didntRunCount={0}
+          activeWorkflows={workflows.filter((w: any) => w.state !== 'disabled_manually').length}
+          consistentCount={8}
+          improvedCount={1}
+          regressedCount={1}
+          stillFailingCount={9}
+          avgRunsPerHour={1}
+          minRunsPerHour={0}
+          maxRunsPerHour={8}
+        />
+      )}
+
       {/* Show workflows or loading skeleton */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
@@ -295,11 +314,6 @@ export default function DashboardPage({ params }: PageProps) {
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
             Workflows
           </h2>
-          {!isLoadingWorkflows && (
-            <Badge variant="secondary" className="text-xs">
-              {workflows.length}
-            </Badge>
-          )}
         </div>
         {/* Active Workflows */}
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -358,9 +372,6 @@ export default function DashboardPage({ params }: PageProps) {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-medium">Disabled Workflows</h3>
-              <Badge variant="secondary" className="text-xs">
-                {workflows.filter((w: any) => w.state === 'disabled_manually').length}
-              </Badge>
             </div>
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {workflows
