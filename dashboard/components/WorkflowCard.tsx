@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, Check, Eye } from "lucide-react";
+import { Clock, ExternalLink, Check, Eye, CheckCircle, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import type { WorkflowRun } from "@/lib/github";
@@ -37,6 +37,13 @@ interface WorkflowCardProps {
   isHighlighted?: boolean;
   highlightColor?: string;
   rightAction?: React.ReactNode; // Optional right-side action button (e.g., delete)
+  healthStatus?: 'consistent' | 'improved' | 'regressed' | 'still_failing';
+  healthMetrics?: {
+    status: 'consistent' | 'improved' | 'regressed' | 'still_failing';
+    totalRuns: number;
+    successfulRuns: number;
+    failedRuns: number;
+  };
 }
 
 export default function WorkflowCard({
@@ -45,7 +52,9 @@ export default function WorkflowCard({
   workflowState,
   isHighlighted = false,
   highlightColor = '',
-  rightAction
+  rightAction,
+  healthStatus,
+  healthMetrics
 }: WorkflowCardProps) {
   const status = run.conclusion ?? run.status;
   const isMissing = (run as any).isMissing === true || status === 'missing' || status === 'idle';
@@ -168,7 +177,69 @@ export default function WorkflowCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 space-y-3">
+        {/* Health Status Section */}
+        {healthStatus && (
+          <div className="flex items-center gap-2">
+            {(() => {
+              const getHealthIcon = () => {
+                switch (healthStatus) {
+                  case 'consistent':
+                    return <CheckCircle className="h-4 w-4 text-green-500" />;
+                  case 'improved':
+                    return <TrendingUp className="h-4 w-4 text-blue-500" />;
+                  case 'regressed':
+                    return <TrendingDown className="h-4 w-4 text-orange-500" />;
+                  case 'still_failing':
+                    return <AlertTriangle className="h-4 w-4 text-red-500" />;
+                  default:
+                    return null;
+                }
+              };
+
+              const getHealthLabel = () => {
+                switch (healthStatus) {
+                  case 'consistent':
+                    return 'Consistent';
+                  case 'improved':
+                    return 'Improved';
+                  case 'regressed':
+                    return 'Regressed';
+                  case 'still_failing':
+                    return 'Still Failing';
+                  default:
+                    return '';
+                }
+              };
+
+              const getHealthColor = () => {
+                switch (healthStatus) {
+                  case 'consistent':
+                    return 'text-green-500';
+                  case 'improved':
+                    return 'text-blue-500';
+                  case 'regressed':
+                    return 'text-orange-500';
+                  case 'still_failing':
+                    return 'text-red-500';
+                  default:
+                    return 'text-muted-foreground';
+                }
+              };
+
+              return (
+                <>
+                  {getHealthIcon()}
+                  <span className={`text-sm font-medium ${getHealthColor()}`}>
+                    {getHealthLabel()}
+                  </span>
+                </>
+              );
+            })()}
+          </div>
+        )}
+        
+        {/* Duration and View Button */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />

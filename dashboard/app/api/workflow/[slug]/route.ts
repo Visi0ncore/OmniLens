@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getUserRepo, saveWorkflows, getWorkflows } from '@/lib/db-storage';
-import { getLatestWorkflowRuns, getWorkflowRunsForDate } from '@/lib/github';
+import { getLatestWorkflowRuns, getWorkflowRunsForDate, getWorkflowRunsForDateGrouped } from '@/lib/github';
 
 // Zod schemas for validation
 const slugSchema = z.string().min(1, 'Repository slug is required');
@@ -96,13 +96,14 @@ export async function GET(
     // Check if this is a request for workflow runs (with date parameter)
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
+    const grouped = searchParams.get('grouped') === 'true';
     
     if (date) {
       try {
         // Validate date parameter
         const validatedDate = dateSchema.parse(date);
         // Handle workflow runs request
-        return await handleWorkflowRunsRequest(validatedSlug, repo, validatedDate);
+        return await handleWorkflowRunsRequest(validatedSlug, repo, validatedDate, grouped);
       } catch (error) {
         if (error instanceof z.ZodError) {
           return NextResponse.json(
@@ -239,12 +240,15 @@ export async function GET(
 async function handleWorkflowRunsRequest(
   slug: string,
   repo: any,
-  date: string
+  date: string,
+  grouped: boolean = false
 ) {
   try {
     // The getWorkflowRunsForDate function handles all GitHub API calls and error handling
     const dateObj = new Date(date);
-    const workflowRuns = await getWorkflowRunsForDate(dateObj, slug);
+    const workflowRuns = grouped 
+      ? await getWorkflowRunsForDateGrouped(dateObj, slug)
+      : await getWorkflowRunsForDate(dateObj, slug);
     
     // Calculate overview data
     const completedRuns = workflowRuns.filter(run => run.status === 'completed').length;

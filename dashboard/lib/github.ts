@@ -122,7 +122,7 @@ export function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[
 
 
 
-// Get workflow runs for a specific date and repository
+// Get workflow runs for a specific date and repository (for daily metrics - returns all runs)
 export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Promise<WorkflowRun[]> {
   try {
     const { token, repo } = await getRepoInfo(repoSlug);
@@ -205,7 +205,97 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
       return runStartTime >= targetDateStart && runStartTime <= targetDateEnd;
     });
 
-    // Group by workflow and collect all run data for the UI
+    // For daily metrics, return ALL runs for the day, not just the latest per workflow
+    return filteredRuns;
+
+  } catch (error) {
+    console.error("Error fetching workflow runs:", error);
+    throw error;
+  }
+}
+
+// Get workflow runs for a specific date and repository (for workflow cards - returns grouped data)
+export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string): Promise<WorkflowRun[]> {
+  try {
+    const { token, repo } = await getRepoInfo(repoSlug);
+
+    // Format date to ISO string for GitHub API
+    const dateStr = format(date, "yyyy-MM-dd");
+
+    // Get workflow runs from midnight of the target date until now
+    const startOfDay = `${dateStr}T00:00:00Z`;
+    const now = new Date().toISOString();
+    
+    const startTime = startOfDay;
+    const endTime = now;
+    
+    // Fetch all workflow runs for the date, handling pagination
+    let allRuns: WorkflowRun[] = [];
+    let page = 1;
+    let hasMorePages = true;
+    let pagesFetched = 0;
+
+    while (hasMorePages) {
+      // Use the correct time range: from midnight of target date until now
+      const res = await fetch(
+        `${API_BASE}/repos/${repo}/actions/runs?created=${startTime}..${endTime}&per_page=100&page=${page}&_t=${Date.now()}`,
+        {
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${token}`,
+            "X-GitHub-Api-Version": "2022-11-28",
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            // Add conditional request headers to reduce unnecessary data transfer
+            'If-None-Match': '', // Will be populated if we have a cached ETag
+          },
+        }
+      );
+
+      // Handle 304 Not Modified response
+      if (res.status === 304) {
+        break; // No need to fetch more pages if data hasn't changed
+      }
+
+      if (!res.ok) {
+        // Handle specific GitHub API errors gracefully
+        if (res.status === 404) {
+          return []; // Return empty array for repositories with no workflows
+        }
+        if (res.status === 403) {
+          throw new Error(`GitHub API error: ${res.status} ${res.statusText} - Repository access denied`);
+        }
+        throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      const pageRuns = json.workflow_runs as WorkflowRun[];
+
+      allRuns = allRuns.concat(pageRuns);
+      pagesFetched++;
+
+      // Check if we need to fetch more pages
+      hasMorePages = pageRuns.length === 100; // If we got 100 results, there might be more
+      page++;
+
+      // Safety break to avoid infinite loops
+      if (page > 10) {
+        break;
+      }
+    }
+
+    // Filter runs to only include those that actually started on the target date
+    const targetDateStart = new Date(date);
+    targetDateStart.setHours(0, 0, 0, 0);
+    const targetDateEnd = new Date(date);
+    targetDateEnd.setHours(23, 59, 59, 999);
+    
+    const filteredRuns = allRuns.filter(run => {
+      const runStartTime = new Date(run.run_started_at);
+      return runStartTime >= targetDateStart && runStartTime <= targetDateEnd;
+    });
+
+    // For workflow cards, group by workflow and collect all run data for the UI
     // This shows one card per workflow but includes run_count and all_runs data
     const latestRuns = getLatestWorkflowRuns(filteredRuns);
 
