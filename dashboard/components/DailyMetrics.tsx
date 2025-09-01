@@ -14,6 +14,8 @@ interface DailyMetricsProps {
   avgRunsPerHour: number;
   minRunsPerHour: number;
   maxRunsPerHour: number;
+  runsByHour?: Array<{ hour: number; count: number }>;
+  selectedDate: Date;
 }
 
 export default function DailyMetrics({
@@ -28,7 +30,9 @@ export default function DailyMetrics({
   stillFailingCount,
   avgRunsPerHour,
   minRunsPerHour,
-  maxRunsPerHour
+  maxRunsPerHour,
+  runsByHour,
+  selectedDate
 }: DailyMetricsProps) {
   return (
     <Card>
@@ -169,9 +173,43 @@ export default function DailyMetrics({
           {/* Runs by hour Section */}
           <div className="space-y-4 h-full">
             <h3 className="text-lg font-medium">Runs by hour</h3>
-            {/* Placeholder for area chart */}
-            <div className="w-full h-28 bg-muted rounded flex items-center justify-center">
-              <span className="text-sm text-muted-foreground">Area Chart</span>
+            {/* Area Chart */}
+            <div className="w-full h-28 bg-muted rounded p-3">
+              <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                {/* Area chart path */}
+                {runsByHour && runsByHour.length > 0 && (
+                  <path
+                    d={(() => {
+                      const maxCount = Math.max(...runsByHour.map(r => r.count), 1);
+                      const points = runsByHour.map((run, index) => {
+                        const x = (index / (runsByHour.length - 1)) * 100;
+                        const y = 100 - (run.count / maxCount) * 80; // Leave 20% margin at bottom
+                        return `${x},${y}`;
+                      });
+                      const areaPath = `M ${points.join(' L ')} L ${points[points.length - 1].split(',')[0]},100 L 0,100 Z`;
+                      return areaPath;
+                    })()}
+                    fill="hsl(var(--muted-foreground))"
+                    fillOpacity="0.2"
+                    stroke="hsl(var(--foreground))"
+                    strokeWidth="0.5"
+                  />
+                )}
+              </svg>
+            </div>
+            {/* Hour Legend */}
+            <div className="text-xs text-muted-foreground text-center mt-2">
+              <div className="flex justify-between">
+                <span>0h</span>
+                <span>3h</span>
+                <span>6h</span>
+                <span>9h</span>
+                <span>12h</span>
+                <span>15h</span>
+                <span>18h</span>
+                <span>21h</span>
+                <span>23h</span>
+              </div>
             </div>
           </div>
         </div>

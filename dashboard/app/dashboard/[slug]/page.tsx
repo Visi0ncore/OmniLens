@@ -242,6 +242,23 @@ export default function DashboardPage({ params }: PageProps) {
     return workflowRuns.find(run => run.workflow_id === workflowId) || null;
   }, [workflowRuns]);
 
+  // Helper function to generate runs by hour data
+  const generateRunsByHour = useCallback(() => {
+    const hourlyData = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }));
+    
+    workflowRuns.forEach(run => {
+      if (run.run_started_at) {
+        const startDate = new Date(run.run_started_at);
+        const hour = startDate.getHours();
+        if (hour >= 0 && hour < 24) {
+          hourlyData[hour].count++;
+        }
+      }
+    });
+    
+    return hourlyData;
+  }, [workflowRuns]);
+
   // Format repository display name - use the same logic as the repo card
   const repoDisplayName = addedRepoPath ? formatRepoDisplayName(addedRepoPath) : formatRepoDisplayName(repoSlug);
 
@@ -304,6 +321,7 @@ export default function DashboardPage({ params }: PageProps) {
           avgRunsPerHour={1}
           minRunsPerHour={0}
           maxRunsPerHour={8}
+          runsByHour={generateRunsByHour()}
         />
       )}
 
