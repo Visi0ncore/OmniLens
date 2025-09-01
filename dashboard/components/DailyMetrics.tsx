@@ -1,6 +1,6 @@
 import { CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, AlertTriangle, Workflow } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from 'recharts';
+import { Label, PolarRadiusAxis, RadialBar, RadialBarChart, Bar, BarChart, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 
@@ -71,12 +71,12 @@ function PassFailPieChart({ passed, failed }: { passed: number; failed: number }
       </div>
       <div className="space-y-3">
         <div className="flex items-center gap-3">
-          <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-          <span className="text-base">Pass: {passed}</span>
+          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+          <span className="text-sm">Pass: {passed}</span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-          <span className="text-base">Fail: {failed}</span>
+          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+          <span className="text-sm">Fail: {failed}</span>
         </div>
       </div>
     </div>
@@ -159,7 +159,7 @@ export default function DailyMetrics({
       {/* Health Section */}
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="text-xl">Health</CardTitle>
+          <CardTitle className="text-xl">Workflow Health</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -204,51 +204,18 @@ export default function DailyMetrics({
           <CardTitle className="text-xl">Runs by hour</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Area Chart */}
-          <div className="w-full h-28 bg-muted rounded p-3">
-            <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-              {/* Smooth line chart */}
-              {runsByHour && runsByHour.length > 0 && (
-                <>
-                  {/* Area fill */}
-                  <path
-                    d={(() => {
-                      const maxCount = Math.max(...runsByHour.map(r => r.count), 1);
-                      const points = runsByHour.map((run, index) => {
-                        const x = (index / (runsByHour.length - 1)) * 100;
-                        const y = 100 - (run.count / maxCount) * 80; // Leave 20% margin at bottom
-                        return `${x},${y}`;
-                      });
-                      
-                      // Create area path by adding baseline
-                      const linePath = `M ${points.join(' L ')}`;
-                      const areaPath = `${linePath} L ${points[points.length - 1].split(',')[0]},100 L 0,100 Z`;
-                      return areaPath;
-                    })()}
-                    fill="hsl(var(--muted-foreground))"
-                    fillOpacity="0.2"
-                  />
-                  {/* Line stroke */}
-                  <path
-                    d={(() => {
-                      const maxCount = Math.max(...runsByHour.map(r => r.count), 1);
-                      const points = runsByHour.map((run, index) => {
-                        const x = (index / (runsByHour.length - 1)) * 100;
-                        const y = 100 - (run.count / maxCount) * 80; // Leave 20% margin at bottom
-                        return `${x},${y}`;
-                      });
-                      
-                      // Create smooth line path only
-                      return `M ${points.join(' L ')}`;
-                    })()}
-                    fill="none"
-                    stroke="hsl(var(--foreground))"
-                    strokeWidth="0.5"
-                  />
-                </>
-              )}
-            </svg>
-          </div>
+          <ChartContainer
+            config={{
+              count: {
+                label: "Runs",
+              },
+            }}
+            className="h-32"
+          >
+            <BarChart data={runsByHour}>
+              <Bar dataKey="count" fill="hsl(var(--foreground))" fillOpacity={0.7} />
+            </BarChart>
+          </ChartContainer>
         </CardContent>
       </Card>
     </div>
