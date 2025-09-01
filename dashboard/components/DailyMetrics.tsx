@@ -225,12 +225,35 @@ export default function DailyMetrics({
             config={{
               count: {
                 label: "Runs",
+                color: "hsl(var(--chart-1))",
               },
             }}
-            className="h-32"
+            className="h-36"
           >
-            <BarChart data={runsByHour}>
-              <Bar dataKey="count" fill="hsl(var(--foreground))" fillOpacity={0.7} />
+            <BarChart data={runsByHour} margin={{ left: 0, right: 0, top: 5, bottom: 5 }}>
+              <XAxis 
+                dataKey="hour" 
+                tickFormatter={(hour) => `${hour}:00`}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 12 }}
+              />
+              <YAxis 
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 12 }}
+                width={30}
+              />
+              <Bar 
+                dataKey="count" 
+                fill="var(--color-count)" 
+                radius={[2, 2, 0, 0]}
+              />
+              <ChartTooltip 
+                content={<ChartTooltipContent />}
+                cursor={false}
+                labelFormatter={(hour) => `${hour}:00`}
+              />
             </BarChart>
           </ChartContainer>
         </CardContent>
