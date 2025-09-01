@@ -56,19 +56,35 @@ function WorkflowDefinitionCard({ workflow }: { workflow: any }) {
 // Workflow Card Skeleton Component
 function WorkflowCardSkeleton() {
   return (
-    <Card className="relative h-full animate-pulse">
+    <Card className="relative h-auto border-2 border-border animate-pulse">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-6 bg-muted rounded w-32" />
-          </div>
+          <h3 className="font-semibold text-sm leading-tight truncate pr-2">
+            <div className="h-4 bg-muted rounded w-32" />
+          </h3>
           <div className="flex items-center gap-2">
-            <div className="h-5 bg-muted rounded w-8" />
-            <div className="h-5 bg-muted rounded w-16" />
+            {/* Run count badge skeleton */}
+            <div className="h-5 bg-muted rounded w-6" />
+            {/* Status badge skeleton */}
+            <div className="h-5 bg-muted rounded w-12" />
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0 space-y-3">
+        {/* Health Status Section Skeleton */}
+        <div className="flex items-center gap-2">
+          <div className="h-4 w-4 bg-muted rounded" />
+          <div className="h-4 bg-muted rounded w-20" />
+        </div>
+        
+        {/* Duration and View Button Section Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <div className="h-4 w-4 bg-muted rounded" />
+            <div className="h-4 bg-muted rounded w-16" />
+          </div>
+          <div className="h-8 bg-muted rounded w-16" />
+        </div>
       </CardContent>
     </Card>
   );
@@ -303,20 +319,30 @@ export default function DashboardPage({ params }: PageProps) {
 
   // Helper function to generate runs by hour data
   const generateRunsByHour = useCallback(() => {
-    const hourlyData = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }));
+    const hourlyData = Array.from({ length: 24 }, (_, hour) => ({ 
+      hour, 
+      passed: 0, 
+      failed: 0,
+      total: 0
+    }));
     
     workflowRuns.forEach(run => {
       if (run.run_started_at) {
         const startDate = new Date(run.run_started_at);
         const hour = startDate.getHours();
         if (hour >= 0 && hour < 24) {
-          hourlyData[hour].count++;
+          hourlyData[hour].total++;
+          if (run.conclusion === 'success') {
+            hourlyData[hour].passed++;
+          } else if (run.conclusion === 'failure') {
+            hourlyData[hour].failed++;
+          }
         }
       }
     });
     
     // Only return hours that have actual runs
-    return hourlyData.filter(data => data.count > 0);
+    return hourlyData.filter(data => data.total > 0);
   }, [workflowRuns]);
 
   // Helper function to calculate overview metrics
@@ -350,7 +376,7 @@ export default function DashboardPage({ params }: PageProps) {
     
     // Calculate runs per hour stats
     const runsByHour = generateRunsByHour();
-    const counts = runsByHour.map(r => r.count);
+    const counts = runsByHour.map(r => r.total);
     const avgRunsPerHour = counts.length > 0 ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length * 10) / 10 : 0;
     const minRunsPerHour = Math.min(...counts);
     const maxRunsPerHour = Math.max(...counts);
@@ -367,7 +393,7 @@ export default function DashboardPage({ params }: PageProps) {
       minRunsPerHour,
       maxRunsPerHour
     };
-  }, [workflowRuns, generateRunsByHour]);
+  }, [workflowRuns]);
 
 
 
@@ -501,7 +527,7 @@ export default function DashboardPage({ params }: PageProps) {
       successfulRuns: todayRuns.filter(run => run.conclusion === 'success').length,
       failedRuns: todayRuns.filter(run => run.conclusion === 'failure').length
     };
-  }, [workflowRuns, classifyWorkflowHealth]);
+  }, [workflowRuns]);
 
   // Helper function to calculate health metrics from workflow health data
   const calculateHealthMetrics = useCallback(() => {
@@ -538,7 +564,7 @@ export default function DashboardPage({ params }: PageProps) {
       regressedCount,
       stillFailingCount
     };
-  }, [workflows, classifyWorkflowHealth]);
+  }, [workflows, workflowRuns]);
 
   // Format repository display name - use the same logic as the repo card
   const repoDisplayName = addedRepoPath ? formatRepoDisplayName(addedRepoPath) : formatRepoDisplayName(repoSlug);
@@ -588,7 +614,125 @@ export default function DashboardPage({ params }: PageProps) {
       </div>
 
       {/* Daily Metrics */}
-      {!isLoadingWorkflows && !isLoadingRuns && (() => {
+      {isLoadingWorkflows || isLoadingRuns ? (
+        // Daily Metrics Skeleton
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Pass/Fail Rate Skeleton */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Pass/Fail Rate</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-6">
+                <div className="relative">
+                  <div className="h-32 w-32 bg-muted rounded-full animate-pulse" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="h-6 w-8 bg-muted rounded animate-pulse" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 bg-muted rounded-full animate-pulse" />
+                    <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 bg-muted rounded-full animate-pulse" />
+                    <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Overview Skeleton */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-8 bg-muted rounded animate-pulse" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-8 bg-muted rounded animate-pulse" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-8 bg-muted rounded animate-pulse" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Workflow Health Skeleton */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Workflow Health</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-8 bg-muted rounded animate-pulse" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-8 bg-muted rounded animate-pulse" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-8 bg-muted rounded animate-pulse" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-8 bg-muted rounded animate-pulse" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Runs by hour Skeleton */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Runs by hour</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-36 bg-muted rounded animate-pulse" />
+            </CardContent>
+          </Card>
+        </div>
+      ) : (() => {
         const overviewMetrics = calculateOverviewMetrics();
         const healthMetrics = calculateHealthMetrics();
         

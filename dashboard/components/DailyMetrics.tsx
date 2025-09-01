@@ -20,7 +20,7 @@ interface DailyMetricsProps {
   avgRunsPerHour: number;
   minRunsPerHour: number;
   maxRunsPerHour: number;
-  runsByHour?: Array<{ hour: number; count: number }>;
+  runsByHour?: Array<{ hour: number; passed: number; failed: number; total: number }>;
   selectedDate: Date;
 }
 
@@ -223,9 +223,13 @@ export default function DailyMetrics({
         <CardContent>
           <ChartContainer
             config={{
-              count: {
-                label: "Runs",
+              passed: {
+                label: "Passed",
                 color: "hsl(var(--chart-1))",
+              },
+              failed: {
+                label: "Failed", 
+                color: "hsl(var(--chart-2))",
               },
             }}
             className="h-36"
@@ -245,8 +249,15 @@ export default function DailyMetrics({
                 width={30}
               />
               <Bar 
-                dataKey="count" 
-                fill="var(--color-count)" 
+                dataKey="passed" 
+                stackId="runs"
+                fill="var(--color-passed)" 
+                radius={[0, 0, 0, 0]}
+              />
+              <Bar 
+                dataKey="failed" 
+                stackId="runs"
+                fill="var(--color-failed)" 
                 radius={[2, 2, 0, 0]}
               />
               <ChartTooltip 

@@ -573,7 +573,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#0D0D0D]">
-      <div className="p-6 space-y-8">
+      <div className="container mx-auto p-6 space-y-8">
         <div className="flex justify-end mb-6">
           <div className="flex items-center gap-2">
             {showAddForm && (
