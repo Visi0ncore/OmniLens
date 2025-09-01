@@ -33,15 +33,15 @@ export default function DailyMetrics({
   return (
     <Card>
       <CardContent className="p-6">
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 items-start">
           {/* Overview Section */}
-          <div className="space-y-4">
+          <div className="space-y-4 h-full">
             <h3 className="text-lg font-medium">Overview</h3>
             <div className="flex items-start gap-4">
               {/* Daily Success Rate */}
               <div className="flex flex-col items-center space-y-2">
-                <div className="relative w-20 h-20">
-                  <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
+                <div className="relative w-24 h-24">
+                  <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
                     {/* Background circle */}
                     <circle
                       cx="50"
@@ -77,35 +77,35 @@ export default function DailyMetrics({
                     <CheckCircle className="h-4 w-4 text-green-500" />
                     <span className="text-sm">Completed</span>
                   </div>
-                  <span className="text-sm font-medium">{completedRuns}</span>
+                  <span className="text-sm font-medium ml-2">{completedRuns}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-purple-500" />
                     <span className="text-sm">Total Runtime</span>
                   </div>
-                  <span className="text-sm font-medium">{totalRuntime}</span>
+                  <span className="text-sm font-medium ml-2">{totalRuntime}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <XCircle className="h-4 w-4 text-red-500" />
                     <span className="text-sm">Didn't run</span>
                   </div>
-                  <span className="text-sm font-medium">{didntRunCount}</span>
+                  <span className="text-sm font-medium ml-2">{didntRunCount}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Workflow className="h-4 w-4 text-blue-500" />
                     <span className="text-sm">Workflows</span>
                   </div>
-                  <span className="text-sm font-medium">{activeWorkflows}</span>
+                  <span className="text-sm font-medium ml-2">{activeWorkflows}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Health Section */}
-          <div className="space-y-4">
+          <div className="space-y-4 h-full">
             <h3 className="text-lg font-medium">Health</h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
@@ -167,10 +167,10 @@ export default function DailyMetrics({
           </div>
 
           {/* Runs by hour Section */}
-          <div className="space-y-4">
+          <div className="space-y-4 h-full">
             <h3 className="text-lg font-medium">Runs by hour</h3>
             {/* Placeholder for area chart */}
-            <div className="w-full h-24 bg-muted rounded flex items-center justify-center">
+            <div className="w-full h-28 bg-muted rounded flex items-center justify-center">
               <span className="text-sm text-muted-foreground">Area Chart</span>
             </div>
           </div>
