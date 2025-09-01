@@ -22,7 +22,7 @@ export default function CompactMetricsOverview({
       {/* Success Rate with Progress Bar */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Success Rate</span>
+          <span className="text-xs text-muted-foreground">Daily Success Rate</span>
           <span className="text-xs font-medium">{successRate}%</span>
         </div>
         <div className="w-full bg-muted rounded-full h-1.5">

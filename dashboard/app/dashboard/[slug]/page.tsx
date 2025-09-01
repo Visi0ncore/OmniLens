@@ -165,7 +165,14 @@ export default function DashboardPage({ params }: PageProps) {
         if (response.ok) {
           const data = await response.json();
           const sortedWorkflows = (data.workflows || []).sort((a: any, b: any) => {
-            // Sort by workflow name without emojis
+            // First, sort by state: active workflows first, then disabled
+            const aIsDisabled = a.state === 'disabled_manually';
+            const bIsDisabled = b.state === 'disabled_manually';
+            
+            if (aIsDisabled && !bIsDisabled) return 1; // a is disabled, b is active
+            if (!aIsDisabled && bIsDisabled) return -1; // a is active, b is disabled
+            
+            // If both have the same state, sort by workflow name without emojis
             const nameA = removeEmojiFromWorkflowName(a.name || '');
             const nameB = removeEmojiFromWorkflowName(b.name || '');
             return nameA.localeCompare(nameB);
@@ -294,40 +301,99 @@ export default function DashboardPage({ params }: PageProps) {
             </Badge>
           )}
         </div>
+        {/* Active Workflows */}
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {isLoadingWorkflows || isLoadingRuns ? (
-            // Show 3 rows of skeleton cards (9 total)
-            Array.from({ length: 9 }).map((_, index) => (
+            // Show skeleton cards for active workflows (6 cards)
+            Array.from({ length: 6 }).map((_, index) => (
               <WorkflowCardSkeleton key={index} />
             ))
           ) : (
-            workflows.map((workflow: any) => {
-              const runData = getWorkflowRunData(workflow.id);
-              
-              // If no run data, create a mock run to show the workflow as idle
-              const mockRun: WorkflowRun = {
-                id: 0,
-                name: workflow.name,
-                workflow_id: workflow.id,
-                path: workflow.path,
-                conclusion: null,
-                status: 'idle',
-                html_url: '',
-                run_started_at: '',
-                updated_at: '',
-                isMissing: true
-              };
+            workflows
+              .filter((workflow: any) => workflow.state !== 'disabled_manually')
+              .map((workflow: any) => {
+                const runData = getWorkflowRunData(workflow.id);
+                
+                // If no run data, create a mock run to show the workflow as idle
+                const mockRun: WorkflowRun = {
+                  id: 0,
+                  name: workflow.name,
+                  workflow_id: workflow.id,
+                  path: workflow.path,
+                  conclusion: null,
+                  status: 'idle',
+                  html_url: '',
+                  run_started_at: '',
+                  updated_at: '',
+                  isMissing: true
+                };
 
-              return (
-                <WorkflowCard
-                  key={workflow.id}
-                  run={runData || mockRun}
-                  repoSlug={repoSlug}
-                />
-              );
-            })
+                return (
+                  <WorkflowCard
+                    key={workflow.id}
+                    run={runData || mockRun}
+                    workflowState={workflow.state}
+                    repoSlug={repoSlug}
+                  />
+                );
+              })
           )}
         </div>
+
+        {/* Disabled Workflows */}
+        {(isLoadingWorkflows || isLoadingRuns) ? (
+          // Show skeleton section for disabled workflows during loading
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="h-6 bg-muted rounded w-32" />
+              <div className="h-5 bg-muted rounded w-8" />
+            </div>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <WorkflowCardSkeleton key={`disabled-${index}`} />
+              ))}
+            </div>
+          </div>
+        ) : workflows.filter((w: any) => w.state === 'disabled_manually').length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-medium">Disabled Workflows</h3>
+              <Badge variant="secondary" className="text-xs">
+                {workflows.filter((w: any) => w.state === 'disabled_manually').length}
+              </Badge>
+            </div>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {workflows
+                .filter((workflow: any) => workflow.state === 'disabled_manually')
+                .map((workflow: any) => {
+                  const runData = getWorkflowRunData(workflow.id);
+                  
+                  // If no run data, create a mock run to show the workflow as idle
+                  const mockRun: WorkflowRun = {
+                    id: 0,
+                    name: workflow.name,
+                    workflow_id: workflow.id,
+                    path: workflow.path,
+                    conclusion: null,
+                    status: 'idle',
+                    html_url: '',
+                    run_started_at: '',
+                    updated_at: '',
+                    isMissing: true
+                  };
+
+                  return (
+                    <WorkflowCard
+                      key={workflow.id}
+                      run={runData || mockRun}
+                      workflowState={workflow.state}
+                      repoSlug={repoSlug}
+                    />
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

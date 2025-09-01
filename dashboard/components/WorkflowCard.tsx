@@ -33,6 +33,7 @@ function formatRunTime(dateString: string): string {
 interface WorkflowCardProps {
   run: WorkflowRun;
   repoSlug: string; // Repository slug for config context
+  workflowState?: string; // Workflow state from database (e.g., "active", "disabled_manually")
   isHighlighted?: boolean;
   highlightColor?: string;
   rightAction?: React.ReactNode; // Optional right-side action button (e.g., delete)
@@ -41,6 +42,7 @@ interface WorkflowCardProps {
 export default function WorkflowCard({
   run,
   repoSlug,
+  workflowState,
   isHighlighted = false,
   highlightColor = '',
   rightAction
@@ -50,7 +52,7 @@ export default function WorkflowCard({
   const isSuccess = !isMissing && status === "success";
   const isInProgress = !isMissing && (status === "in_progress" || status === 'queued');
   const isIdle = isMissing && !run.run_started_at;
-  const isDisabled = status === 'disabled';
+  const isDisabled = workflowState === 'disabled_manually';
 
   // Determine border classes
   const getBorderClass = () => {
@@ -177,19 +179,19 @@ export default function WorkflowCard({
             </span>
           </div>
           <div className="flex items-center gap-2">
-                          {run.html_url && !isIdle ? (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={run.html_url} target="_blank">
-                    <Eye className="h-3 w-3 mr-1" />
-                    View
-                  </Link>
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" disabled>
+            {run.html_url && !isIdle ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={run.html_url} target="_blank">
                   <Eye className="h-3 w-3 mr-1" />
-                  No Run
-                </Button>
-              )}
+                  View
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" disabled>
+                <Eye className="h-3 w-3 mr-1" />
+                No Run
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>
