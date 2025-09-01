@@ -30,39 +30,55 @@ function PassFailPieChart({ passed, failed }: { passed: number; failed: number }
   if (total === 0) return null;
 
   const passedPercentage = (passed / total) * 100;
-  const failedPercentage = (failed / total) * 100;
 
-  // SVG pie chart with simple arcs - increased size
-  const radius = 50;
-  const circumference = 2 * Math.PI * radius;
-  const passedOffset = circumference - (passedPercentage / 100) * circumference;
+  // Prepare data for the radial bar chart
+  const chartData = [
+    {
+      name: "Passed",
+      value: passed,
+      fill: "hsl(var(--chart-1))"
+    },
+    {
+      name: "Failed", 
+      value: failed,
+      fill: "hsl(var(--chart-2))"
+    }
+  ];
+
+  const chartConfig = {
+    Passed: {
+      label: "Passed",
+      color: "hsl(var(--chart-1))",
+    },
+    Failed: {
+      label: "Failed", 
+      color: "hsl(var(--chart-2))",
+    },
+  };
 
   return (
     <div className="flex items-center gap-6">
       <div className="relative">
-        <svg width="120" height="120" className="transform -rotate-90">
-          {/* Background circle */}
-          <circle
-            cx="60"
-            cy="60"
-            r={radius}
-            fill="none"
-            stroke="hsl(var(--muted))"
-            strokeWidth="10"
-          />
-          {/* Passed portion */}
-          <circle
-            cx="60"
-            cy="60"
-            r={radius}
-            fill="none"
-            stroke="rgb(34, 197, 94)"
-            strokeWidth="10"
-            strokeDasharray={circumference}
-            strokeDashoffset={passedOffset}
-            strokeLinecap="round"
-          />
-        </svg>
+        <ChartContainer
+          config={chartConfig}
+          className="h-32 w-32"
+        >
+          <RadialBarChart
+            cx="50%"
+            cy="50%"
+            innerRadius="60%"
+            outerRadius="90%"
+            data={chartData}
+            startAngle={90}
+            endAngle={-270}
+          >
+            <RadialBar
+              dataKey="value"
+              cornerRadius={4}
+              fill="var(--color-Passed)"
+            />
+          </RadialBarChart>
+        </ChartContainer>
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-lg font-semibold">
             {Math.round(passedPercentage)}%

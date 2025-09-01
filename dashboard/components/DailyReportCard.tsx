@@ -3,6 +3,8 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Clock, XCircle, ArrowDown, ArrowUp } from "lucide-react";
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { RadialBar, RadialBarChart, Bar, BarChart, ResponsiveContainer } from "recharts";
 import type { WorkflowRun } from "@/lib/github";
 
 
@@ -33,44 +35,60 @@ interface Props {
 
 function Donut({ passed, failed }: { passed: number; failed: number }) {
   const total = Math.max(1, passed + failed);
-  const radius = 36;
-  const C = 2 * Math.PI * radius;
-  const passedPct = passed / total;
-  const failedPct = failed / total;
+  const passedPercentage = Math.round((passed / total) * 100);
+
+  // Prepare data for the radial bar chart
+  const chartData = [
+    {
+      name: "Passed",
+      value: passed,
+      fill: "hsl(var(--chart-1))"
+    },
+    {
+      name: "Failed", 
+      value: failed,
+      fill: "hsl(var(--chart-2))"
+    }
+  ];
+
+  const chartConfig = {
+    Passed: {
+      label: "Passed",
+      color: "hsl(var(--chart-1))",
+    },
+    Failed: {
+      label: "Failed", 
+      color: "hsl(var(--chart-2))",
+    },
+  };
+
   return (
     <div className="relative w-[96px] h-[96px]">
-      <svg width="96" height="96" className="-rotate-90">
-        <circle cx="48" cy="48" r={radius} fill="none" stroke="hsl(var(--muted))" strokeWidth="10" />
-        {passed > 0 && (
-          <circle
-            cx="48"
-            cy="48"
-            r={radius}
-            fill="none"
-            stroke="rgb(34, 197, 94)"
-            strokeWidth="10"
-            strokeDasharray={C}
-            strokeDashoffset={C - passedPct * C}
-            strokeLinecap="round"
+      <ChartContainer
+        config={chartConfig}
+        className="h-full w-full"
+      >
+        <RadialBarChart
+          cx="50%"
+          cy="50%"
+          innerRadius="60%"
+          outerRadius="90%"
+          data={chartData}
+          startAngle={90}
+          endAngle={-270}
+        >
+          <RadialBar
+            dataKey="value"
+            cornerRadius={4}
+            fill="var(--color-Passed)"
+            animationBegin={0}
+            animationDuration={1000}
+            animationEasing="ease-out"
           />
-        )}
-        {failed > 0 && (
-          <circle
-            cx="48"
-            cy="48"
-            r={radius}
-            fill="none"
-            stroke="rgb(239, 68, 68)"
-            strokeWidth="10"
-            strokeDasharray={C}
-            strokeDashoffset={C - failedPct * C}
-            transform={`rotate(${passedPct * 360} 48 48)`}
-            strokeLinecap="round"
-          />
-        )}
-      </svg>
+        </RadialBarChart>
+      </ChartContainer>
       <div className="absolute inset-0 grid place-items-center">
-        <div className="text-sm font-semibold">{Math.round((passed / total) * 100)}%</div>
+        <div className="text-sm font-semibold">{passedPercentage}%</div>
       </div>
     </div>
   );
@@ -207,10 +225,10 @@ export default function DailyReportCard({ repoSlug, todayRuns, yesterdayRuns, ov
   const { consistent, improved, regressed, regressing } = compareDaily(todayRuns, yesterdayRuns);
   const totalDaily = consistent + improved + regressed + regressing;
   const metricSegments = [
-    { label: 'Consistent', value: consistent, color: 'rgb(34, 197, 94)' },
-    { label: 'Improved', value: improved, color: 'rgb(59, 130, 246)' },
-    { label: 'Regressed', value: regressed, color: 'rgb(249, 115, 22)' },
-    { label: 'Still failing', value: regressing, color: 'rgb(239, 68, 68)' },
+    { label: 'Consistent', value: consistent, color: 'hsl(var(--chart-1))' },
+    { label: 'Improved', value: improved, color: 'hsl(var(--chart-2))' },
+    { label: 'Regressed', value: regressed, color: 'hsl(var(--chart-3))' },
+    { label: 'Still failing', value: regressing, color: 'hsl(var(--chart-4))' },
   ];
 
   return (
