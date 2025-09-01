@@ -273,8 +273,7 @@ export default function DashboardPage({ params }: PageProps) {
                 console.log('Setting selected date to:', date);
                 setSelectedDate(date);
                 // Load workflow runs for the newly selected date
-                const dateStr = format(date, 'yyyy-MM-dd');
-                loadWorkflowRuns(dateStr);
+                loadWorkflowRuns(date);
               }
             }}
             placeholder="Select Date"

@@ -20,7 +20,6 @@
     "@prisma/client": "^6.15.0",
     "@radix-ui/react-popover": "^1.1.14",
     "@radix-ui/react-slot": "^1.2.3",
-    "@tanstack/react-query": "^4.35.0",
     "@types/pg": "^8.15.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
