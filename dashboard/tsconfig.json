@@ -18,10 +18,7 @@
     "jsx": "preserve",
     "esModuleInterop": true,
     "incremental": true,
-    "types": [
-      "vitest/globals",
-      "@testing-library/jest-dom"
-    ],
+    "types": [],
     "baseUrl": ".",
     "paths": {
       "@/*": [

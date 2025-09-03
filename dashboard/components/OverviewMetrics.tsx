@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Play, Pause, Clock, XCircle, Calendar } from "lucide-react";
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { RadialBar, RadialBarChart } from "recharts";
 
 interface OverviewData {
   completedRuns: number;
@@ -16,7 +18,6 @@ type MetricType = 'didnt_run';
 
 interface OverviewMetricsProps {
   data: OverviewData;
-  reviewedPercentage?: number; // percent of displayed workflows reviewed
   onMetricHover?: (metricType: MetricType, workflowIds: string[]) => void;
   onMetricLeave?: () => void;
 }
@@ -35,11 +36,34 @@ function formatDuration(seconds: number): string {
   }
 }
 
-export default function OverviewMetrics({ data, reviewedPercentage = 0, onMetricHover, onMetricLeave }: OverviewMetricsProps) {
+export default function OverviewMetrics({ data, onMetricHover, onMetricLeave }: OverviewMetricsProps) {
   const passedPercentage = data.completedRuns > 0 ? Math.round((data.passedRuns / data.completedRuns) * 100) : 0;
 
   // Create missing workflow IDs for hover functionality
   const missingWorkflowIds = data.missingWorkflows.map(workflow => `missing-${workflow}`);
+
+  // Prepare data for the radial bar chart
+  const chartData = [
+    {
+      name: "Passed",
+      value: data.passedRuns,
+      fill: "hsl(var(--chart-1))"
+    },
+    {
+      name: "Failed", 
+      value: data.failedRuns,
+      fill: "hsl(var(--chart-2))"
+    }
+  ];
+
+  const chartConfig = {
+    Passed: {
+      label: "Passed",
+    },
+    Failed: {
+      label: "Failed",
+    },
+  };
 
   return (
     <Card>
@@ -51,58 +75,29 @@ export default function OverviewMetrics({ data, reviewedPercentage = 0, onMetric
       </CardHeader>
       <CardContent>
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Pass/Fail Summary with Pie Chart - Top/Left Side */}
+          {/* Pass/Fail Summary with Radial Chart - Top/Left Side */}
           <div className="flex-shrink-0 flex justify-center lg:justify-start">
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <svg width="60" height="60" className="transform -rotate-90">
-                  {/* Background circle */}
-                  <circle
-                    cx="30"
-                    cy="30"
-                    r="25"
-                    fill="none"
-                    stroke="hsl(var(--muted))"
-                    strokeWidth="6"
+              <ChartContainer
+                config={chartConfig}
+                className="h-16 w-16"
+              >
+                <RadialBarChart
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="60%"
+                  outerRadius="90%"
+                  data={chartData}
+                  startAngle={90}
+                  endAngle={-270}
+                >
+                  <RadialBar
+                    dataKey="value"
+                    cornerRadius={4}
+                    fill="var(--color-Passed)"
                   />
-
-                  {/* Passed (Green) */}
-                  {data.passedRuns > 0 && (
-                    <circle
-                      cx="30"
-                      cy="30"
-                      r="25"
-                      fill="none"
-                      stroke="rgb(34, 197, 94)"
-                      strokeWidth="6"
-                      strokeDasharray={2 * Math.PI * 25}
-                      strokeDashoffset={2 * Math.PI * 25 - ((data.passedRuns / data.completedRuns) * 2 * Math.PI * 25)}
-                      strokeLinecap="round"
-                    />
-                  )}
-
-                  {/* Failed (Red) */}
-                  {data.failedRuns > 0 && (
-                    <circle
-                      cx="30"
-                      cy="30"
-                      r="25"
-                      fill="none"
-                      stroke="rgb(239, 68, 68)"
-                      strokeWidth="6"
-                      strokeDasharray={2 * Math.PI * 25}
-                      strokeDashoffset={2 * Math.PI * 25 - ((data.failedRuns / data.completedRuns) * 2 * Math.PI * 25)}
-                      strokeLinecap="round"
-                      transform={`rotate(${(data.passedRuns / data.completedRuns) * 360} 30 30)`}
-                    />
-                  )}
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xs font-semibold">
-                    {data.completedRuns > 0 ? Math.round((data.passedRuns / data.completedRuns) * 100) : 0}%
-                  </span>
-                </div>
-              </div>
+                </RadialBarChart>
+              </ChartContainer>
               <div className="space-y-1">
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -141,16 +136,7 @@ export default function OverviewMetrics({ data, reviewedPercentage = 0, onMetric
               </div>
             </div>
 
-            {/* Reviewed % (replaces the earlier Didn't Run tile) */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                <span className="text-sm truncate">Reviewed</span>
-              </div>
-              <div className={`font-semibold flex-shrink-0 ${reviewedPercentage === 0 ? 'text-muted-foreground' : 'text-white'}`}>
-                {reviewedPercentage}%
-              </div>
-            </div>
+
 
             {/* Total Runtime */}
             <div className="flex items-center gap-3">

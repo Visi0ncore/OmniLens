@@ -1,56 +1,65 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Play, CheckCircle, XCircle, Pause } from "lucide-react";
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { RadialBar, RadialBarChart } from "recharts";
 import type { WorkflowRun } from "@/lib/github";
 
 interface MetricsOverviewProps {
   runs: WorkflowRun[];
 }
 
-function PieChart({ passed, failed }: { passed: number; failed: number }) {
+function RadialChart({ passed, failed }: { passed: number; failed: number }) {
   const total = passed + failed;
   if (total === 0) return null;
 
   const passedPercentage = (passed / total) * 100;
-  const failedPercentage = (failed / total) * 100;
 
-  // SVG pie chart with simple arcs
-  const radius = 40;
-  const circumference = 2 * Math.PI * radius;
-  const passedOffset = circumference - (passedPercentage / 100) * circumference;
+  // Prepare data for the radial bar chart
+  const chartData = [
+    {
+      name: "Passed",
+      value: passed,
+      fill: "hsl(var(--chart-1))"
+    },
+    {
+      name: "Failed", 
+      value: failed,
+      fill: "hsl(var(--chart-2))"
+    }
+  ];
+
+  const chartConfig = {
+    Passed: {
+      label: "Passed",
+    },
+    Failed: {
+      label: "Failed",
+    },
+  };
 
   return (
     <div className="flex items-center gap-4">
-      <div className="relative">
-        <svg width="100" height="100" className="transform -rotate-90">
-          {/* Background circle */}
-          <circle
-            cx="50"
-            cy="50"
-            r={radius}
-            fill="none"
-            stroke="hsl(var(--muted))"
-            strokeWidth="8"
+      <ChartContainer
+        config={chartConfig}
+        className="h-20 w-20"
+      >
+        <RadialBarChart
+          cx="50%"
+          cy="50%"
+          innerRadius="60%"
+          outerRadius="90%"
+          data={chartData}
+          startAngle={90}
+          endAngle={-270}
+        >
+          <RadialBar
+            dataKey="value"
+            cornerRadius={4}
+            fill="var(--color-Passed)"
           />
-          {/* Passed portion */}
-          <circle
-            cx="50"
-            cy="50"
-            r={radius}
-            fill="none"
-            stroke="rgb(34, 197, 94)"
-            strokeWidth="8"
-            strokeDasharray={circumference}
-            strokeDashoffset={passedOffset}
-            strokeLinecap="round"
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm font-semibold">
-            {Math.round(passedPercentage)}%
-          </span>
-        </div>
-      </div>
+        </RadialBarChart>
+      </ChartContainer>
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-green-500 rounded-full"></div>
@@ -108,46 +117,7 @@ export default function MetricsOverview({ runs }: MetricsOverviewProps) {
         </CardHeader>
         <CardContent className="pt-0">
           {completedRuns.length > 0 ? (
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <svg width="60" height="60" className="transform -rotate-90">
-                  <circle
-                    cx="30"
-                    cy="30"
-                    r="25"
-                    fill="none"
-                    stroke="hsl(var(--muted))"
-                    strokeWidth="6"
-                  />
-                  <circle
-                    cx="30"
-                    cy="30"
-                    r="25"
-                    fill="none"
-                    stroke="rgb(34, 197, 94)"
-                    strokeWidth="6"
-                    strokeDasharray={2 * Math.PI * 25}
-                    strokeDashoffset={2 * Math.PI * 25 - ((passedRuns.length / completedRuns.length) * 2 * Math.PI * 25)}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xs font-semibold">
-                    {Math.round((passedRuns.length / completedRuns.length) * 100)}%
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-xs">{passedRuns.length}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="text-xs">{failedRuns.length}</span>
-                </div>
-              </div>
-            </div>
+            <RadialChart passed={passedRuns.length} failed={failedRuns.length} />
           ) : (
             <p className="text-xs text-muted-foreground">No completed workflows</p>
           )}

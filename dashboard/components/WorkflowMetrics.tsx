@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, Circle, TrendingUp, TrendingDown, ArrowDown } from "lucide-react";
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { RadialBar, RadialBarChart } from "recharts";
 import type { WorkflowRun } from "@/lib/github";
 
 type MetricType = 'consistent' | 'improved' | 'regressed' | 'regressing';
@@ -96,105 +98,69 @@ export default function WorkflowMetrics({ todayRuns, yesterdayRuns, onMetricHove
     </div>
   );
 
-  // Pie chart component
-  const MetricsPieChart = () => {
-    const radius = 25;
-    const circumference = 2 * Math.PI * radius;
-    let currentOffset = 0;
+  // Prepare data for the radial bar chart
+  const chartData = [
+    {
+      name: "Consistent",
+      value: metrics.consistent.length,
+      fill: "hsl(var(--chart-1))"
+    },
+    {
+      name: "Improved",
+      value: metrics.improved.length,
+      fill: "hsl(var(--chart-2))"
+    },
+    {
+      name: "Regressed",
+      value: metrics.regressed.length,
+      fill: "hsl(var(--chart-3))"
+    },
+    {
+      name: "Regressing",
+      value: metrics.regressing.length,
+      fill: "hsl(var(--chart-4))"
+    }
+  ];
 
-    // Calculate percentages and offsets for each metric
-    const consistentPercent = totalWorkflows > 0 ? (metrics.consistent.length / totalWorkflows) * 100 : 0;
-    const improvedPercent = totalWorkflows > 0 ? (metrics.improved.length / totalWorkflows) * 100 : 0;
-    const regressedPercent = totalWorkflows > 0 ? (metrics.regressed.length / totalWorkflows) * 100 : 0;
-    const regressingPercent = totalWorkflows > 0 ? (metrics.regressing.length / totalWorkflows) * 100 : 0;
+  const chartConfig = {
+    Consistent: {
+      label: "Consistent",
+    },
+    Improved: {
+      label: "Improved",
+    },
+    Regressed: {
+      label: "Regressed",
+    },
+    Regressing: {
+      label: "Regressing",
+    },
+  };
 
+  // Radial chart component
+  const MetricsRadialChart = () => {
     return (
       <div className="flex items-center gap-3">
-        <div className="relative">
-          <svg width="60" height="60" className="transform -rotate-90">
-            {/* Background circle */}
-            <circle
-              cx="30"
-              cy="30"
-              r={radius}
-              fill="none"
-              stroke="hsl(var(--muted))"
-              strokeWidth="6"
+        <ChartContainer
+          config={chartConfig}
+          className="h-16 w-16"
+        >
+          <RadialBarChart
+            cx="50%"
+            cy="50%"
+            innerRadius="60%"
+            outerRadius="90%"
+            data={chartData}
+            startAngle={90}
+            endAngle={-270}
+          >
+            <RadialBar
+              dataKey="value"
+              cornerRadius={4}
+              fill="var(--color-Consistent)"
             />
-            
-            {/* Consistent (Green) */}
-            {metrics.consistent.length > 0 && (
-              <circle
-                cx="30"
-                cy="30"
-                r={radius}
-                fill="none"
-                stroke="rgb(34, 197, 94)"
-                strokeWidth="6"
-                strokeDasharray={circumference}
-                strokeDashoffset={circumference - (consistentPercent / 100) * circumference}
-                strokeLinecap="round"
-                transform={`rotate(${currentOffset} 30 30)`}
-              />
-            )}
-            {currentOffset += (consistentPercent / 100) * 360}
-
-            {/* Improved (Blue) */}
-            {metrics.improved.length > 0 && (
-              <circle
-                cx="30"
-                cy="30"
-                r={radius}
-                fill="none"
-                stroke="rgb(59, 130, 246)"
-                strokeWidth="6"
-                strokeDasharray={circumference}
-                strokeDashoffset={circumference - (improvedPercent / 100) * circumference}
-                strokeLinecap="round"
-                transform={`rotate(${currentOffset} 30 30)`}
-              />
-            )}
-            {currentOffset += (improvedPercent / 100) * 360}
-
-            {/* Regressed (Orange) */}
-            {metrics.regressed.length > 0 && (
-              <circle
-                cx="30"
-                cy="30"
-                r={radius}
-                fill="none"
-                stroke="rgb(249, 115, 22)"
-                strokeWidth="6"
-                strokeDasharray={circumference}
-                strokeDashoffset={circumference - (regressedPercent / 100) * circumference}
-                strokeLinecap="round"
-                transform={`rotate(${currentOffset} 30 30)`}
-              />
-            )}
-            {currentOffset += (regressedPercent / 100) * 360}
-
-            {/* Regressing (Red) */}
-            {metrics.regressing.length > 0 && (
-              <circle
-                cx="30"
-                cy="30"
-                r={radius}
-                fill="none"
-                stroke="rgb(239, 68, 68)"
-                strokeWidth="6"
-                strokeDasharray={circumference}
-                strokeDashoffset={circumference - (regressingPercent / 100) * circumference}
-                strokeLinecap="round"
-                transform={`rotate(${currentOffset} 30 30)`}
-              />
-            )}
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xs font-semibold">
-              {Math.round(consistentPercent)}%
-            </span>
-          </div>
-        </div>
+          </RadialBarChart>
+        </ChartContainer>
         <div className="space-y-1">
           <div className="flex items-center gap-1">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -227,9 +193,9 @@ export default function WorkflowMetrics({ todayRuns, yesterdayRuns, onMetricHove
       </CardHeader>
       <CardContent>
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Pie Chart - Top/Left Side */}
+          {/* Radial Chart - Top/Left Side */}
           <div className="flex-shrink-0 flex justify-center lg:justify-start">
-            <MetricsPieChart />
+            <MetricsRadialChart />
           </div>
 
           {/* Metrics Grid - Bottom/Right Side */}

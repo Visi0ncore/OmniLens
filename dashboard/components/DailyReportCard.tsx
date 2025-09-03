@@ -3,6 +3,8 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Clock, XCircle, ArrowDown, ArrowUp } from "lucide-react";
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { RadialBar, RadialBarChart, Bar, BarChart, PieChart, Pie, Cell } from "recharts";
 import type { WorkflowRun } from "@/lib/github";
 
 
@@ -33,44 +35,58 @@ interface Props {
 
 function Donut({ passed, failed }: { passed: number; failed: number }) {
   const total = Math.max(1, passed + failed);
-  const radius = 36;
-  const C = 2 * Math.PI * radius;
-  const passedPct = passed / total;
-  const failedPct = failed / total;
+  const passedPercentage = Math.round((passed / total) * 100);
+
+  // Prepare data for the radial bar chart
+  const chartData = [
+    {
+      name: "Passed",
+      value: passed,
+      fill: "hsl(var(--chart-1))"
+    },
+    {
+      name: "Failed", 
+      value: failed,
+      fill: "hsl(var(--chart-2))"
+    }
+  ];
+
+  const chartConfig = {
+    Passed: {
+      label: "Passed",
+      color: "hsl(var(--chart-1))",
+    },
+    Failed: {
+      label: "Failed", 
+      color: "hsl(var(--chart-2))",
+    },
+  };
+
   return (
     <div className="relative w-[96px] h-[96px]">
-      <svg width="96" height="96" className="-rotate-90">
-        <circle cx="48" cy="48" r={radius} fill="none" stroke="hsl(var(--muted))" strokeWidth="10" />
-        {passed > 0 && (
-          <circle
-            cx="48"
-            cy="48"
-            r={radius}
-            fill="none"
-            stroke="rgb(34, 197, 94)"
-            strokeWidth="10"
-            strokeDasharray={C}
-            strokeDashoffset={C - passedPct * C}
-            strokeLinecap="round"
-          />
-        )}
-        {failed > 0 && (
-          <circle
-            cx="48"
-            cy="48"
-            r={radius}
-            fill="none"
-            stroke="rgb(239, 68, 68)"
-            strokeWidth="10"
-            strokeDasharray={C}
-            strokeDashoffset={C - failedPct * C}
-            transform={`rotate(${passedPct * 360} 48 48)`}
-            strokeLinecap="round"
-          />
-        )}
-      </svg>
+      <ChartContainer
+        config={chartConfig}
+        className="h-full w-full"
+      >
+        <PieChart>
+          <Pie
+            data={chartData}
+            cx="50%"
+            cy="50%"
+            innerRadius={30}
+            outerRadius={45}
+            dataKey="value"
+            startAngle={90}
+            endAngle={-270}
+          >
+            {chartData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.fill} />
+            ))}
+          </Pie>
+        </PieChart>
+      </ChartContainer>
       <div className="absolute inset-0 grid place-items-center">
-        <div className="text-sm font-semibold">{Math.round((passed / total) * 100)}%</div>
+        <div className="text-sm font-semibold">{passedPercentage}%</div>
       </div>
     </div>
   );
@@ -96,28 +112,33 @@ function MetricsHorizontalBars({ segments }: { segments: Array<{ label: string; 
   );
 }
 
-function AreaSpark({ runs, width = 420, height = 120 }: { runs: WorkflowRun[]; width?: number; height?: number }) {
+function AreaSpark({ runs }: { runs: WorkflowRun[] }) {
   const buckets = new Array(24).fill(0) as number[];
   runs.forEach((r) => {
     const h = new Date(r.run_started_at).getHours();
     buckets[h] += 1;
   });
-  const max = Math.max(1, ...buckets);
-  const pad = 8;
-  const stepX = (width - pad * 2) / 23;
-  const points = buckets.map((v, i) => {
-    const x = pad + i * stepX;
-    const y = height - pad - (v / max) * (height - pad * 2);
-    return [x, y] as const;
-  });
-  const path = points.map((p, i) => (i === 0 ? `M ${p[0]} ${p[1]}` : `L ${p[0]} ${p[1]}`)).join(' ');
-  const lastX = pad + (buckets.length - 1) * stepX;
-  const area = `${path} L ${lastX} ${height - pad} L ${pad} ${height - pad} Z`;
+  
+  const chartData = buckets.map((count, hour) => ({
+    hour: hour.toString(),
+    count
+  }));
+
+  const chartConfig = {
+    count: {
+      label: "Runs",
+    },
+  };
+
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} preserveAspectRatio="none" className="block mx-auto">
-      <path d={area} fill="rgba(255,255,255,0.15)" />
-      <path d={path} stroke="white" strokeWidth={2} fill="none" />
-    </svg>
+    <ChartContainer
+      config={chartConfig}
+      className="h-32"
+    >
+      <BarChart data={chartData}>
+        <Bar dataKey="count" fill="hsl(var(--foreground))" fillOpacity={0.7} />
+      </BarChart>
+    </ChartContainer>
   );
 }
 
@@ -207,10 +228,10 @@ export default function DailyReportCard({ repoSlug, todayRuns, yesterdayRuns, ov
   const { consistent, improved, regressed, regressing } = compareDaily(todayRuns, yesterdayRuns);
   const totalDaily = consistent + improved + regressed + regressing;
   const metricSegments = [
-    { label: 'Consistent', value: consistent, color: 'rgb(34, 197, 94)' },
-    { label: 'Improved', value: improved, color: 'rgb(59, 130, 246)' },
-    { label: 'Regressed', value: regressed, color: 'rgb(249, 115, 22)' },
-    { label: 'Still failing', value: regressing, color: 'rgb(239, 68, 68)' },
+    { label: 'Consistent', value: consistent, color: 'hsl(var(--chart-1))' },
+    { label: 'Improved', value: improved, color: 'hsl(var(--chart-2))' },
+    { label: 'Regressed', value: regressed, color: 'hsl(var(--chart-3))' },
+    { label: 'Still failing', value: regressing, color: 'hsl(var(--chart-4))' },
   ];
 
   return (
@@ -274,7 +295,7 @@ export default function DailyReportCard({ repoSlug, todayRuns, yesterdayRuns, ov
             <div className="text-sm text-muted-foreground">Runs by hour</div>
             {runsChart === 'area' ? (
               <>
-                <AreaSpark runs={todayRuns} width={sparkWidth} height={sparkHeight} />
+                <AreaSpark runs={todayRuns} />
                 <HourlyLegend runs={todayRuns} />
               </>
             ) : (
@@ -297,35 +318,43 @@ function formatDuration(seconds: number): string {
 }
 
 function MiniPie({ segments }: { segments: Array<{ color: string; value: number; label: string }> }) {
-  const total = Math.max(1, segments.reduce((s, x) => s + x.value, 0));
-  const radius = 34;
-  const C = 2 * Math.PI * radius;
-  let offset = 0;
+  const chartData = segments.map((segment, index) => ({
+    name: segment.label || `Segment ${index + 1}`,
+    value: segment.value,
+    fill: segment.color
+  }));
+
+  const chartConfig = segments.reduce((config, segment, index) => {
+    const key = segment.label || `Segment${index + 1}`;
+    config[key] = {
+      label: segment.label || `Segment ${index + 1}`,
+      color: segment.color,
+    };
+    return config;
+  }, {} as any);
+
   return (
     <div className="relative w-[90px] h-[90px]">
-      <svg width="90" height="90" className="-rotate-90">
-        <circle cx="45" cy="45" r={radius} fill="none" stroke="hsl(var(--muted))" strokeWidth="10" />
-        {segments.map((s, i) => {
-          const pct = s.value / total;
-          const el = (
-            <circle
-              key={i}
-              cx="45"
-              cy="45"
-              r={radius}
-              fill="none"
-              stroke={s.color}
-              strokeWidth="10"
-              strokeDasharray={C}
-              strokeDashoffset={C - pct * C}
-              transform={`rotate(${offset * 360} 45 45)`}
-              strokeLinecap="butt"
-            />
-          );
-          offset += pct;
-          return el;
-        })}
-      </svg>
+      <ChartContainer
+        config={chartConfig}
+        className="h-full w-full"
+      >
+        <RadialBarChart
+          cx="50%"
+          cy="50%"
+          innerRadius="60%"
+          outerRadius="90%"
+          data={chartData}
+          startAngle={90}
+          endAngle={-270}
+        >
+          <RadialBar
+            dataKey="value"
+            cornerRadius={4}
+            fill="var(--color-Segment1)"
+          />
+        </RadialBarChart>
+      </ChartContainer>
     </div>
   );
 }

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getUserRepo, saveWorkflows, getWorkflows } from '@/lib/db-storage';
+import { getLatestWorkflowRuns, getWorkflowRunsForDate, getWorkflowRunsForDateGrouped } from '@/lib/github';
 
-// Validation schema for the slug parameter
+// Zod schemas for validation
 const slugSchema = z.string().min(1, 'Repository slug is required');
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format');
 
 // GitHub API response types
 interface GitHubWorkflow {
@@ -21,6 +23,59 @@ interface GitHubWorkflowsResponse {
   workflows: GitHubWorkflow[];
 }
 
+interface GitHubWorkflowRun {
+  id: number;
+  name: string;
+  workflow_id: number;
+  path?: string;
+  conclusion: string | null;
+  status: string;
+  html_url: string;
+  run_started_at: string;
+  updated_at: string;
+  run_count?: number;
+}
+
+interface GitHubWorkflowRunsResponse {
+  total_count: number;
+  workflow_runs: GitHubWorkflowRun[];
+}
+
+/**
+ * @openapi
+ * /api/workflow/{slug}:
+ *   get:
+ *     summary: Get workflows or workflow runs for a repository
+ *     parameters:
+ *       - name: slug
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Repository slug
+ *       - name: date
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: string
+ *           pattern: '^\d{4}-\d{2}-\d{2}$'
+ *         description: Date in YYYY-MM-DD format to get workflow runs for that date
+ *     responses:
+ *       200:
+ *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               oneOf:
+ *                 - $ref: '#/components/schemas/WorkflowsResponse'
+ *                 - $ref: '#/components/schemas/WorkflowRunsResponse'
+ *       400:
+ *         description: Invalid request parameters
+ *       404:
+ *         description: Repository not found
+ *       500:
+ *         description: Internal server error
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } }
@@ -36,6 +91,28 @@ export async function GET(
         { error: 'Repository not found in dashboard' },
         { status: 404 }
       );
+    }
+    
+    // Check if this is a request for workflow runs (with date parameter)
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get('date');
+    const grouped = searchParams.get('grouped') === 'true';
+    
+    if (date) {
+      try {
+        // Validate date parameter
+        const validatedDate = dateSchema.parse(date);
+        // Handle workflow runs request
+        return await handleWorkflowRunsRequest(validatedSlug, repo, validatedDate, grouped);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return NextResponse.json(
+            { error: 'Invalid date format. Use YYYY-MM-DD format.' },
+            { status: 400 }
+          );
+        }
+        throw error;
+      }
     }
     
     // First, try to get workflows from database
@@ -152,6 +229,66 @@ export async function GET(
     }
     
     console.error('Error fetching workflows:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// Helper function to handle workflow runs requests
+async function handleWorkflowRunsRequest(
+  slug: string,
+  repo: any,
+  date: string,
+  grouped: boolean = false
+) {
+  try {
+    // The getWorkflowRunsForDate function handles all GitHub API calls and error handling
+    const dateObj = new Date(date);
+    const workflowRuns = grouped 
+      ? await getWorkflowRunsForDateGrouped(dateObj, slug)
+      : await getWorkflowRunsForDate(dateObj, slug);
+    
+    // Calculate overview data
+    const completedRuns = workflowRuns.filter(run => run.status === 'completed').length;
+    const inProgressRuns = workflowRuns.filter(run => run.status === 'in_progress').length;
+    const passedRuns = workflowRuns.filter(run => run.conclusion === 'success').length;
+    const failedRuns = workflowRuns.filter(run => run.conclusion === 'failure').length;
+    
+    // Calculate total runtime (simplified - would need more detailed API calls for accurate runtime)
+    const totalRuntime = workflowRuns.reduce((total, run) => {
+      if (run.status === 'completed' && run.run_started_at && run.updated_at) {
+        const start = new Date(run.run_started_at).getTime();
+        const end = new Date(run.updated_at).getTime();
+        return total + (end - start);
+      }
+      return total;
+    }, 0);
+    
+    // Get total workflows count (this would need a separate API call to get all workflows)
+    // For now, we'll use the unique workflow IDs from the runs
+    const uniqueWorkflowIds = new Set(workflowRuns.map(run => run.workflow_id));
+    const totalWorkflows = uniqueWorkflowIds.size;
+    
+    const overviewData = {
+      completedRuns,
+      inProgressRuns,
+      passedRuns,
+      failedRuns,
+      totalRuntime,
+      didntRunCount: 0, // Would need to compare with total workflows
+      totalWorkflows,
+      missingWorkflows: [] // Would need to compare with all workflows
+    };
+    
+    return NextResponse.json({
+      workflowRuns,
+      overviewData
+    });
+    
+  } catch (error) {
+    console.error('Error fetching workflow runs:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
