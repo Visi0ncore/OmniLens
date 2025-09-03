@@ -4,7 +4,7 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Clock, XCircle, ArrowDown, ArrowUp } from "lucide-react";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { RadialBar, RadialBarChart, Bar, BarChart, PieChart, Pie, Cell } from "recharts";
+import { RadialBar, RadialBarChart, Bar, BarChart, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import type { WorkflowRun } from "@/lib/github";
 
 

@@ -1,6 +1,6 @@
 import { CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, AlertTriangle, Workflow } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bar, BarChart, PieChart, Pie, Cell, XAxis, YAxis } from 'recharts';
+import { Label, PolarRadiusAxis, RadialBar, RadialBarChart, Bar, BarChart, PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 
@@ -92,6 +92,8 @@ function PassFailPieChart({ passed, failed }: { passed: number; failed: number }
               innerRadius={40}
               outerRadius={60}
               dataKey="value"
+              startAngle={90}
+              endAngle={-270}
             >
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
