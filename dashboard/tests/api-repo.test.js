@@ -37,7 +37,7 @@ async function testGetRepositories() {
       logInfo(`Found ${response.data.repositories.length} repositories`);
       
       // Validate each repository has required fields
-      const requiredFields = ['slug', 'displayName', 'hasConfig'];
+      const requiredFields = ['slug', 'displayName'];
       let allValid = true;
       
       for (const repo of response.data.repositories) {

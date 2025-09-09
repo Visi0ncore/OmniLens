@@ -251,9 +251,9 @@ export default function DailyMetrics({
                 color: "hsl(var(--chart-2))",
               },
             }}
-            className="h-36"
+            className="h-36 aspect-none"
           >
-            <BarChart data={runsByHour} margin={{ left: 0, right: 0, top: 5, bottom: 5 }}>
+            <BarChart data={runsByHour} margin={{ left: 0, right: 12, top: 5, bottom: 5 }}>
               <XAxis 
                 dataKey="hour" 
                 tickFormatter={(hour) => `${hour}:00`}
@@ -280,9 +280,8 @@ export default function DailyMetrics({
                 radius={[2, 2, 0, 0]}
               />
               <ChartTooltip 
-                content={<ChartTooltipContent />}
+                content={<ChartTooltipContent labelFormatter={() => "Data"} />}
                 cursor={false}
-                labelFormatter={(hour) => `${hour}:00`}
               />
             </BarChart>
           </ChartContainer>

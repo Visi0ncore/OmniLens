@@ -84,27 +84,24 @@ export async function saveWorkflows(repoSlug: string, workflows: Array<{
   state: string;
 }>) {
   try {
-    // Delete existing workflows for this repo
+    // Delete existing workflows for this repo to ensure clean state
     await pool.query(
       'DELETE FROM workflows WHERE repo_slug = $1',
       [repoSlug]
     );
     
-    // Insert new workflows
+    console.log(`🧹 Deleted existing workflows for repo: ${repoSlug}`);
+    
+    // Insert only current workflows from GitHub
     for (const workflow of workflows) {
       await pool.query(
         `INSERT INTO workflows (repo_slug, workflow_id, workflow_name, workflow_path, workflow_state)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (repo_slug, workflow_id) DO UPDATE SET
-         workflow_name = EXCLUDED.workflow_name,
-         workflow_path = EXCLUDED.workflow_path,
-         workflow_state = EXCLUDED.workflow_state,
-         updated_at = CURRENT_TIMESTAMP`,
+         VALUES ($1, $2, $3, $4, $5)`,
         [repoSlug, workflow.id, workflow.name, workflow.path, workflow.state]
       );
     }
     
-    console.log(`✅ Saved ${workflows.length} workflows for repo: ${repoSlug}`);
+    console.log(`✅ Saved ${workflows.length} current workflows for repo: ${repoSlug}`);
   } catch (error) {
     console.error('Error saving workflows:', error);
     throw error;

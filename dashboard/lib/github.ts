@@ -75,9 +75,9 @@ export function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[
     new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime()
   );
 
-  // Use workflow name as the key
+  // Use workflow ID as the key (workflow names are not unique!)
   sortedRuns.forEach(run => {
-    const workflowKey = run.name || `workflow-${run.workflow_id}`;
+    const workflowKey = run.workflow_id.toString();
 
     if (!latestRuns.has(workflowKey)) {
       latestRuns.set(workflowKey, run);
@@ -109,7 +109,7 @@ export function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[
 
   // Add run count and all runs to each workflow run for the UI
   const result = Array.from(latestRuns.values()).map(run => {
-    const workflowKey = run.name || `workflow-${run.workflow_id}`;
+    const workflowKey = run.workflow_id.toString();
     return {
       ...run,
       run_count: duplicateCount.get(workflowKey) || 1,
@@ -123,9 +123,12 @@ export function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[
 
 
 // Get workflow runs for a specific date and repository (for daily metrics - returns all runs)
-export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Promise<WorkflowRun[]> {
+export async function getWorkflowRunsForDate(date: Date, repoSlug: string, branch?: string): Promise<WorkflowRun[]> {
   try {
+    console.log(`🔎 [GITHUB] getWorkflowRunsForDate - slug: ${repoSlug}, date: ${format(date, "yyyy-MM-dd")}`);
+    
     const { token, repo } = await getRepoInfo(repoSlug);
+    console.log(`🔎 [GITHUB] Got repo info:`, { repoPath: repo });
 
     // Format date to ISO string for GitHub API
     const dateStr = format(date, "yyyy-MM-dd");
@@ -137,6 +140,8 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
     const startTime = startOfDay;
     const endTime = now;
     
+    console.log(`🔎 [GITHUB] Time range: ${startTime} to ${endTime}`);
+    
 
     
     // Fetch all workflow runs for the date, handling pagination
@@ -147,8 +152,9 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
 
     while (hasMorePages) {
           // Use the correct time range: from midnight of target date until now
+    const branchParam = branch ? `&branch=${encodeURIComponent(branch)}` : '';
     const res = await fetch(
-      `${API_BASE}/repos/${repo}/actions/runs?created=${startTime}..${endTime}&per_page=100&page=${page}&_t=${Date.now()}`,
+      `${API_BASE}/repos/${repo}/actions/runs?created=${startTime}..${endTime}&per_page=100&page=${page}${branchParam}&_t=${Date.now()}`,
       {
         headers: {
           Accept: "application/vnd.github+json",
@@ -180,6 +186,14 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
 
       const json = await res.json();
       const pageRuns = json.workflow_runs as WorkflowRun[];
+      
+      console.log(`🔎 [GITHUB] Page ${page} response:`, {
+        total_count: json.total_count,
+        runs_this_page: pageRuns.length,
+        run_ids: pageRuns.map(r => r.id),
+        workflow_ids: pageRuns.map(r => r.workflow_id),
+        run_names: pageRuns.map(r => r.name)
+      });
 
       allRuns = allRuns.concat(pageRuns);
       pagesFetched++;
@@ -206,6 +220,11 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
     });
 
     // For daily metrics, return ALL runs for the day, not just the latest per workflow
+    console.log(`🔎 [GITHUB] getWorkflowRunsForDate final result:`, {
+      total_runs: filteredRuns.length,
+      unique_workflows: [...new Set(filteredRuns.map(r => r.workflow_id))],
+      run_details: filteredRuns.map(r => ({ id: r.id, workflow_id: r.workflow_id, name: r.name, status: r.status, conclusion: r.conclusion }))
+    });
     return filteredRuns;
 
   } catch (error) {
@@ -215,9 +234,12 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
 }
 
 // Get workflow runs for a specific date and repository (for workflow cards - returns grouped data)
-export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string): Promise<WorkflowRun[]> {
+export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string, branch?: string): Promise<WorkflowRun[]> {
   try {
+    console.log(`🔎 [GITHUB] getWorkflowRunsForDateGrouped - slug: ${repoSlug}, date: ${format(date, "yyyy-MM-dd")}`);
+    
     const { token, repo } = await getRepoInfo(repoSlug);
+    console.log(`🔎 [GITHUB] Got repo info:`, { repoPath: repo });
 
     // Format date to ISO string for GitHub API
     const dateStr = format(date, "yyyy-MM-dd");
@@ -229,6 +251,8 @@ export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string
     const startTime = startOfDay;
     const endTime = now;
     
+    console.log(`🔎 [GITHUB] Time range: ${startTime} to ${endTime}`);
+    
     // Fetch all workflow runs for the date, handling pagination
     let allRuns: WorkflowRun[] = [];
     let page = 1;
@@ -237,8 +261,9 @@ export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string
 
     while (hasMorePages) {
       // Use the correct time range: from midnight of target date until now
+      const branchParam = branch ? `&branch=${encodeURIComponent(branch)}` : '';
       const res = await fetch(
-        `${API_BASE}/repos/${repo}/actions/runs?created=${startTime}..${endTime}&per_page=100&page=${page}&_t=${Date.now()}`,
+        `${API_BASE}/repos/${repo}/actions/runs?created=${startTime}..${endTime}&per_page=100&page=${page}${branchParam}&_t=${Date.now()}`,
         {
           headers: {
             Accept: "application/vnd.github+json",
@@ -270,6 +295,14 @@ export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string
 
       const json = await res.json();
       const pageRuns = json.workflow_runs as WorkflowRun[];
+      
+      console.log(`🔎 [GITHUB] Page ${page} response:`, {
+        total_count: json.total_count,
+        runs_this_page: pageRuns.length,
+        run_ids: pageRuns.map(r => r.id),
+        workflow_ids: pageRuns.map(r => r.workflow_id),
+        run_names: pageRuns.map(r => r.name)
+      });
 
       allRuns = allRuns.concat(pageRuns);
       pagesFetched++;
@@ -299,6 +332,12 @@ export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string
     // This shows one card per workflow but includes run_count and all_runs data
     const latestRuns = getLatestWorkflowRuns(filteredRuns);
 
+    console.log(`🔎 [GITHUB] getWorkflowRunsForDateGrouped final result:`, {
+      total_runs: latestRuns.length,
+      unique_workflows: [...new Set(latestRuns.map(r => r.workflow_id))],
+      run_details: latestRuns.map(r => ({ id: r.id, workflow_id: r.workflow_id, name: r.name, status: r.status, conclusion: r.conclusion, run_count: r.run_count }))
+    });
+
     return latestRuns;
 
   } catch (error) {
@@ -327,7 +366,7 @@ export function calculateOverviewData(workflowRuns: WorkflowRun[]): OverviewData
     return total;
   }, 0);
 
-  // For now, we don't track missing workflows since we removed categorization
+  // Simple workflow metrics calculation
   const didntRunCount = 0;
   const totalWorkflows = workflowRuns.length;
   const missingWorkflows: string[] = [];

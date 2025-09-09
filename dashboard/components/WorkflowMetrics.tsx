@@ -42,7 +42,7 @@ function compareWorkflows(todayRuns: WorkflowRun[], yesterdayRuns: WorkflowRun[]
                        run.conclusion === null && run.status === 'in_progress' ? 'running' : 'failed';
     const yesterdayStatus = yesterdayMap.get(run.workflow_id) || 'unknown';
 
-    // Skip workflows that are currently running (don't categorize them in daily metrics)
+    // Skip workflows that are currently running (don't include them in daily metrics)
     if (todayStatus === 'running') {
       // Don't add to any metrics - running workflows shouldn't be compared
       return;

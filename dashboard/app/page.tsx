@@ -11,6 +11,7 @@ import {
   Package,
   X,
   Github,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CompactMetricsOverview from "@/components/CompactMetricsOverview";
@@ -129,7 +130,7 @@ function RepositoryCard({ repoSlug, repoPath, displayName, avatarUrl, htmlUrl, h
         ) : (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              No workflows configured
+              No workflows found
             </p>
           </div>
         )}
@@ -211,11 +212,9 @@ export default function HomePage() {
   const [availableRepos, setAvailableRepos] = React.useState<Array<{
     slug: string;
     repoPath: string;
-    envKey: string;
     displayName: string;
     avatarUrl?: string;
     htmlUrl?: string;
-    hasConfig: boolean;
     hasWorkflows?: boolean;
     metrics?: {
       totalWorkflows: number;
@@ -242,14 +241,10 @@ export default function HomePage() {
 
 
 
-  // Clear any in-memory trigger map cache for this repo
+  // Clear any in-memory cache for this repo
   const clearRepoLocalState = React.useCallback((repoSlug: string) => {
-    try {
-      const cache = (globalThis as any).__triggerMaps as Record<string, any> | undefined;
-      if (cache && cache[repoSlug]) {
-        delete cache[repoSlug];
-      }
-    } catch {}
+    // Clear any cached data for this repository
+    console.log(`🧹 Clearing local cache for repo: ${repoSlug}`);
   }, []);
 
   // Build repositories list from API (includes both env-configured and user-added repos)
@@ -271,10 +266,8 @@ export default function HomePage() {
         slug: r.slug,
         repoPath: r.repoPath || r.slug.replace(/-/g, '/'), // Convert slug back to repoPath if needed
         htmlUrl: r.htmlUrl,
-        envKey: r.envKey || 'LOCAL',
         displayName: r.displayName,
         avatarUrl: r.avatarUrl,
-        hasConfig: r.hasConfig || false,
         hasWorkflows: false,
         metrics: null,
       }));
@@ -287,12 +280,12 @@ export default function HomePage() {
 
       const todayStr = new Date().toISOString().slice(0, 10);
 
-      // Fetch workflow data for each repository
+      // Check each repository for existing workflow data (without triggering fetch)
       const enhanced = await Promise.all(
         mappedRepos.map(async (repo: any) => {
           try {
-            // Fetch workflows for this repository
-            const workflowResponse = await fetch(`/api/workflow/${repo.slug}`, { cache: 'no-store' });
+            // First check if workflows are already saved in database (without triggering GitHub fetch)
+            const checkResponse = await fetch(`/api/workflow/${repo.slug}/exists`, { cache: 'no-store' });
             let hasWorkflows = false;
             let metrics = {
               totalWorkflows: 0,
@@ -303,22 +296,19 @@ export default function HomePage() {
               hasActivity: false
             };
 
-            if (workflowResponse.ok) {
-              const workflowData = await workflowResponse.json();
-              hasWorkflows = workflowData.workflows && workflowData.workflows.length > 0;
+            if (checkResponse.ok) {
+              const checkData = await checkResponse.json();
               
-              // Get total workflow count from all workflows (not just those that ran today)
-              const totalWorkflows = workflowData.workflows ? workflowData.workflows.length : 0;
-              
-              if (hasWorkflows) {
-                // Fetch today's workflow runs to calculate metrics
+              if (checkData.hasWorkflows) {
+                // Only fetch metrics for repos that have already been visited (have saved workflows)
                 const runsResponse = await fetch(`/api/workflow/${repo.slug}?date=${todayStr}`, { cache: 'no-store' });
                 if (runsResponse.ok) {
                   const runsData = await runsResponse.json();
                   const overviewData = runsData.overviewData;
                   
+                  hasWorkflows = true;
                   metrics = {
-                    totalWorkflows: totalWorkflows, // Use total workflows from all workflows
+                    totalWorkflows: checkData.workflowCount || 0,
                     passedRuns: overviewData.passedRuns || 0,
                     failedRuns: overviewData.failedRuns || 0,
                     inProgressRuns: overviewData.inProgressRuns || 0,
@@ -328,9 +318,10 @@ export default function HomePage() {
                     hasActivity: (overviewData.completedRuns > 0 || overviewData.inProgressRuns > 0)
                   };
                 } else {
-                  // If runs API fails, still show total workflow count
+                  // If runs API fails, still show that workflows exist but no current activity
+                  hasWorkflows = true;
                   metrics = {
-                    totalWorkflows: totalWorkflows,
+                    totalWorkflows: checkData.workflowCount || 0,
                     passedRuns: 0,
                     failedRuns: 0,
                     inProgressRuns: 0,
@@ -339,7 +330,8 @@ export default function HomePage() {
                   };
                 }
               } else {
-                // No workflows found
+                // No workflows saved yet - show default state (don't trigger fetch)
+                hasWorkflows = false;
                 metrics = {
                   totalWorkflows: 0,
                   passedRuns: 0,
@@ -349,6 +341,9 @@ export default function HomePage() {
                   hasActivity: false
                 };
               }
+            } else {
+              // Check API failed - assume no workflows found yet
+              hasWorkflows = false;
             }
 
             return { 
@@ -357,7 +352,7 @@ export default function HomePage() {
               metrics 
             };
           } catch (error) {
-            console.error(`Error fetching workflow data for ${repo.slug}:`, error);
+            console.error(`Error checking workflow data for ${repo.slug}:`, error);
             return { 
               ...repo, 
               hasWorkflows: false, 
@@ -381,25 +376,12 @@ export default function HomePage() {
     }
   };
 
-  // Load repositories on mount and set up polling
+  // Load repositories on mount (no polling)
   React.useEffect(() => {
     console.log('🏠 Home page mounted - loading repositories...');
     
     // Initial load
     hydrateUserRepos();
-    
-    // Set up polling interval (starts after initial load)
-    const intervalId = window.setInterval(() => {
-      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-        console.log('🔄 Polling repositories (10s interval)...');
-        hydrateUserRepos();
-      }
-    }, 10000); // 10s
-    
-    return () => {
-      console.log('🏠 Home page unmounting - clearing interval');
-      window.clearInterval(intervalId);
-    };
   }, []); // Empty dependency array - only run once on mount
 
   async function handleAddRepo(e: React.FormEvent) {
@@ -558,10 +540,10 @@ export default function HomePage() {
   );
 }
 
-  // Process each repository to check for errors and workflow configuration
+  // Process each repository to check for errors and workflow data
   const repositoryData = availableRepos.map(repo => ({
     ...repo,
-    // Keep neutral style and allow navigation even when not configured
+    // Keep neutral style and allow navigation even when no workflows found
     hasError: false,
     errorMessage: ''
   })).sort((a, b) => {
@@ -576,6 +558,16 @@ export default function HomePage() {
       <div className="container mx-auto p-6 space-y-8">
         <div className="flex justify-end mb-6">
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={hydrateUserRepos}
+              disabled={isLoading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             {showAddForm && (
               <form onSubmit={handleAddRepo} className="flex items-center gap-2">
                 <input
@@ -635,7 +627,7 @@ export default function HomePage() {
               errorMessage={repo.errorMessage}
               hasWorkflows={repo.hasWorkflows}
               metrics={repo.metrics}
-              isUserRepo={repo.envKey === 'LOCAL' || repo.slug.startsWith('local-')}
+              isUserRepo={true}
               onRequestDelete={() => setRepoToDelete({ slug: repo.slug, displayName: repo.displayName })}
             />
           ))}

@@ -39,7 +39,7 @@ export default function CompactMetricsOverview({
       {/* Metrics Row */}
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-3">
-          {/* Total Workflows (configured) */}
+          {/* Total Workflows */}
           <div className="flex items-center gap-1">
             <Folder className="h-3 w-3 text-blue-500" />
             <span className="text-muted-foreground">{totalWorkflows}</span>

@@ -1,12 +1,12 @@
 # 👁️ OmniLens
 
-A real-time dashboard for monitoring GitHub workflow runs across different categories.
+A real-time dashboard for monitoring GitHub workflow runs.
 
 ## ✨ Features
 
 - **Real-time Data**: Fetches live workflow data from GitHub API
 - **Date Selection**: View workflow runs for any specific date
-- **Category Organization**: Workflows organized by utility, trigger, and testing categories
+- **Workflow Management**: Simple and unified workflow monitoring
 - **Review System**: Mark workflows as reviewed with persistent state
 - **Metrics Overview**: Comprehensive metrics and analytics
 - **Error Handling**: Proper error states when API calls fail
