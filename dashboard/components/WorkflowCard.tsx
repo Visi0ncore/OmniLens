@@ -178,70 +178,80 @@ export default function WorkflowCard({
         </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
-        {/* Health Status Section */}
+        {/* Health Status Section - Show placeholder when running to maintain spacing */}
         {healthStatus && (
           <div className="flex items-center gap-2">
-            {(() => {
-              const getHealthIcon = () => {
-                switch (healthStatus) {
-                  case 'consistent':
-                    return <CheckCircle className="h-4 w-4 text-green-500" />;
-                  case 'improved':
-                    return <TrendingUp className="h-4 w-4 text-blue-500" />;
-                  case 'regressed':
-                    return <TrendingDown className="h-4 w-4 text-orange-500" />;
-                  case 'still_failing':
-                    return <AlertTriangle className="h-4 w-4 text-red-500" />;
-                  case 'no_runs_today':
-                    return <Clock className="h-4 w-4 text-muted-foreground" />;
-                  default:
-                    return null;
-                }
-              };
+            {isInProgress ? (
+              /* Placeholder content for running workflows to maintain spacing */
+              <>
+                <div className="h-4 w-4" /> {/* Invisible icon spacer */}
+                <span className="text-sm font-medium text-transparent select-none">
+                  Placeholder
+                </span>
+              </>
+            ) : (
+              (() => {
+                const getHealthIcon = () => {
+                  switch (healthStatus) {
+                    case 'consistent':
+                      return <CheckCircle className="h-4 w-4 text-green-500" />;
+                    case 'improved':
+                      return <TrendingUp className="h-4 w-4 text-blue-500" />;
+                    case 'regressed':
+                      return <TrendingDown className="h-4 w-4 text-orange-500" />;
+                    case 'still_failing':
+                      return <AlertTriangle className="h-4 w-4 text-red-500" />;
+                    case 'no_runs_today':
+                      return <Clock className="h-4 w-4 text-muted-foreground" />;
+                    default:
+                      return null;
+                  }
+                };
 
-              const getHealthLabel = () => {
-                switch (healthStatus) {
-                  case 'consistent':
-                    return 'Consistent';
-                  case 'improved':
-                    return 'Improved';
-                  case 'regressed':
-                    return 'Regressed';
-                  case 'still_failing':
-                    return 'Still Failing';
-                  case 'no_runs_today':
-                    return 'No Runs Today';
-                  default:
-                    return '';
-                }
-              };
+                const getHealthLabel = () => {
+                  switch (healthStatus) {
+                    case 'consistent':
+                      return 'Consistent';
+                    case 'improved':
+                      return 'Improved';
+                    case 'regressed':
+                      return 'Regressed';
+                    case 'still_failing':
+                      return 'Still Failing';
+                    case 'no_runs_today':
+                      return 'No Runs Today';
+                    default:
+                      return '';
+                  }
+                };
 
-              const getHealthColor = () => {
-                switch (healthStatus) {
-                  case 'consistent':
-                    return 'text-green-500';
-                  case 'improved':
-                    return 'text-blue-500';
-                  case 'regressed':
-                    return 'text-orange-500';
-                  case 'still_failing':
-                    return 'text-red-500';
-                  case 'no_runs_today':
-                    return 'text-muted-foreground';
-                  default:
-                    return 'text-muted-foreground';
-                }
-              };
+                const getHealthColor = () => {
+                  switch (healthStatus) {
+                    case 'consistent':
+                      return 'text-green-500';
+                    case 'improved':
+                      return 'text-blue-500';
+                    case 'regressed':
+                      return 'text-orange-500';
+                    case 'still_failing':
+                      return 'text-red-500';
+                    case 'no_runs_today':
+                      return 'text-muted-foreground';
+                    default:
+                      return 'text-muted-foreground';
+                  }
+                };
 
-              return (
-                <>
-                  {getHealthIcon()}
-                  <span className={`text-sm font-medium ${getHealthColor()}`}>
-                    {getHealthLabel()}
-                  </span>
-                </>
-              );
-            })()}
+                return (
+                  <>
+                    {getHealthIcon()}
+                    <span className={`text-sm font-medium ${getHealthColor()}`}>
+                      {getHealthLabel()}
+                    </span>
+                  </>
+                );
+              })()
+            )}
           </div>
         )}
         

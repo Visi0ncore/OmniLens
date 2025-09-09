@@ -99,8 +99,9 @@ export async function GET(
     
     for (const workflow of savedWorkflows) {
       try {
-        const response = await fetch(
-          `https://api.github.com/repos/${owner}/${repoName}/actions/workflows/${workflow.id}/runs?branch=${defaultBranch}&per_page=1`,
+        // First, try to get any currently running workflows (in_progress, queued)
+        const runningResponse = await fetch(
+          `https://api.github.com/repos/${owner}/${repoName}/actions/workflows/${workflow.id}/runs?status=in_progress&per_page=1`,
           {
             headers: {
               'Authorization': `Bearer ${githubToken}`,
@@ -110,24 +111,73 @@ export async function GET(
           }
         );
         
-        if (response.ok) {
-          const data = await response.json();
-          if (data.workflow_runs && data.workflow_runs.length > 0) {
-            const run = data.workflow_runs[0];
-            latestRuns.push({
-              id: run.id,
-              name: run.name,
-              workflow_id: workflow.id,
-              path: run.path,
-              conclusion: run.conclusion,
-              status: run.status,
-              html_url: run.html_url,
-              run_started_at: run.run_started_at,
-              updated_at: run.updated_at
-            });
+        let foundRun = null;
+        
+        if (runningResponse.ok) {
+          const runningData = await runningResponse.json();
+          if (runningData.workflow_runs && runningData.workflow_runs.length > 0) {
+            foundRun = runningData.workflow_runs[0];
+            console.log(`🏃 [LATEST RUNS API] Found running workflow ${workflow.id}: status=${foundRun.status}, conclusion=${foundRun.conclusion}`);
           }
-        } else {
-          console.warn(`Failed to fetch latest run for workflow ${workflow.id}: ${response.status}`);
+        }
+        
+        // If no running workflow found, try queued
+        if (!foundRun) {
+          const queuedResponse = await fetch(
+            `https://api.github.com/repos/${owner}/${repoName}/actions/workflows/${workflow.id}/runs?status=queued&per_page=1`,
+            {
+              headers: {
+                'Authorization': `Bearer ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'OmniLens-Dashboard'
+              }
+            }
+          );
+          
+          if (queuedResponse.ok) {
+            const queuedData = await queuedResponse.json();
+            if (queuedData.workflow_runs && queuedData.workflow_runs.length > 0) {
+              foundRun = queuedData.workflow_runs[0];
+              console.log(`🏃 [LATEST RUNS API] Found queued workflow ${workflow.id}: status=${foundRun.status}, conclusion=${foundRun.conclusion}`);
+            }
+          }
+        }
+        
+        // If no running/queued workflow, fall back to latest completed run from default branch
+        if (!foundRun) {
+          const response = await fetch(
+            `https://api.github.com/repos/${owner}/${repoName}/actions/workflows/${workflow.id}/runs?branch=${defaultBranch}&per_page=1`,
+            {
+              headers: {
+                'Authorization': `Bearer ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'OmniLens-Dashboard'
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.workflow_runs && data.workflow_runs.length > 0) {
+              foundRun = data.workflow_runs[0];
+            }
+          } else {
+            console.warn(`Failed to fetch latest run for workflow ${workflow.id}: ${response.status}`);
+          }
+        }
+        
+        if (foundRun) {
+          latestRuns.push({
+            id: foundRun.id,
+            name: foundRun.name,
+            workflow_id: workflow.id,
+            path: foundRun.path,
+            conclusion: foundRun.conclusion,
+            status: foundRun.status,
+            html_url: foundRun.html_url,
+            run_started_at: foundRun.run_started_at,
+            updated_at: foundRun.updated_at
+          });
         }
       } catch (error) {
         console.error(`Error fetching latest run for workflow ${workflow.id}:`, error);

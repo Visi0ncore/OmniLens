@@ -384,7 +384,18 @@ export default function DashboardPage({ params }: PageProps) {
 
   // Helper function to classify workflow health status with proper yesterday comparison
   const classifyWorkflowHealth = useCallback((workflowId: number): 'consistent' | 'improved' | 'regressed' | 'still_failing' | 'no_runs_today' => {
+    // Check if there's a currently running workflow from latest runs
+    const currentlyRunning = latestRuns.find(run => 
+      run.workflow_id === workflowId && 
+      (run.status === 'in_progress' || run.status === 'queued')
+    );
+    
     const todayRuns = workflowRuns.filter(run => run.workflow_id === workflowId);
+    
+    // If currently running, don't show historical health status - just show no historical data
+    if (currentlyRunning) {
+      return todayRuns.length === 0 ? 'no_runs_today' : 'consistent';
+    }
     
     if (todayRuns.length === 0) {
       return 'no_runs_today'; // No runs today, show as no runs rather than failing
