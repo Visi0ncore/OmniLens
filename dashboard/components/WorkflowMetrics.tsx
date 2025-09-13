@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, Circle, TrendingUp, TrendingDown, ArrowDown } from "lucide-react";
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartContainer } from "@/components/ui/chart";
 import { RadialBar, RadialBarChart } from "recharts";
 import type { WorkflowRun } from "@/lib/github";
 

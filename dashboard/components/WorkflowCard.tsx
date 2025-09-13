@@ -1,12 +1,10 @@
-import { Clock, ExternalLink, Check, Eye, CheckCircle, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { Clock, Eye, CheckCircle, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
 import type { WorkflowRun } from "@/lib/github";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cleanWorkflowName } from "@/lib/utils";
 
 function duration(start: string, end: string): string {
   const startTime = new Date(start);
@@ -33,7 +31,7 @@ function formatRunTime(dateString: string): string {
 interface WorkflowCardProps {
   run: WorkflowRun;
   repoSlug: string; // Repository slug for config context
-  workflowState?: string; // Workflow state from database (e.g., "active", "disabled_manually")
+  workflowState?: string; // Workflow state from database (always "active" now)
   isHighlighted?: boolean;
   highlightColor?: string;
   rightAction?: React.ReactNode; // Optional right-side action button (e.g., delete)
@@ -61,7 +59,6 @@ export default function WorkflowCard({
   const isSuccess = !isMissing && status === "success";
   const isInProgress = !isMissing && (status === "in_progress" || status === 'queued');
   const isIdle = isMissing && !run.run_started_at;
-  const isDisabled = workflowState === 'disabled_manually';
 
   // Determine border classes
   const getBorderClass = () => {
@@ -159,7 +156,6 @@ export default function WorkflowCard({
             <Badge
               variant={
                 isIdle ? "secondary" : 
-                isDisabled ? "secondary" :
                 isSuccess ? "success" : 
                 isInProgress ? "destructive" : 
                 "destructive"
@@ -167,7 +163,6 @@ export default function WorkflowCard({
               className={`shrink-0 ${isInProgress ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
             >
               {isIdle ? "Idle" : 
-               isDisabled ? "Disabled" :
                isMissing ? "Didn't Run" : 
                isSuccess ? "Pass" : 
                isInProgress ? "Running" : 

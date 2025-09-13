@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Play, Pause, Clock, XCircle, Calendar } from "lucide-react";
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Pause, Clock, XCircle, Calendar } from "lucide-react";
+import { ChartContainer } from "@/components/ui/chart";
 import { RadialBar, RadialBarChart } from "recharts";
 
 interface OverviewData {
