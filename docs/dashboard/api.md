@@ -142,7 +142,6 @@ GET /api/workflows?date=2025-08-01&repo=repo1
           "run_started_at": "2025-08-01T05:10:39Z"
         }
       ],
-      "isMissing": false
     }
   ],
   "overviewData": {

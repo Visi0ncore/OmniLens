@@ -19,7 +19,6 @@ export interface WorkflowRun {
     html_url: string;
     run_started_at: string;
   }>; // All runs for this workflow on this date
-  isMissing?: boolean; // Flag to identify mock workflows
 }
 
 interface OverviewData {
@@ -226,12 +225,13 @@ export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string
     // Format date to ISO string for GitHub API
     const dateStr = format(date, "yyyy-MM-dd");
 
-    // Get workflow runs from midnight of the target date until now
-    const startOfDay = `${dateStr}T00:00:00Z`;
-    const now = new Date().toISOString();
+    // Get workflow runs with timezone buffer (12 hours before and after target date)
+    const targetDate = new Date(dateStr + "T00:00:00Z");
+    const startTime = new Date(targetDate.getTime() - 12 * 60 * 60 * 1000).toISOString(); // 12 hours before
+    const endTime = new Date(targetDate.getTime() + 36 * 60 * 60 * 1000).toISOString(); // 36 hours after (next day + 12 hours)
     
-    const startTime = startOfDay;
-    const endTime = now;
+    // Debug logging
+    console.log(`🔍 GitHub API Debug: Searching for runs between ${startTime} and ${endTime} for repo ${repo}`);
     
     // Fetch all workflow runs for the date, handling pagination
     let allRuns: WorkflowRun[] = [];

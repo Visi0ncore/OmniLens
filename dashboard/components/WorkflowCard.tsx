@@ -55,10 +55,8 @@ export default function WorkflowCard({
   healthMetrics
 }: WorkflowCardProps) {
   const status = run.conclusion ?? run.status;
-  const isMissing = (run as any).isMissing === true || status === 'missing' || status === 'idle';
-  const isSuccess = !isMissing && status === "success";
-  const isInProgress = !isMissing && (status === "in_progress" || status === 'queued');
-  const isIdle = isMissing && !run.run_started_at;
+  const isSuccess = status === "success";
+  const isInProgress = status === "in_progress" || status === 'queued';
 
   // Determine border classes
   const getBorderClass = () => {
@@ -155,16 +153,13 @@ export default function WorkflowCard({
             })()}
             <Badge
               variant={
-                isIdle ? "secondary" : 
                 isSuccess ? "success" : 
                 isInProgress ? "destructive" : 
                 "destructive"
               }
               className={`shrink-0 ${isInProgress ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
             >
-              {isIdle ? "Idle" : 
-               isMissing ? "Didn't Run" : 
-               isSuccess ? "Pass" : 
+              {isSuccess ? "Pass" : 
                isInProgress ? "Running" : 
                "Fail"}
             </Badge>
@@ -256,13 +251,12 @@ export default function WorkflowCard({
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
               <span>
-                {isIdle ? "No runs" : 
-                 isInProgress ? "Running" : 
+                {isInProgress ? "Running" : 
                  (run.run_started_at && run.updated_at ? duration(run.run_started_at, run.updated_at) : "No duration")}
               </span>
             </div>
           <div className="flex items-center gap-2">
-            {run.html_url && !isIdle ? (
+            {run.html_url ? (
               <Button variant="outline" size="sm" asChild>
                 <Link href={run.html_url} target="_blank">
                   <Eye className="h-3 w-3 mr-1" />

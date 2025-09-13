@@ -17,6 +17,31 @@ jobs:
   test-health:
     runs-on: ubuntu-latest
     
+    env:
+      # Database configuration (single source of truth)
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: omnilens
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      # Application configuration
+      NODE_ENV: test
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: omnilens
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -35,23 +60,45 @@ jobs:
       working-directory: ./dashboard
       run: bun install
 
+    - name: Setup database schema
+      working-directory: ./dashboard
+      run: |
+        # Install PostgreSQL client
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client
+        
+        # Wait for PostgreSQL to be ready
+        sleep 5
+        
+        # Create database schema
+        psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f lib/schema.sql
+      env:
+        PGPASSWORD: ${{ env.DB_PASSWORD }}
+
     - name: Start development server
       working-directory: ./dashboard
       run: |
-        # Set environment variables
-        echo "DB_USER=postgres" >> .env.local
-        echo "DB_HOST=localhost" >> .env.local
-        echo "DB_NAME=omnilens" >> .env.local
-        echo "DB_PASSWORD=postgres" >> .env.local
-        echo "DB_PORT=5432" >> .env.local
-        echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env.local
-        
-        # Start server in background
+        # Start server in background with environment variables
         bun run dev &
         sleep 10
       env:
+        # Database configuration (inherited from job-level env)
+        DB_HOST: ${{ env.DB_HOST }}
+        DB_PORT: ${{ env.DB_PORT }}
+        DB_NAME: ${{ env.DB_NAME }}
+        DB_USER: ${{ env.DB_USER }}
+        DB_PASSWORD: ${{ env.DB_PASSWORD }}
+        # GitHub token for API access
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Run health tests
       working-directory: ./dashboard
       run: bun run test:health
+      env:
+        # Ensure tests have access to same configuration
+        DB_HOST: ${{ env.DB_HOST }}
+        DB_PORT: ${{ env.DB_PORT }}
+        DB_NAME: ${{ env.DB_NAME }}
+        DB_USER: ${{ env.DB_USER }}
+        DB_PASSWORD: ${{ env.DB_PASSWORD }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

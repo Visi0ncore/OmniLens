@@ -645,25 +645,17 @@ export default function DashboardPage({ params }: PageProps) {
               .map((workflow: any) => {
                 const runData = getWorkflowRunData(workflow.id);
                 
-                // If no run data, create a mock run to show the workflow as idle
-                const mockRun: WorkflowRun = {
-                  id: 0,
-                  name: workflow.name,
-                  workflow_id: workflow.id,
-                  path: workflow.path,
-                  conclusion: null,
-                  status: 'idle',
-                  html_url: '',
-                  run_started_at: '',
-                  updated_at: '',
-                  isMissing: true
-                };
-
                 const healthData = getWorkflowHealthMetrics(workflow.id);
+                
+                // Only show cards for workflows that have actual run data
+                if (!runData) {
+                  return null;
+                }
+                
                 return (
                   <WorkflowCard
                     key={workflow.id}
-                    run={runData || mockRun}
+                    run={runData}
                     workflowState={workflow.state}
                     repoSlug={repoSlug}
                     healthStatus={healthData.status}
@@ -671,6 +663,7 @@ export default function DashboardPage({ params }: PageProps) {
                   />
                 );
               })
+              .filter(Boolean)
           )}
         </div>
 
