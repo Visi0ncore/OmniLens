@@ -101,7 +101,6 @@ export default function DashboardPage({ params }: PageProps) {
   const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([]);
   const [groupedWorkflowRuns, setGroupedWorkflowRuns] = useState<WorkflowRun[]>([]);
   const [yesterdayWorkflowRuns, setYesterdayWorkflowRuns] = useState<WorkflowRun[]>([]);
-  const [latestRuns, setLatestRuns] = useState<WorkflowRun[]>([]);
   const [overviewData, setOverviewData] = useState<any>(null);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true);
   const [isLoadingRuns, setIsLoadingRuns] = useState(false);
@@ -221,29 +220,6 @@ export default function DashboardPage({ params }: PageProps) {
     loadYesterdayRuns();
   }, [selectedDate, repoSlug, workflows.length]);
 
-  // Load latest runs for workflow cards
-  useEffect(() => {
-    const loadLatestRuns = async () => {
-      if (workflows.length === 0) return; // Don't load runs if no workflows
-      
-      try {
-        const response = await fetch(`/api/workflow/${repoSlug}/latest-runs`);
-        if (response.ok) {
-          const data = await response.json();
-          setLatestRuns(data.latestRuns || []);
-          console.log(`📊 Loaded ${data.latestRuns?.length || 0} latest workflow runs`);
-        } else {
-          console.error('Failed to load latest workflow runs');
-          setLatestRuns([]);
-        }
-      } catch (error) {
-        console.error('Error loading latest workflow runs:', error);
-        setLatestRuns([]);
-      }
-    };
-
-    loadLatestRuns();
-  }, [repoSlug, workflows.length]);
 
   const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
   const isSelectedDateToday = isToday(selectedDate);
@@ -282,10 +258,10 @@ export default function DashboardPage({ params }: PageProps) {
     }
   }, [repoSlug]);
 
-  // Get workflow run data for a specific workflow (from latest runs for cards)
+  // Get workflow run data for a specific workflow (from today's runs for cards)
   const getWorkflowRunData = useCallback((workflowId: number): WorkflowRun | null => {
-    return latestRuns.find(run => run.workflow_id === workflowId) || null;
-  }, [latestRuns]);
+    return workflowRuns.find(run => run.workflow_id === workflowId) || null;
+  }, [workflowRuns]);
 
 
 
@@ -310,8 +286,8 @@ export default function DashboardPage({ params }: PageProps) {
 
   // Helper function to classify workflow health status with proper yesterday comparison
   const classifyWorkflowHealth = useCallback((workflowId: number): 'consistent' | 'improved' | 'regressed' | 'still_failing' | 'no_runs_today' => {
-    // Check if there's a currently running workflow from latest runs
-    const currentlyRunning = latestRuns.find(run => 
+    // Check if there's a currently running workflow from today's runs
+    const currentlyRunning = workflowRuns.find(run => 
       run.workflow_id === workflowId && 
       (run.status === 'in_progress' || run.status === 'queued')
     );
