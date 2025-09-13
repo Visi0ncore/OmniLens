@@ -121,21 +121,16 @@ export default function DashboardPage({ params }: PageProps) {
         const response = await fetch(`/api/workflow/${repoSlug}`);
         if (response.ok) {
           const data = await response.json();
-          const sortedWorkflows = (data.workflows || []).sort((a: any, b: any) => {
-            // First, sort by state: active workflows first, then disabled
-            const aIsDisabled = a.state === 'disabled_manually';
-            const bIsDisabled = b.state === 'disabled_manually';
-            
-            if (aIsDisabled && !bIsDisabled) return 1; // a is disabled, b is active
-            if (!aIsDisabled && bIsDisabled) return -1; // a is active, b is disabled
-            
-            // If both have the same state, sort by workflow name without emojis
-            const nameA = removeEmojiFromWorkflowName(a.name || '');
-            const nameB = removeEmojiFromWorkflowName(b.name || '');
-            return nameA.localeCompare(nameB);
-          });
-          setWorkflows(sortedWorkflows);
-          console.log(`📋 Loaded ${sortedWorkflows.length} workflows`);
+          // Filter to only active workflows and sort by name
+          const activeWorkflows = (data.workflows || [])
+            .filter((workflow: any) => workflow.state === 'active')
+            .sort((a: any, b: any) => {
+              const nameA = removeEmojiFromWorkflowName(a.name || '');
+              const nameB = removeEmojiFromWorkflowName(b.name || '');
+              return nameA.localeCompare(nameB);
+            });
+          setWorkflows(activeWorkflows);
+          console.log(`📋 Loaded ${activeWorkflows.length} active workflows`);
         } else {
           console.error('Failed to load workflows');
           setWorkflows([]);
@@ -267,21 +262,16 @@ export default function DashboardPage({ params }: PageProps) {
       const response = await fetch(`/api/workflow/${repoSlug}`);
       if (response.ok) {
         const data = await response.json();
-        const sortedWorkflows = (data.workflows || []).sort((a: any, b: any) => {
-          // First, sort by state: active workflows first, then disabled
-          const aIsDisabled = a.state === 'disabled_manually';
-          const bIsDisabled = b.state === 'disabled_manually';
-          
-          if (aIsDisabled && !bIsDisabled) return 1; // a is disabled, b is active
-          if (!aIsDisabled && bIsDisabled) return -1; // a is active, b is disabled
-          
-          // If both have the same state, sort by workflow name without emojis
-          const nameA = removeEmojiFromWorkflowName(a.name || '');
-          const nameB = removeEmojiFromWorkflowName(b.name || '');
-          return nameA.localeCompare(nameB);
-        });
-        setWorkflows(sortedWorkflows);
-        console.log(`🔄 Refreshed ${sortedWorkflows.length} workflows`);
+        // Filter to only active workflows and sort by name
+        const activeWorkflows = (data.workflows || [])
+          .filter((workflow: any) => workflow.state === 'active')
+          .sort((a: any, b: any) => {
+            const nameA = removeEmojiFromWorkflowName(a.name || '');
+            const nameB = removeEmojiFromWorkflowName(b.name || '');
+            return nameA.localeCompare(nameB);
+          });
+        setWorkflows(activeWorkflows);
+        console.log(`🔄 Refreshed ${activeWorkflows.length} active workflows`);
       } else {
         console.error('Failed to refresh workflows');
       }
@@ -402,17 +392,14 @@ export default function DashboardPage({ params }: PageProps) {
 
   // Helper function to calculate health metrics from workflow health data
   const calculateHealthMetrics = useCallback(() => {
-    // Get all active workflows
-    const activeWorkflows = workflows.filter((w: any) => w.state !== 'disabled_manually');
-    
-    // Count workflows by health status
+    // Count workflows by health status (all workflows are active now)
     let consistentCount = 0;
     let improvedCount = 0;
     let regressedCount = 0;
     let stillFailingCount = 0;
     let noRunsTodayCount = 0;
     
-    activeWorkflows.forEach(workflow => {
+    workflows.forEach(workflow => {
       const healthStatus = classifyWorkflowHealth(workflow.id);
       switch (healthStatus) {
         case 'consistent':
@@ -643,7 +630,7 @@ export default function DashboardPage({ params }: PageProps) {
               completedRuns={overviewData.completedRuns || 0}
               totalRuntime={overviewData.totalRuntime || '0h 0m 0s'}
               didntRunCount={overviewData.didntRunCount || 0}
-              activeWorkflows={workflows.filter((w: any) => w.state !== 'disabled_manually').length}
+              activeWorkflows={workflows.length}
               consistentCount={healthMetrics.consistentCount}
               improvedCount={healthMetrics.improvedCount}
               regressedCount={healthMetrics.regressedCount}
@@ -679,7 +666,6 @@ export default function DashboardPage({ params }: PageProps) {
             ))
           ) : (
             workflows
-              .filter((workflow: any) => workflow.state !== 'disabled_manually')
               .map((workflow: any) => {
                 const runData = getWorkflowRunData(workflow.id);
                 
@@ -712,57 +698,6 @@ export default function DashboardPage({ params }: PageProps) {
           )}
         </div>
 
-        {/* Disabled Workflows */}
-        {(isLoadingWorkflows || isLoadingRuns) ? (
-          // Show skeleton section for disabled workflows during loading
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="h-6 bg-muted rounded w-32" />
-              <div className="h-5 bg-muted rounded w-8" />
-            </div>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 2 }).map((_, index) => (
-                <WorkflowCardSkeleton key={`disabled-${index}`} />
-              ))}
-            </div>
-          </div>
-        ) : workflows.filter((w: any) => w.state === 'disabled_manually').length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-medium">Disabled Workflows</h3>
-            </div>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {workflows
-                .filter((workflow: any) => workflow.state === 'disabled_manually')
-                .map((workflow: any) => {
-                  const runData = getWorkflowRunData(workflow.id);
-                  
-                  // If no run data, create a mock run to show the workflow as idle
-                  const mockRun: WorkflowRun = {
-                    id: 0,
-                    name: workflow.name,
-                    workflow_id: workflow.id,
-                    path: workflow.path,
-                    conclusion: null,
-                    status: 'idle',
-                    html_url: '',
-                    run_started_at: '',
-                    updated_at: '',
-                    isMissing: true
-                  };
-
-                  return (
-                    <WorkflowCard
-                      key={workflow.id}
-                      run={runData || mockRun}
-                      workflowState={workflow.state}
-                      repoSlug={repoSlug}
-                    />
-                  );
-                })}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
