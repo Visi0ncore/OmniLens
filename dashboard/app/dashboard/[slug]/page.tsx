@@ -115,11 +115,30 @@ export default function DashboardPage({ params }: PageProps) {
   // Load workflows when component mounts
   useEffect(() => {
     const loadWorkflows = async () => {
+      console.log(`📋 Initial load: Validating cache and fetching workflows for ${repoSlug}`);
       setIsLoadingWorkflows(true);
       try {
-        const response = await fetch(`/api/workflow/${repoSlug}`);
+        const response = await fetch(`/api/workflow/${repoSlug}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+        
         if (response.ok) {
           const data = await response.json();
+          
+          // Log cache status from API response
+          if (data.cacheUpdated) {
+            console.log(`🔄 Initial load: Cache was outdated and has been updated with ${data.totalCount} workflows`);
+          } else if (data.cached === false) {
+            console.log(`✅ Initial load: Cache was current, ${data.totalCount} workflows validated`);
+          } else {
+            console.log(`📋 Initial load: ${data.totalCount} workflows loaded`);
+          }
+          
           // Filter to only active workflows and sort by name
           const activeWorkflows = (data.workflows || [])
             .filter((workflow: any) => workflow.state === 'active')
@@ -129,7 +148,7 @@ export default function DashboardPage({ params }: PageProps) {
               return nameA.localeCompare(nameB);
             });
           setWorkflows(activeWorkflows);
-          console.log(`📋 Loaded ${activeWorkflows.length} active workflows`);
+          console.log(`✅ Initial load complete: ${activeWorkflows.length} active workflows loaded`);
         } else {
           console.error('Failed to load workflows');
           setWorkflows([]);
@@ -231,13 +250,32 @@ export default function DashboardPage({ params }: PageProps) {
 
   // Manual refresh function
   const handleRefresh = useCallback(async () => {
-    console.log(`🔄 Manual refresh triggered - reloading workflows`);
+    console.log(`🔄 Manual refresh triggered - validating cache and fetching latest workflows from GitHub`);
     setIsLoadingWorkflows(true);
     
     try {
-      const response = await fetch(`/api/workflow/${repoSlug}`);
+      // Add timestamp to force cache revalidation
+      const response = await fetch(`/api/workflow/${repoSlug}?refresh=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
       if (response.ok) {
         const data = await response.json();
+        
+        // Log cache status from API response
+        if (data.cacheUpdated) {
+          console.log(`🔄 Manual refresh: Cache was outdated and has been updated with ${data.totalCount} workflows`);
+        } else if (data.cached === false) {
+          console.log(`✅ Manual refresh: Cache was current, ${data.totalCount} workflows validated`);
+        } else {
+          console.log(`🔄 Manual refresh: ${data.totalCount} workflows loaded`);
+        }
+        
         // Filter to only active workflows and sort by name
         const activeWorkflows = (data.workflows || [])
           .filter((workflow: any) => workflow.state === 'active')
@@ -247,7 +285,7 @@ export default function DashboardPage({ params }: PageProps) {
             return nameA.localeCompare(nameB);
           });
         setWorkflows(activeWorkflows);
-        console.log(`🔄 Refreshed ${activeWorkflows.length} active workflows`);
+        console.log(`✅ Manual refresh complete: ${activeWorkflows.length} active workflows loaded`);
       } else {
         console.error('Failed to refresh workflows');
       }
@@ -644,26 +682,31 @@ export default function DashboardPage({ params }: PageProps) {
             workflows
               .map((workflow: any) => {
                 const runData = getWorkflowRunData(workflow.id);
-                
                 const healthData = getWorkflowHealthMetrics(workflow.id);
                 
-                // Only show cards for workflows that have actual run data
-                if (!runData) {
-                  return null;
-                }
+                // Create a placeholder run object for workflows without run data
+                const displayRun: WorkflowRun = runData || {
+                  id: 0,
+                  name: workflow.name,
+                  workflow_id: workflow.id,
+                  path: workflow.path,
+                  conclusion: null,
+                  status: 'no_runs',
+                  html_url: '',
+                  run_started_at: '',
+                  updated_at: ''
+                };
                 
                 return (
                   <WorkflowCard
                     key={workflow.id}
-                    run={runData}
-                    workflowState={workflow.state}
+                    run={displayRun}
                     repoSlug={repoSlug}
                     healthStatus={healthData.status}
                     healthMetrics={healthData}
                   />
                 );
               })
-              .filter(Boolean)
           )}
         </div>
 

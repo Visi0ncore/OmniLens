@@ -115,26 +115,7 @@ export async function GET(
       }
     }
     
-    // For basic workflow listing, check if we have cached workflows first
-    const savedWorkflows = await getWorkflows(validatedSlug);
-    if (savedWorkflows.length > 0) {
-      
-      const response = {
-        repository: {
-          slug: validatedSlug,
-          displayName: repo.displayName,
-          repoPath: repo.repoPath
-        },
-        workflows: savedWorkflows,
-        totalCount: savedWorkflows.length,
-        cached: true
-      };
-      
-      return NextResponse.json(response);
-    }
-    
-    // Always fetch fresh workflows from GitHub to ensure we have current data
-    
+    // Always fetch fresh workflows from GitHub first to ensure data integrity
     // Extract owner and repo name from the repository path
     const [owner, repoName] = repo.repoPath.split('/');
     if (!owner || !repoName) {
@@ -253,12 +234,43 @@ export async function GET(
       deletedAt: workflow.deleted_at
     }));
     
-    // Save workflows to database for persistence
-    try {
-      await saveWorkflows(validatedSlug, workflows);
-    } catch (error) {
-      console.error('❌ [WORKFLOW API] Error saving workflows to database:', error);
-      // Continue with the response even if saving fails
+    // Compare with cached workflows to detect changes
+    const savedWorkflows = await getWorkflows(validatedSlug);
+    
+    // Helper function to compare workflow arrays
+    const workflowsAreEqual = (github: any[], cached: any[]) => {
+      if (github.length !== cached.length) return false;
+      
+      // Sort both arrays by id for comparison
+      const githubSorted = [...github].sort((a, b) => a.id - b.id);
+      const cachedSorted = [...cached].sort((a, b) => a.id - b.id);
+      
+      return githubSorted.every((ghWorkflow, index) => {
+        const cachedWorkflow = cachedSorted[index];
+        return (
+          ghWorkflow.id === cachedWorkflow.id &&
+          ghWorkflow.name === cachedWorkflow.name &&
+          ghWorkflow.path === cachedWorkflow.path &&
+          ghWorkflow.state === cachedWorkflow.state
+        );
+      });
+    };
+    
+    const isCacheValid = workflowsAreEqual(workflows, savedWorkflows);
+    let cacheUpdated = false;
+    
+    // Update cache if there are differences
+    if (!isCacheValid) {
+      try {
+        await saveWorkflows(validatedSlug, workflows);
+        cacheUpdated = true;
+        console.log(`🔄 [WORKFLOW API] Cache updated: ${workflows.length} workflows for ${validatedSlug}`);
+      } catch (error) {
+        console.error('❌ [WORKFLOW API] Error updating workflow cache:', error);
+        // Continue with the response even if saving fails
+      }
+    } else {
+      console.log(`✅ [WORKFLOW API] Cache is current: ${workflows.length} workflows for ${validatedSlug}`);
     }
     
     const response = {
@@ -268,7 +280,9 @@ export async function GET(
         repoPath: repo.repoPath
       },
       workflows: workflows,
-      totalCount: workflows.length
+      totalCount: workflows.length,
+      cached: !cacheUpdated,
+      cacheUpdated: cacheUpdated
     };
     
     return NextResponse.json(response);

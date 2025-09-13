@@ -31,7 +31,6 @@ function formatRunTime(dateString: string): string {
 interface WorkflowCardProps {
   run: WorkflowRun;
   repoSlug: string; // Repository slug for config context
-  workflowState?: string; // Workflow state from database (always "active" now)
   isHighlighted?: boolean;
   highlightColor?: string;
   rightAction?: React.ReactNode; // Optional right-side action button (e.g., delete)
@@ -47,7 +46,6 @@ interface WorkflowCardProps {
 export default function WorkflowCard({
   run,
   repoSlug,
-  workflowState,
   isHighlighted = false,
   highlightColor = '',
   rightAction,
@@ -57,6 +55,7 @@ export default function WorkflowCard({
   const status = run.conclusion ?? run.status;
   const isSuccess = status === "success";
   const isInProgress = status === "in_progress" || status === 'queued';
+  const hasNoRuns = status === 'no_runs';
 
   // Determine border classes
   const getBorderClass = () => {
@@ -153,13 +152,15 @@ export default function WorkflowCard({
             })()}
             <Badge
               variant={
+                hasNoRuns ? "secondary" :
                 isSuccess ? "success" : 
                 isInProgress ? "destructive" : 
                 "destructive"
               }
               className={`shrink-0 ${isInProgress ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
             >
-              {isSuccess ? "Pass" : 
+              {hasNoRuns ? "No Runs" :
+               isSuccess ? "Pass" : 
                isInProgress ? "Running" : 
                "Fail"}
             </Badge>
@@ -246,7 +247,7 @@ export default function WorkflowCard({
         )}
         
         {/* Duration and View Button */}
-        {healthStatus !== 'no_runs_today' && (
+        {healthStatus !== 'no_runs_today' && !hasNoRuns && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
@@ -255,22 +256,17 @@ export default function WorkflowCard({
                  (run.run_started_at && run.updated_at ? duration(run.run_started_at, run.updated_at) : "No duration")}
               </span>
             </div>
-          <div className="flex items-center gap-2">
-            {run.html_url ? (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={run.html_url} target="_blank">
-                  <Eye className="h-3 w-3 mr-1" />
-                  View
-                </Link>
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" disabled>
-                <Eye className="h-3 w-3 mr-1" />
-                No Run
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {run.html_url && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={run.html_url} target="_blank">
+                    <Eye className="h-3 w-3 mr-1" />
+                    View
+                  </Link>
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
         )}
       </CardContent>
     </Card>
