@@ -193,19 +193,24 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string, branc
       }
     }
 
-    // Filter runs to include those that started on the target date OR are currently running
+    // Filter runs to include those that started on the target date OR are currently running (only for today)
     const targetDateStart = new Date(date);
     targetDateStart.setHours(0, 0, 0, 0);
     const targetDateEnd = new Date(date);
     targetDateEnd.setHours(23, 59, 59, 999);
+    
+    // Check if the target date is today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isTargetDateToday = targetDateStart.getTime() === today.getTime();
     
     const filteredRuns = allRuns.filter(run => {
       const runStartTime = new Date(run.run_started_at);
       const startedOnTargetDate = runStartTime >= targetDateStart && runStartTime <= targetDateEnd;
       const isCurrentlyRunning = run.status === 'in_progress' || run.status === 'queued';
       
-      // Include if it started on the target date OR if it's currently running
-      return startedOnTargetDate || isCurrentlyRunning;
+      // Include if it started on the target date OR if it's currently running (only when viewing today)
+      return startedOnTargetDate || (isCurrentlyRunning && isTargetDateToday);
     });
 
     // For daily metrics, return ALL runs for the day, not just the latest per workflow
@@ -290,19 +295,24 @@ export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string
       }
     }
 
-    // Filter runs to include those that started on the target date OR are currently running
+    // Filter runs to include those that started on the target date OR are currently running (only for today)
     const targetDateStart = new Date(date);
     targetDateStart.setHours(0, 0, 0, 0);
     const targetDateEnd = new Date(date);
     targetDateEnd.setHours(23, 59, 59, 999);
+    
+    // Check if the target date is today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isTargetDateToday = targetDateStart.getTime() === today.getTime();
     
     const filteredRuns = allRuns.filter(run => {
       const runStartTime = new Date(run.run_started_at);
       const startedOnTargetDate = runStartTime >= targetDateStart && runStartTime <= targetDateEnd;
       const isCurrentlyRunning = run.status === 'in_progress' || run.status === 'queued';
       
-      // Include if it started on the target date OR if it's currently running
-      return startedOnTargetDate || isCurrentlyRunning;
+      // Include if it started on the target date OR if it's currently running (only when viewing today)
+      return startedOnTargetDate || (isCurrentlyRunning && isTargetDateToday);
     });
 
     // For workflow cards, group by workflow and collect all run data for the UI

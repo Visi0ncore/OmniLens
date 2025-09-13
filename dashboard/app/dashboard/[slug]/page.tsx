@@ -252,6 +252,7 @@ export default function DashboardPage({ params }: PageProps) {
   const handleRefresh = useCallback(async () => {
     console.log(`🔄 Manual refresh triggered - validating cache and fetching latest workflows from GitHub`);
     setIsLoadingWorkflows(true);
+    setIsLoadingRuns(true);
     
     try {
       // Add timestamp to force cache revalidation
@@ -285,7 +286,62 @@ export default function DashboardPage({ params }: PageProps) {
             return nameA.localeCompare(nameB);
           });
         setWorkflows(activeWorkflows);
-        console.log(`✅ Manual refresh complete: ${activeWorkflows.length} active workflows loaded`);
+        console.log(`✅ Manual refresh: workflows updated with ${activeWorkflows.length} active workflows`);
+        
+        // Also refresh workflow runs data to get latest running status
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        
+        // Fetch workflow runs
+        const runsResponse = await fetch(`/api/workflow/${repoSlug}?date=${dateStr}&grouped=true&refresh=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+        
+        // Fetch overview data
+        const overviewResponse = await fetch(`/api/workflow/${repoSlug}/overview?date=${dateStr}&refresh=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+        
+        if (runsResponse.ok && overviewResponse.ok) {
+          const runsData = await runsResponse.json();
+          const overviewDataResponse = await overviewResponse.json();
+          
+          setWorkflowRuns(runsData.workflowRuns || []);
+          setGroupedWorkflowRuns(runsData.workflowRuns || []);
+          setOverviewData(overviewDataResponse.overview || null);
+          console.log(`📊 Manual refresh: Loaded ${runsData.workflowRuns?.length || 0} workflow runs for ${dateStr}`);
+        }
+        
+        // Also refresh yesterday's runs for health comparison
+        const yesterday = new Date(selectedDate);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
+        
+        const yesterdayResponse = await fetch(`/api/workflow/${repoSlug}?date=${yesterdayStr}&grouped=true&refresh=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+        
+        if (yesterdayResponse.ok) {
+          const yesterdayData = await yesterdayResponse.json();
+          setYesterdayWorkflowRuns(yesterdayData.workflowRuns || []);
+          console.log(`📊 Manual refresh: Loaded ${yesterdayData.workflowRuns?.length || 0} yesterday's workflow runs for ${yesterdayStr}`);
+        }
+        
+        console.log(`✅ Manual refresh complete: workflows and runs refreshed`);
       } else {
         console.error('Failed to refresh workflows');
       }
@@ -293,8 +349,9 @@ export default function DashboardPage({ params }: PageProps) {
       console.error('Error refreshing workflows:', error);
     } finally {
       setIsLoadingWorkflows(false);
+      setIsLoadingRuns(false);
     }
-  }, [repoSlug]);
+  }, [repoSlug, selectedDate]);
 
   // Get workflow run data for a specific workflow (from today's runs for cards)
   const getWorkflowRunData = useCallback((workflowId: number): WorkflowRun | null => {
