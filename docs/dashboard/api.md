@@ -1,279 +1,701 @@
-# Dashboard API Documentation
+# OmniLens Dashboard API Documentation
 
-## Environment Variables Required
+## Overview
 
-**Backend (.env.local):**
-- `GITHUB_TOKEN` - GitHub Personal Access Token with `actions:read` permission
-- `GITHUB_REPO_1` - Primary repository in format `owner/repo` (e.g., `microsoft/vscode`)
-- `GITHUB_REPO_2` - Secondary repository in format `owner/repo` (optional)
-- `GITHUB_REPO_3` - Tertiary repository in format `owner/repo` (optional)
+The OmniLens Dashboard provides a REST API for managing GitHub repository workflows and their execution data. The system uses a database-driven approach with intelligent caching and GitHub API integration.
 
-## Frontend to Backend APIs
+## Authentication
 
-### 1. Get Available Repositories
+**Required Environment Variable:**
+- `GITHUB_TOKEN` - GitHub Personal Access Token with the following permissions:
+  - `actions:read` - Read access to GitHub Actions
+  - `repo:read` - Read access to repository metadata
+  - `workflows:read` - Read access to workflow definitions
+
+## Database Integration
+
+The dashboard uses a PostgreSQL database for:
+- **Repository Management**: User-added repositories are stored in the database
+- **Workflow Persistence**: Workflow definitions are cached with automatic validation
+- **Performance**: Reduces GitHub API calls through intelligent caching
+
+---
+
+## Repository Management Endpoints
+
+### 1. List Repositories
+
+Get all user-added repositories from the database.
+
 **Endpoint:** 
+```http
+GET /api/repo
 ```
-GET /api/repositories
-```
 
-**Required Values:**
-- None
-
-**Request Body:**
-- None (GET request)
-
-**Response Body:**
+**Response:**
 ```json
 {
   "repositories": [
     {
-      "slug": "repo1",
-      "repoPath": "owner/repo",
-      "envKey": "GITHUB_REPO_1",
-      "displayName": "Owner/Repo",
-      "hasConfig": true
+      "slug": "omnilens-chris-repo-1",
+      "displayName": "Chris/OmniLens",
+      "avatarUrl": "https://avatars.githubusercontent.com/u/12345?v=4",
+      "htmlUrl": "https://github.com/chris/omnilens"
     }
   ]
 }
 ```
 
-**Note:** The `displayName` field contains the repository name extracted from the corresponding environment variable (e.g., `GITHUB_REPO_1` value).
-
-**Expected Result Code:** 
+**Status Codes:**
 - `200` - Success
-- `500` - Server error (missing env vars, config issues, etc.)
+- `500` - Database error
 
-**Example Request:**
+---
+
+### 2. Add Repository
+
+Add a new repository to the dashboard.
+
+**Endpoint:**
 ```http
-GET /api/repositories
+POST /api/repo/add
 ```
-
-### 2. Get Repositories with Metrics
-**Endpoint:** 
-```
-GET /api/repositories/metrics
-```
-
-**Required Values:**
-- None
 
 **Request Body:**
-- None (GET request)
-
-**Response Body:**
 ```json
 {
-  "repositories": [
-    {
-      "slug": "repo1",
-      "repoPath": "owner/repo",
-      "envKey": "GITHUB_REPO_1",
-      "displayName": "Owner/Repo",
-      "hasConfig": true,
-      "hasWorkflows": true,
-      "metrics": {
-        "totalWorkflows": 5,
-        "passedRuns": 3,
-        "failedRuns": 1,
-        "inProgressRuns": 1,
-        "successRate": 75,
-        "hasActivity": true
-      }
-    }
-  ]
+  "repoPath": "owner/repository-name"
 }
 ```
 
-**Note:** 
-- The `displayName` field contains the repository name extracted from the corresponding environment variable
-- The `metrics` field contains today's workflow summary data for the home page display
-- `metrics` will be `null` if the repository has no workflows configured or if there was an error fetching data
-- `successRate` is calculated as `(passedRuns / (passedRuns + failedRuns)) * 100`, rounded to nearest integer
-- `hasActivity` indicates if there were any completed runs or runs in progress today
-
-**Expected Result Code:** 
-- `200` - Success (individual repository errors don't fail the entire request)
-- `500` - Server error (missing env vars, config issues, etc.)
-
-**Example Request:**
-```http
-GET /api/repositories/metrics
-```
-
-### 3. Get Workflow Data
-**Endpoint:** 
-```
-GET /api/workflows
-```
-
-**Required Values:**
-- `date` (query parameter) - Date in YYYY-MM-DD format
-- `repo` (query parameter) - Repository slug (e.g., `repo1`, `repo2`, `repo3`)
-
-```
-GET /api/workflows?date=2025-08-01&repo=repo1
-```
-
-**Request Body:**
-- None (GET request)
-
-**Response Body:**
+**Response:**
 ```json
 {
-  "workflowRuns": [
-    {
-      "id": 16665280399,
-      "name": "🧪 Single Workflow",
-      "workflow_id": 123456,
-      "workflow_name": "Single Workflow",
-      "path": ".github/workflows/single-workflow.yml",
-      "conclusion": "success" | "failure" | null,
-      "status": "completed" | "in_progress" | "queued",
-      "html_url": "https://github.com/owner/repo/actions/runs/16665280399",
-      "run_started_at": "2025-08-01T05:10:39Z",
-      "updated_at": "2025-08-01T05:12:15Z",
-      "run_count": 1,
-      "all_runs": [
-        {
-          "id": 16665280399,
-          "conclusion": "success",
-          "status": "completed",
-          "html_url": "https://github.com/owner/repo/actions/runs/16665280399",
-          "run_started_at": "2025-08-01T05:10:39Z"
-        }
-      ],
-      "isMissing": false
-    }
-  ],
-  "overviewData": {
-    "completedRuns": 2,
-    "inProgressRuns": 0,
-    "passedRuns": 1,
-    "failedRuns": 1,
-    "totalRuntime": 156,
-    "didntRunCount": 1,
-    "totalWorkflows": 2,
-    "missingWorkflows": ["build-workflow.yml"]
+  "success": true,
+  "repository": {
+    "slug": "omnilens-owner-repository-name",
+    "repoPath": "owner/repository-name",
+    "displayName": "Owner/Repository Name",
+    "htmlUrl": "https://github.com/owner/repository-name",
+    "defaultBranch": "main",
+    "avatarUrl": "https://avatars.githubusercontent.com/u/12345?v=4"
   }
 }
 ```
 
-**Expected Result Code:** 
-- `200` - Success
-- `400` - Missing or invalid date/repo parameter
-- `500` - Server error (GitHub API failure, missing env vars, etc.)
+**Status Codes:**
+- `201` - Repository added successfully
+- `400` - Invalid repository path or validation failed
+- `409` - Repository already exists
+- `500` - Server error
 
-**Example Request:**
+---
+
+### 3. Validate Repository
+
+Validate a repository path before adding it.
+
+**Endpoint:**
 ```http
-GET /api/workflows?date=2025-08-01&repo=repo1
+POST /api/repo/validate
 ```
-
-## Backend to External APIs
-
-### 1. GitHub Actions API - List Workflow Runs
-**Endpoint:** 
-```
-GET https://api.github.com/repos/{owner}/{repo}/actions/runs
-```
-
-**Required Values:**
-- `{owner}` - GitHub repository owner/organization (e.g., "microsoft")
-- `{repo}` - GitHub repository name (e.g., "vscode")
-- `created` (query parameter) - Date range filter in ISO format
-- `per_page` (query parameter) - Results per page (max 100)
-- `page` (query parameter) - Page number (starts at 1)
-
-**Note:** The `{owner}` and `{repo}` values are extracted from the corresponding `GITHUB_REPO_X` environment variable for the requested repository slug.
-
-```
-GET https://api.github.com/repos/owner/repo/actions/runs?created=2025-08-01T00:00:00Z..2025-08-01T23:59:59Z&per_page=100&page=1
-```
-
-**Required Headers:**
-- `Accept: application/vnd.github+json`
-- `Authorization: Bearer {GITHUB_TOKEN}`
-- `X-GitHub-Api-Version: 2022-11-28`
 
 **Request Body:**
-- None (GET request)
-
-**Response Body:**
 ```json
 {
-  "total_count": 234,
-  "workflow_runs": [
+  "repoInput": "owner/repository-name"
+}
+```
+
+**Response:**
+```json
+{
+  "isValid": true,
+  "repoPath": "owner/repository-name",
+  "displayName": "Owner/Repository Name",
+  "htmlUrl": "https://github.com/owner/repository-name",
+  "defaultBranch": "main",
+  "avatarUrl": "https://avatars.githubusercontent.com/u/12345?v=4"
+}
+```
+
+**Status Codes:**
+- `200` - Validation successful
+- `400` - Invalid repository format
+- `404` - Repository not found or not accessible
+- `500` - Server error
+
+---
+
+### 4. Get Repository Details
+
+Get details for a specific repository.
+
+**Endpoint:**
+```http
+GET /api/repo/{slug}
+```
+
+**Parameters:**
+- `slug` - Repository slug (URL-safe identifier)
+
+**Response:**
+```json
+{
+  "repository": {
+    "slug": "omnilens-owner-repo",
+    "repoPath": "owner/repo",
+    "displayName": "Owner/Repo",
+    "htmlUrl": "https://github.com/owner/repo",
+    "defaultBranch": "main",
+    "avatarUrl": "https://avatars.githubusercontent.com/u/12345?v=4",
+    "addedAt": "2024-09-13T10:30:00Z"
+  }
+}
+```
+
+**Status Codes:**
+- `200` - Success
+- `404` - Repository not found
+- `500` - Server error
+
+---
+
+### 5. Delete Repository
+
+Remove a repository from the dashboard.
+
+**Endpoint:** 
+```http
+DELETE /api/repo/{slug}
+```
+
+**Parameters:**
+- `slug` - Repository slug
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Repository removed successfully"
+}
+```
+
+**Status Codes:**
+- `200` - Repository deleted successfully
+- `404` - Repository not found
+- `500` - Server error
+
+---
+
+## Workflow Management Endpoints
+
+### 1. Get Workflows / Workflow Runs
+
+Main endpoint that returns either workflow definitions or workflow run data based on parameters.
+
+**Endpoint:**
+```http
+GET /api/workflow/{slug}
+GET /api/workflow/{slug}?date=YYYY-MM-DD
+GET /api/workflow/{slug}?date=YYYY-MM-DD&grouped=true
+```
+
+**Parameters:**
+- `slug` (path) - Repository slug
+- `date` (query, optional) - Date in YYYY-MM-DD format
+- `grouped` (query, optional) - Return grouped workflow runs (latest per workflow)
+
+#### Without Date Parameter (Workflow Definitions)
+
+**Response:**
+```json
+{
+  "repository": {
+    "slug": "omnilens-owner-repo",
+    "displayName": "Owner/Repo",
+    "repoPath": "owner/repo"
+  },
+  "workflows": [
     {
-      "id": 16665280399,
-      "name": "🧪 Single Workflow",
-      "workflow_id": 123456,
-      "path": ".github/workflows/single-workflow.yml",
+      "id": 12345,
+      "name": "🧪 CI Tests",
+      "path": ".github/workflows/ci.yml",
+      "state": "active",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-09-13T14:20:00Z"
+    }
+  ],
+  "totalCount": 5,
+  "cached": false,
+  "cacheUpdated": true
+}
+```
+
+#### With Date Parameter (Workflow Runs)
+
+**Response:**
+```json
+{
+  "repository": {
+    "slug": "omnilens-owner-repo",
+    "displayName": "Owner/Repo",
+    "repoPath": "owner/repo"
+  },
+  "workflowRuns": [
+    {
+      "id": 987654321,
+      "name": "🧪 CI Tests",
+      "workflow_id": 12345,
+      "path": ".github/workflows/ci.yml",
       "conclusion": "success",
       "status": "completed",
-      "html_url": "https://github.com/owner/repo/actions/runs/16665280399",
-      "run_started_at": "2025-08-01T05:10:39Z",
-      "updated_at": "2025-08-01T05:12:15Z",
-      "head_branch": "main",
-      "head_sha": "abc123def456"
+      "html_url": "https://github.com/owner/repo/actions/runs/987654321",
+      "run_started_at": "2024-09-13T10:00:00Z",
+      "updated_at": "2024-09-13T10:05:00Z",
+      "run_count": 3,
+      "all_runs": [
+        {
+          "id": 987654321,
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/owner/repo/actions/runs/987654321",
+          "run_started_at": "2024-09-13T10:00:00Z"
+        }
+      ]
     }
   ]
 }
 ```
 
-**Expected Result Code:**
+**Status Codes:**
 - `200` - Success
-- `401` - Invalid or missing GitHub token
-- `403` - Rate limit exceeded or insufficient permissions
+- `400` - Invalid date format or parameters
 - `404` - Repository not found
-- `422` - Invalid parameters
+- `500` - Server error
 
-**Example Request:**
+**Cache Behavior:**
+- Always fetches fresh data from GitHub API
+- Compares with database cache to detect changes
+- Updates cache only when differences are found
+- Returns cache status indicators
+
+---
+
+### 2. Get Workflow Overview
+
+Get daily metrics and overview data for a repository.
+
+**Endpoint:**
 ```http
-GET https://api.github.com/repos/owner/repo/actions/runs?created=2025-08-01T00:00:00Z..2025-08-01T23:59:59Z&per_page=100&page=1
-Authorization: Bearer ghp_xxxxxxxxxxxx
-Accept: application/vnd.github+json
-X-GitHub-Api-Version: 2022-11-28
+GET /api/workflow/{slug}/overview?date=YYYY-MM-DD
 ```
+
+**Parameters:**
+- `slug` (path) - Repository slug
+- `date` (query, optional) - Date in YYYY-MM-DD format (defaults to today)
+
+**Response:**
+```json
+{
+  "repository": {
+    "slug": "omnilens-owner-repo",
+    "displayName": "Owner/Repo",
+    "repoPath": "owner/repo"
+  },
+  "overview": {
+    "completedRuns": 15,
+    "inProgressRuns": 2,
+    "passedRuns": 12,
+    "failedRuns": 3,
+    "totalRuntime": "2h 30m 45s",
+    "didntRunCount": 1,
+    "totalWorkflows": 5,
+    "successRate": 80,
+    "passRate": 80,
+    "avgRunsPerHour": 2.5,
+    "minRunsPerHour": 0,
+    "maxRunsPerHour": 8,
+    "runsByHour": [
+      {
+        "hour": 9,
+        "passed": 2,
+        "failed": 0,
+        "total": 2
+      }
+    ]
+  }
+}
+```
+
+**Status Codes:**
+- `200` - Success
+- `400` - Invalid date format
+- `404` - Repository not found
+- `500` - Server error
+
+---
+
+### 3. Check Workflow Existence
+
+Check if workflows exist in the database cache without triggering GitHub API calls.
+
+**Endpoint:**
+```http
+GET /api/workflow/{slug}/exists
+```
+
+**Parameters:**
+- `slug` (path) - Repository slug
+
+**Response:**
+```json
+{
+  "hasWorkflows": true,
+  "workflowCount": 5,
+  "message": "Found 5 saved workflows for omnilens-owner-repo"
+}
+```
+
+**Status Codes:**
+- `200` - Success
+- `400` - Invalid repository slug
+- `500` - Server error
+
+---
+
+### 4. Get Latest Workflow Runs
+
+Get the latest run for each workflow (prioritizes running/queued over completed runs).
+
+**Endpoint:**
+```http
+GET /api/workflow/{slug}/latest-runs
+```
+
+**Parameters:**
+- `slug` (path) - Repository slug
+
+**Response:**
+```json
+{
+  "repository": {
+    "slug": "omnilens-owner-repo",
+    "displayName": "Owner/Repo",
+    "repoPath": "owner/repo"
+  },
+  "latestRuns": [
+    {
+      "id": 987654321,
+      "name": "🧪 CI Tests",
+      "workflow_id": 12345,
+      "path": ".github/workflows/ci.yml",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/owner/repo/actions/runs/987654321",
+      "run_started_at": "2024-09-13T10:00:00Z",
+      "updated_at": "2024-09-13T10:05:00Z"
+    }
+  ]
+}
+```
+
+**Status Codes:**
+- `200` - Success
+- `404` - Repository not found
+- `500` - Server error
+
+---
+
+### 5. Get Health Metrics
+
+Get workflow health status based on yesterday vs today comparison.
+
+**Endpoint:**
+```http
+GET /api/workflow/{slug}/health-metrics?date=YYYY-MM-DD
+```
+
+**Parameters:**
+- `slug` (path) - Repository slug
+- `date` (query, optional) - Date in YYYY-MM-DD format (defaults to today)
+
+**Response:**
+```json
+{
+  "repository": {
+    "slug": "omnilens-owner-repo",
+    "displayName": "Owner/Repo",
+    "repoPath": "owner/repo"
+  },
+  "healthMetrics": [
+    {
+      "workflowId": 12345,
+      "workflowName": "🧪 CI Tests",
+      "status": "consistent",
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    }
+  ]
+}
+```
+
+**Health Status Values:**
+- `consistent` - Performing the same as yesterday
+- `improved` - Better performance than yesterday
+- `regressed` - Worse performance than yesterday
+- `still_failing` - Continued failures from yesterday
+- `no_runs_today` - No runs on the selected date
+
+**Status Codes:**
+- `200` - Success
+- `400` - Invalid date format
+- `404` - Repository not found
+- `500` - Server error
+
+---
+
+## Response Format Standards
+
+### Success Responses
+
+All successful responses follow consistent patterns:
+
+**Single Resource:**
+```json
+{
+  "repository": { /* repository details */ },
+  "data": { /* resource data */ }
+}
+```
+
+**Multiple Resources:**
+```json
+{
+  "repository": { /* repository details */ },
+  "resources": [ /* array of resources */ ],
+  "totalCount": 5
+}
+```
+
+**Cache Indicators (when applicable):**
+```json
+{
+  "cached": false,        // true if serving from cache
+  "cacheUpdated": true    // true if cache was refreshed
+}
+```
+
+### Error Responses
+
+**Validation Errors (400):**
+```json
+{
+  "error": "Invalid date format. Use YYYY-MM-DD format.",
+  "details": ["date: String must contain exactly 10 character(s)"]
+}
+```
+
+**Not Found Errors (404):**
+```json
+{
+  "error": "Repository not found in dashboard"
+}
+```
+
+**Server Errors (500):**
+```json
+{
+  "error": "GitHub integration not configured"
+}
+```
+
+---
+
+## GitHub API Integration
+
+### Rate Limiting
+
+The dashboard implements intelligent rate limiting:
+- **Cache-first approach**: Checks database before GitHub API calls
+- **Batch operations**: Groups related API calls together
+- **Error handling**: Graceful degradation on rate limit hits
+
+### Branch Filtering
+
+All workflow data is filtered to the repository's default branch:
+- Workflow definitions must have runs on the default branch
+- Workflow runs are filtered by default branch
+- Historical data respects branch-based filtering
+
+### Pagination
+
+GitHub API responses are automatically paginated:
+- **Page size**: 100 results per page (GitHub maximum)
+- **Auto-pagination**: Continues until all results are fetched
+- **Safety limits**: Maximum 10 pages to prevent infinite loops
+
+---
+
+## Database Schema
+
+### Repositories Table
+
+```sql
+CREATE TABLE repositories (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(255) UNIQUE NOT NULL,
+  repo_path VARCHAR(255) NOT NULL,
+  display_name VARCHAR(255) NOT NULL,
+  html_url TEXT NOT NULL,
+  default_branch VARCHAR(100) NOT NULL,
+  avatar_url TEXT,
+  added_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Workflows Table
+
+```sql
+CREATE TABLE workflows (
+  id SERIAL PRIMARY KEY,
+  repo_slug VARCHAR(255) NOT NULL,
+  workflow_id INTEGER NOT NULL,
+  workflow_name VARCHAR(255) NOT NULL,
+  workflow_path VARCHAR(500) NOT NULL,
+  workflow_state VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(repo_slug, workflow_id)
+);
+```
+
+---
+
+## Environment Setup
+
+### Required Environment Variables
+
+```env
+# GitHub Integration
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+
+# Database Connection
+DATABASE_URL=postgresql://username:password@host:port/database
+
+# Next.js Configuration
+NEXTAUTH_SECRET=your-secret-key
+NEXTAUTH_URL=http://localhost:3000
+```
+
+### GitHub Token Permissions
+
+The GitHub token requires these scopes:
+- `actions:read` - Read workflow runs and artifacts
+- `repo` - Access repository data (for private repos)
+- `workflow` - Read workflow definitions
+
+### Database Setup
+
+1. **Install PostgreSQL** (version 12+)
+2. **Run schema migration**:
+   ```bash
+   psql -d your_database -f lib/schema.sql
+   ```
+3. **Verify tables** are created correctly
+
+---
 
 ## Error Handling
 
-### Frontend Errors
-- **Network errors** - Displays error state component
-- **400/500 responses** - Shows error message to user
-- **Missing data** - Falls back to skeleton loading state
-- **No repositories found** - Displays "No repositories found" message with configuration instructions
+### Client-Side Error Handling
 
-### Backend Errors
-- **GitHub API rate limits** - Returns 500 with descriptive error
-- **Invalid GitHub token** - Returns 500 with auth error
-- **Missing environment variables** - Returns 500 with configuration error
-- **Date parsing errors** - Returns 400 with validation error
-- **Invalid repository slug** - Returns 400 with validation error
-- **Repository not found in config** - Returns 400 with configuration error
+**Network Errors:**
+- Display error state components
+- Provide retry mechanisms
+- Graceful fallback to cached data
 
-## Pagination
+**API Errors:**
+- Parse error response messages
+- Show user-friendly error notifications
+- Log detailed errors for debugging
 
-The GitHub API automatically handles pagination:
-- **Per page limit:** 100 results maximum
-- **Page tracking:** Automatically fetches all pages until no more results
-- **Logging:** Reports total pages fetched for debugging
-- **Safety limit:** Maximum 10 pages to prevent infinite loops
+### Server-Side Error Handling
 
-## Multi-Repository Support
+**GitHub API Errors:**
+- Rate limit detection and backoff
+- Token validation and refresh
+- Repository access verification
 
-The dashboard now supports up to 3 repositories:
+**Database Errors:**
+- Connection pool management
+- Transaction rollback on failures
+- Data consistency checks
 
-### Repository Configuration
-- **Environment Variables:** `GITHUB_REPO_1`, `GITHUB_REPO_2`, `GITHUB_REPO_3` (source of truth for repository names)
-- **Repository Slugs:** `repo1`, `repo2`, `repo3` (used in API calls and URLs)
-- **Configuration:** Each repository has its own categories and trigger mappings in `workflows.json`
-- **Repository Names:** Extracted from environment variables, not stored in JSON config
+**Validation Errors:**
+- Zod schema validation for all inputs
+- Comprehensive error messages
+- Input sanitization and security
 
-### URL Structure
-- **Home Page:** `/` - Repository selection page
-- **Repository Dashboard:** `/dashboard/[slug]` - Where `[slug]` is `repo1`, `repo2`, or `repo3`
+---
 
-### Data Isolation
-- **Local Storage:** Repository-specific keys (e.g., `reviewedWorkflows-repo1-2025-01-15`)
-- **API Calls:** All workflow data is scoped to the specific repository
-- **Configuration:** Each repository maintains its own workflow categories and mappings
-- **Repository Names:** Single source of truth from environment variables, eliminating data duplication
+## Security Considerations
+
+### Authentication
+
+- GitHub token stored securely in environment variables
+- No tokens exposed to client-side code
+- Token permissions follow principle of least privilege
+
+### Input Validation
+
+- All inputs validated with Zod schemas
+- SQL injection prevention through parameterized queries
+- XSS prevention through proper data sanitization
+
+### Rate Limiting
+
+- Intelligent caching reduces API call frequency
+- Graceful degradation on rate limit hits
+- Monitoring and alerting for unusual usage patterns
+
+---
+
+## Development and Testing
+
+### Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+
+# Run database migrations
+npm run db:migrate
+
+# Start development server
+npm run dev
+```
+
+### API Testing
+
+The API includes comprehensive error handling and logging:
+- Request/response logging in development
+- Error tracking with stack traces
+- Performance monitoring for slow endpoints
+
+### Health Checks
+
+Monitor API health through:
+- Database connection status
+- GitHub API connectivity
+- Cache performance metrics
+- Error rate monitoring
+
+---
+
+This documentation reflects the current state of the OmniLens Dashboard API as of September 2024. For the most up-to-date information, refer to the OpenAPI specifications in the codebase.

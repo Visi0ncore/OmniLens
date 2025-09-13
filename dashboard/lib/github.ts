@@ -19,7 +19,6 @@ export interface WorkflowRun {
     html_url: string;
     run_started_at: string;
   }>; // All runs for this workflow on this date
-  isMissing?: boolean; // Flag to identify mock workflows
 }
 
 interface OverviewData {
@@ -75,9 +74,9 @@ export function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[
     new Date(b.run_started_at).getTime() - new Date(a.run_started_at).getTime()
   );
 
-  // Use workflow name as the key
+  // Use workflow ID as the key (workflow names are not unique!)
   sortedRuns.forEach(run => {
-    const workflowKey = run.name || `workflow-${run.workflow_id}`;
+    const workflowKey = run.workflow_id.toString();
 
     if (!latestRuns.has(workflowKey)) {
       latestRuns.set(workflowKey, run);
@@ -109,7 +108,7 @@ export function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[
 
   // Add run count and all runs to each workflow run for the UI
   const result = Array.from(latestRuns.values()).map(run => {
-    const workflowKey = run.name || `workflow-${run.workflow_id}`;
+    const workflowKey = run.workflow_id.toString();
     return {
       ...run,
       run_count: duplicateCount.get(workflowKey) || 1,
@@ -123,7 +122,7 @@ export function getLatestWorkflowRuns(workflowRuns: WorkflowRun[]): WorkflowRun[
 
 
 // Get workflow runs for a specific date and repository (for daily metrics - returns all runs)
-export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Promise<WorkflowRun[]> {
+export async function getWorkflowRunsForDate(date: Date, repoSlug: string, branch?: string): Promise<WorkflowRun[]> {
   try {
     const { token, repo } = await getRepoInfo(repoSlug);
 
@@ -137,8 +136,6 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
     const startTime = startOfDay;
     const endTime = now;
     
-
-    
     // Fetch all workflow runs for the date, handling pagination
     let allRuns: WorkflowRun[] = [];
     let page = 1;
@@ -147,8 +144,9 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
 
     while (hasMorePages) {
           // Use the correct time range: from midnight of target date until now
+    const branchParam = branch ? `&branch=${encodeURIComponent(branch)}` : '';
     const res = await fetch(
-      `${API_BASE}/repos/${repo}/actions/runs?created=${startTime}..${endTime}&per_page=100&page=${page}&_t=${Date.now()}`,
+      `${API_BASE}/repos/${repo}/actions/runs?created=${startTime}..${endTime}&per_page=100&page=${page}${branchParam}&_t=${Date.now()}`,
       {
         headers: {
           Accept: "application/vnd.github+json",
@@ -180,6 +178,7 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
 
       const json = await res.json();
       const pageRuns = json.workflow_runs as WorkflowRun[];
+      
 
       allRuns = allRuns.concat(pageRuns);
       pagesFetched++;
@@ -194,7 +193,7 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
       }
     }
 
-    // Filter runs to only include those that actually started on the target date
+    // Filter runs to include those that started on the target date OR are currently running
     const targetDateStart = new Date(date);
     targetDateStart.setHours(0, 0, 0, 0);
     const targetDateEnd = new Date(date);
@@ -202,7 +201,11 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
     
     const filteredRuns = allRuns.filter(run => {
       const runStartTime = new Date(run.run_started_at);
-      return runStartTime >= targetDateStart && runStartTime <= targetDateEnd;
+      const startedOnTargetDate = runStartTime >= targetDateStart && runStartTime <= targetDateEnd;
+      const isCurrentlyRunning = run.status === 'in_progress' || run.status === 'queued';
+      
+      // Include if it started on the target date OR if it's currently running
+      return startedOnTargetDate || isCurrentlyRunning;
     });
 
     // For daily metrics, return ALL runs for the day, not just the latest per workflow
@@ -215,19 +218,20 @@ export async function getWorkflowRunsForDate(date: Date, repoSlug: string): Prom
 }
 
 // Get workflow runs for a specific date and repository (for workflow cards - returns grouped data)
-export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string): Promise<WorkflowRun[]> {
+export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string, branch?: string): Promise<WorkflowRun[]> {
   try {
     const { token, repo } = await getRepoInfo(repoSlug);
 
     // Format date to ISO string for GitHub API
     const dateStr = format(date, "yyyy-MM-dd");
 
-    // Get workflow runs from midnight of the target date until now
-    const startOfDay = `${dateStr}T00:00:00Z`;
-    const now = new Date().toISOString();
+    // Get workflow runs with timezone buffer (12 hours before and after target date)
+    const targetDate = new Date(dateStr + "T00:00:00Z");
+    const startTime = new Date(targetDate.getTime() - 12 * 60 * 60 * 1000).toISOString(); // 12 hours before
+    const endTime = new Date(targetDate.getTime() + 36 * 60 * 60 * 1000).toISOString(); // 36 hours after (next day + 12 hours)
     
-    const startTime = startOfDay;
-    const endTime = now;
+    // Debug logging
+    console.log(`🔍 GitHub API Debug: Searching for runs between ${startTime} and ${endTime} for repo ${repo}`);
     
     // Fetch all workflow runs for the date, handling pagination
     let allRuns: WorkflowRun[] = [];
@@ -237,8 +241,9 @@ export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string
 
     while (hasMorePages) {
       // Use the correct time range: from midnight of target date until now
+      const branchParam = branch ? `&branch=${encodeURIComponent(branch)}` : '';
       const res = await fetch(
-        `${API_BASE}/repos/${repo}/actions/runs?created=${startTime}..${endTime}&per_page=100&page=${page}&_t=${Date.now()}`,
+        `${API_BASE}/repos/${repo}/actions/runs?created=${startTime}..${endTime}&per_page=100&page=${page}${branchParam}&_t=${Date.now()}`,
         {
           headers: {
             Accept: "application/vnd.github+json",
@@ -270,6 +275,7 @@ export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string
 
       const json = await res.json();
       const pageRuns = json.workflow_runs as WorkflowRun[];
+      
 
       allRuns = allRuns.concat(pageRuns);
       pagesFetched++;
@@ -284,7 +290,7 @@ export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string
       }
     }
 
-    // Filter runs to only include those that actually started on the target date
+    // Filter runs to include those that started on the target date OR are currently running
     const targetDateStart = new Date(date);
     targetDateStart.setHours(0, 0, 0, 0);
     const targetDateEnd = new Date(date);
@@ -292,12 +298,17 @@ export async function getWorkflowRunsForDateGrouped(date: Date, repoSlug: string
     
     const filteredRuns = allRuns.filter(run => {
       const runStartTime = new Date(run.run_started_at);
-      return runStartTime >= targetDateStart && runStartTime <= targetDateEnd;
+      const startedOnTargetDate = runStartTime >= targetDateStart && runStartTime <= targetDateEnd;
+      const isCurrentlyRunning = run.status === 'in_progress' || run.status === 'queued';
+      
+      // Include if it started on the target date OR if it's currently running
+      return startedOnTargetDate || isCurrentlyRunning;
     });
 
     // For workflow cards, group by workflow and collect all run data for the UI
     // This shows one card per workflow but includes run_count and all_runs data
     const latestRuns = getLatestWorkflowRuns(filteredRuns);
+
 
     return latestRuns;
 
@@ -327,7 +338,7 @@ export function calculateOverviewData(workflowRuns: WorkflowRun[]): OverviewData
     return total;
   }, 0);
 
-  // For now, we don't track missing workflows since we removed categorization
+  // Simple workflow metrics calculation
   const didntRunCount = 0;
   const totalWorkflows = workflowRuns.length;
   const missingWorkflows: string[] = [];

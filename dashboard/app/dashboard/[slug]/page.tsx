@@ -6,7 +6,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, ArrowLeft, Settings, BarChart3 } from "lucide-react";
+import { Calendar, ArrowLeft, Settings, BarChart3, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { removeEmojiFromWorkflowName } from "@/lib/utils";
 import type { WorkflowRun } from "@/lib/github";
@@ -100,6 +100,8 @@ export default function DashboardPage({ params }: PageProps) {
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [workflowRuns, setWorkflowRuns] = useState<WorkflowRun[]>([]);
   const [groupedWorkflowRuns, setGroupedWorkflowRuns] = useState<WorkflowRun[]>([]);
+  const [yesterdayWorkflowRuns, setYesterdayWorkflowRuns] = useState<WorkflowRun[]>([]);
+  const [overviewData, setOverviewData] = useState<any>(null);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true);
   const [isLoadingRuns, setIsLoadingRuns] = useState(false);
 
@@ -108,114 +110,15 @@ export default function DashboardPage({ params }: PageProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const selectedDateRef = useRef(selectedDate);
 
-  // Helper function to compare workflow runs for changes
-  const hasWorkflowRunsChanged = useCallback((oldRuns: WorkflowRun[], newRuns: WorkflowRun[]): boolean => {
-    if (oldRuns.length !== newRuns.length) return true;
-    
-    // Create a simple hash of the runs for comparison
-    const oldHash = oldRuns.map(run => `${run.id}-${run.status}-${run.conclusion}`).join('|');
-    const newHash = newRuns.map(run => `${run.id}-${run.status}-${run.conclusion}`).join('|');
-    
-    return oldHash !== newHash;
-  }, []);
 
-  // Load workflow runs for the selected date (ungrouped for daily metrics)
-  const loadWorkflowRuns = useCallback(async (date: Date, isPolling: boolean = false) => {
-    // Only show loading state for initial loads, not polling
-    if (!isPolling) {
-      setIsLoadingRuns(true);
-    }
-    
-    try {
-      const dateStr = format(date, "yyyy-MM-dd");
-      const response = await fetch(`/api/workflow/${repoSlug}?date=${dateStr}`, { 
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const newRuns = data.workflowRuns || [];
-        
-        // Only update state if data has actually changed
-        if (!isPolling || hasWorkflowRunsChanged(workflowRuns, newRuns)) {
-          setWorkflowRuns(newRuns);
-          if (isPolling) {
-            console.log(`🔄 Data updated: ${newRuns.length} workflow runs for ${dateStr}`);
-          } else {
-            console.log(`📊 Loaded ${newRuns.length} workflow runs for ${dateStr}`);
-          }
-        } else if (isPolling) {
-          console.log(`🔄 No changes detected for ${dateStr}`);
-        }
-      } else {
-        console.error('Failed to load workflow runs');
-        if (!isPolling) {
-          setWorkflowRuns([]);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading workflow runs:', error);
-      if (!isPolling) {
-        setWorkflowRuns([]);
-      }
-    } finally {
-      if (!isPolling) {
-        setIsLoadingRuns(false);
-      }
-    }
-  }, [repoSlug, hasWorkflowRunsChanged]);
-
-  // Load grouped workflow runs for the selected date (for workflow cards)
-  const loadGroupedWorkflowRuns = useCallback(async (date: Date, isPolling: boolean = false) => {
-    try {
-      const dateStr = format(date, "yyyy-MM-dd");
-      const response = await fetch(`/api/workflow/${repoSlug}?date=${dateStr}&grouped=true`, { 
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const newGroupedRuns = data.workflowRuns || [];
-        
-        // Only update state if data has actually changed
-        if (!isPolling || hasWorkflowRunsChanged(groupedWorkflowRuns, newGroupedRuns)) {
-          setGroupedWorkflowRuns(newGroupedRuns);
-          if (isPolling) {
-            console.log(`🔄 Grouped data updated: ${newGroupedRuns.length} workflow cards for ${dateStr}`);
-          } else {
-            console.log(`📊 Loaded ${newGroupedRuns.length} grouped workflow runs for ${dateStr}`);
-          }
-        } else if (isPolling) {
-          console.log(`🔄 No changes detected in grouped data for ${dateStr}`);
-        }
-      } else {
-        console.error('Failed to load grouped workflow runs');
-        if (!isPolling) {
-          setGroupedWorkflowRuns([]);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading grouped workflow runs:', error);
-      if (!isPolling) {
-        setGroupedWorkflowRuns([]);
-      }
-    }
-  }, [repoSlug, hasWorkflowRunsChanged]);
 
   // Load workflows when component mounts
   useEffect(() => {
     const loadWorkflows = async () => {
+      console.log(`📋 Initial load: Validating cache and fetching workflows for ${repoSlug}`);
       setIsLoadingWorkflows(true);
       try {
-        const response = await fetch(`/api/workflow/${repoSlug}`, { 
+        const response = await fetch(`/api/workflow/${repoSlug}`, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -223,23 +126,29 @@ export default function DashboardPage({ params }: PageProps) {
             'Expires': '0'
           }
         });
+        
         if (response.ok) {
           const data = await response.json();
-          const sortedWorkflows = (data.workflows || []).sort((a: any, b: any) => {
-            // First, sort by state: active workflows first, then disabled
-            const aIsDisabled = a.state === 'disabled_manually';
-            const bIsDisabled = b.state === 'disabled_manually';
-            
-            if (aIsDisabled && !bIsDisabled) return 1; // a is disabled, b is active
-            if (!aIsDisabled && bIsDisabled) return -1; // a is active, b is disabled
-            
-            // If both have the same state, sort by workflow name without emojis
-            const nameA = removeEmojiFromWorkflowName(a.name || '');
-            const nameB = removeEmojiFromWorkflowName(b.name || '');
-            return nameA.localeCompare(nameB);
-          });
-          setWorkflows(sortedWorkflows);
-          console.log(`📋 Loaded ${sortedWorkflows.length} workflows`);
+          
+          // Log cache status from API response
+          if (data.cacheUpdated) {
+            console.log(`🔄 Initial load: Cache was outdated and has been updated with ${data.totalCount} workflows`);
+          } else if (data.cached === false) {
+            console.log(`✅ Initial load: Cache was current, ${data.totalCount} workflows validated`);
+          } else {
+            console.log(`📋 Initial load: ${data.totalCount} workflows loaded`);
+          }
+          
+          // Filter to only active workflows and sort by name
+          const activeWorkflows = (data.workflows || [])
+            .filter((workflow: any) => workflow.state === 'active')
+            .sort((a: any, b: any) => {
+              const nameA = removeEmojiFromWorkflowName(a.name || '');
+              const nameB = removeEmojiFromWorkflowName(b.name || '');
+              return nameA.localeCompare(nameB);
+            });
+          setWorkflows(activeWorkflows);
+          console.log(`✅ Initial load complete: ${activeWorkflows.length} active workflows loaded`);
         } else {
           console.error('Failed to load workflows');
           setWorkflows([]);
@@ -260,48 +169,75 @@ export default function DashboardPage({ params }: PageProps) {
     selectedDateRef.current = selectedDate;
   }, [selectedDate]);
 
-  // Load workflow runs when date changes and set up smart polling
+  // Load workflow runs when selectedDate changes
   useEffect(() => {
-    console.log(`📊 Dashboard mounted - loading workflow runs for ${format(selectedDate, "yyyy-MM-dd")}...`);
-    
-    // Initial load
-    loadWorkflowRuns(selectedDate);
-    loadGroupedWorkflowRuns(selectedDate);
-    
-    // Only poll if we're looking at today's data
-    const todayStr = format(new Date(), "yyyy-MM-dd");
-    const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
-    const isToday = selectedDateStr === todayStr;
-    
-    if (isToday) {
-      console.log(`🔄 Setting up polling for today's data (${format(selectedDate, "yyyy-MM-dd")})`);
+    const loadWorkflowRuns = async () => {
+      if (workflows.length === 0) return; // Don't load runs if no workflows
       
-      // Set up polling interval (10s, same as main page)
-      const intervalId = window.setInterval(() => {
-        // Check if we're still looking at today's data using the ref
-        const currentTodayStr = format(new Date(), "yyyy-MM-dd");
-        const currentSelectedDateStr = format(selectedDateRef.current, "yyyy-MM-dd");
-        const stillToday = currentSelectedDateStr === currentTodayStr;
+      setIsLoadingRuns(true);
+      try {
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
         
-        if (stillToday && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
-          console.log(`🔄 Polling today's workflow runs (10s interval)...`);
-          loadWorkflowRuns(selectedDateRef.current, true); // Pass isPolling=true
-          loadGroupedWorkflowRuns(selectedDateRef.current, true); // Pass isPolling=true
-        } else if (!stillToday) {
-          console.log(`📊 Stopping polling - no longer looking at today's data`);
-          window.clearInterval(intervalId);
+        // Fetch workflow runs
+        const runsResponse = await fetch(`/api/workflow/${repoSlug}?date=${dateStr}&grouped=true`);
+        
+        // Fetch overview data
+        const overviewResponse = await fetch(`/api/workflow/${repoSlug}/overview?date=${dateStr}`);
+        
+        if (runsResponse.ok && overviewResponse.ok) {
+          const runsData = await runsResponse.json();
+          const overviewDataResponse = await overviewResponse.json();
+          
+          setWorkflowRuns(runsData.workflowRuns || []);
+          setGroupedWorkflowRuns(runsData.workflowRuns || []);
+          setOverviewData(overviewDataResponse.overview || null);
+          console.log(`📊 Loaded ${runsData.workflowRuns?.length || 0} workflow runs for ${dateStr}`);
+        } else {
+          console.error('Failed to load workflow data');
+          setWorkflowRuns([]);
+          setGroupedWorkflowRuns([]);
+          setOverviewData(null);
         }
-      }, 10000); // 10s
-      
-      return () => {
-        console.log(`📊 Dashboard unmounting - clearing polling interval`);
-        window.clearInterval(intervalId);
-      };
-    } else {
-      console.log(`📊 No polling for historical data (${format(selectedDate, "yyyy-MM-dd")})`);
-    }
-  }, [selectedDate, loadWorkflowRuns, loadGroupedWorkflowRuns]);
+      } catch (error) {
+        console.error('Error loading workflow runs:', error);
+        setWorkflowRuns([]);
+        setGroupedWorkflowRuns([]);
+        setOverviewData(null);
+      } finally {
+        setIsLoadingRuns(false);
+      }
+    };
 
+    loadWorkflowRuns();
+  }, [selectedDate, repoSlug, workflows.length]);
+
+  // Load yesterday's workflow runs for health comparison
+  useEffect(() => {
+    const loadYesterdayRuns = async () => {
+      if (workflows.length === 0) return; // Don't load runs if no workflows
+      
+      try {
+        const yesterday = new Date(selectedDate);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
+        
+        const response = await fetch(`/api/workflow/${repoSlug}?date=${yesterdayStr}&grouped=true`);
+        if (response.ok) {
+          const data = await response.json();
+          setYesterdayWorkflowRuns(data.workflowRuns || []);
+          console.log(`📊 Loaded ${data.workflowRuns?.length || 0} yesterday's workflow runs for ${yesterdayStr}`);
+        } else {
+          console.error('Failed to load yesterday workflow runs');
+          setYesterdayWorkflowRuns([]);
+        }
+      } catch (error) {
+        console.error('Error loading yesterday workflow runs:', error);
+        setYesterdayWorkflowRuns([]);
+      }
+    };
+
+    loadYesterdayRuns();
+  }, [selectedDate, repoSlug, workflows.length]);
 
 
   const selectedDateStr = format(selectedDate, "EEEE, MMMM d, yyyy");
@@ -312,96 +248,14 @@ export default function DashboardPage({ params }: PageProps) {
     setSelectedDate(today);
   }, [today]);
 
-  // Get workflow run data for a specific workflow (from grouped data for cards)
-  const getWorkflowRunData = useCallback((workflowId: number): WorkflowRun | null => {
-    return groupedWorkflowRuns.find(run => run.workflow_id === workflowId) || null;
-  }, [groupedWorkflowRuns]);
-
-  // Helper function to generate runs by hour data
-  const generateRunsByHour = useCallback(() => {
-    const hourlyData = Array.from({ length: 24 }, (_, hour) => ({ 
-      hour, 
-      passed: 0, 
-      failed: 0,
-      total: 0
-    }));
+  // Manual refresh function
+  const handleRefresh = useCallback(async () => {
+    console.log(`🔄 Manual refresh triggered - validating cache and fetching latest workflows from GitHub`);
+    setIsLoadingWorkflows(true);
     
-    workflowRuns.forEach(run => {
-      if (run.run_started_at) {
-        const startDate = new Date(run.run_started_at);
-        const hour = startDate.getHours();
-        if (hour >= 0 && hour < 24) {
-          hourlyData[hour].total++;
-          if (run.conclusion === 'success') {
-            hourlyData[hour].passed++;
-          } else if (run.conclusion === 'failure') {
-            hourlyData[hour].failed++;
-          }
-        }
-      }
-    });
-    
-    // Only return hours that have actual runs
-    return hourlyData.filter(data => data.total > 0);
-  }, [workflowRuns]);
-
-  // Helper function to calculate overview metrics
-  const calculateOverviewMetrics = useCallback(() => {
-    const completedRuns = workflowRuns.filter(run => run.status === 'completed').length;
-    const totalRuns = workflowRuns.length;
-    
-    // Calculate actual pass/fail rates from completed runs
-    const completedWorkflowRuns = workflowRuns.filter(run => run.status === 'completed');
-    const passedRuns = completedWorkflowRuns.filter(run => run.conclusion === 'success').length;
-    const failedRuns = completedWorkflowRuns.filter(run => run.conclusion === 'failure').length;
-    const passRate = completedWorkflowRuns.length > 0 ? Math.round((passedRuns / completedWorkflowRuns.length) * 100) : 0;
-    
-    // Legacy success rate (completed vs total)
-    const successRate = totalRuns > 0 ? Math.round((completedRuns / totalRuns) * 100) : 0;
-    
-    // Calculate total runtime
-    const totalRuntimeMs = workflowRuns.reduce((total, run) => {
-      if (run.run_started_at && run.updated_at) {
-        const start = new Date(run.run_started_at);
-        const end = new Date(run.updated_at);
-        return total + (end.getTime() - start.getTime());
-      }
-      return total;
-    }, 0);
-    
-    const hours = Math.floor(totalRuntimeMs / (1000 * 60 * 60));
-    const minutes = Math.floor((totalRuntimeMs % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((totalRuntimeMs % (1000 * 60)) / 1000);
-    const totalRuntime = `${hours}h ${minutes}m ${seconds}s`;
-    
-    // Calculate runs per hour stats
-    const runsByHour = generateRunsByHour();
-    const counts = runsByHour.map(r => r.total);
-    const avgRunsPerHour = counts.length > 0 ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length * 10) / 10 : 0;
-    const minRunsPerHour = Math.min(...counts);
-    const maxRunsPerHour = Math.max(...counts);
-    
-    return {
-      successRate,
-      passRate,
-      passedRuns,
-      failedRuns,
-      completedRuns,
-      totalRuntime,
-      didntRunCount: totalRuns - completedRuns,
-      avgRunsPerHour,
-      minRunsPerHour,
-      maxRunsPerHour
-    };
-  }, [workflowRuns]);
-
-
-
-  // Helper function to get workflow runs for a specific date
-  const getWorkflowRunsForDate = useCallback(async (date: Date, repoSlug: string) => {
     try {
-      const dateStr = format(date, "yyyy-MM-dd");
-      const response = await fetch(`/api/workflow/${repoSlug}?date=${dateStr}`, { 
+      // Add timestamp to force cache revalidation
+      const response = await fetch(`/api/workflow/${repoSlug}?refresh=${Date.now()}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -409,40 +263,50 @@ export default function DashboardPage({ params }: PageProps) {
           'Expires': '0'
         }
       });
+      
       if (response.ok) {
         const data = await response.json();
-        return data.workflowRuns || [];
+        
+        // Log cache status from API response
+        if (data.cacheUpdated) {
+          console.log(`🔄 Manual refresh: Cache was outdated and has been updated with ${data.totalCount} workflows`);
+        } else if (data.cached === false) {
+          console.log(`✅ Manual refresh: Cache was current, ${data.totalCount} workflows validated`);
+        } else {
+          console.log(`🔄 Manual refresh: ${data.totalCount} workflows loaded`);
+        }
+        
+        // Filter to only active workflows and sort by name
+        const activeWorkflows = (data.workflows || [])
+          .filter((workflow: any) => workflow.state === 'active')
+          .sort((a: any, b: any) => {
+            const nameA = removeEmojiFromWorkflowName(a.name || '');
+            const nameB = removeEmojiFromWorkflowName(b.name || '');
+            return nameA.localeCompare(nameB);
+          });
+        setWorkflows(activeWorkflows);
+        console.log(`✅ Manual refresh complete: ${activeWorkflows.length} active workflows loaded`);
+      } else {
+        console.error('Failed to refresh workflows');
       }
-      return [];
     } catch (error) {
-      console.error('Error loading workflow runs for date:', error);
-      return [];
+      console.error('Error refreshing workflows:', error);
+    } finally {
+      setIsLoadingWorkflows(false);
     }
-  }, []);
+  }, [repoSlug]);
 
-  // State to store yesterday's workflow runs
-  const [yesterdayWorkflowRuns, setYesterdayWorkflowRuns] = useState<WorkflowRun[]>([]);
-  const [isLoadingYesterday, setIsLoadingYesterday] = useState(false);
+  // Get workflow run data for a specific workflow (from today's runs for cards)
+  const getWorkflowRunData = useCallback((workflowId: number): WorkflowRun | null => {
+    return workflowRuns.find(run => run.workflow_id === workflowId) || null;
+  }, [workflowRuns]);
 
-  // Load yesterday's data when component mounts or date changes
-  useEffect(() => {
-    const loadYesterdayData = async () => {
-      setIsLoadingYesterday(true);
-      try {
-        const yesterday = new Date(selectedDate);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayRuns = await getWorkflowRunsForDate(yesterday, repoSlug);
-        setYesterdayWorkflowRuns(yesterdayRuns);
-      } catch (error) {
-        console.error('Error loading yesterday data:', error);
-        setYesterdayWorkflowRuns([]);
-      } finally {
-        setIsLoadingYesterday(false);
-      }
-    };
 
-    loadYesterdayData();
-  }, [selectedDate, repoSlug, getWorkflowRunsForDate]);
+
+
+
+
+
 
   // Helper function to get the last run result for a workflow
   const getLastRunResult = useCallback((workflowId: number, runs: WorkflowRun[]): 'success' | 'failure' | null => {
@@ -460,7 +324,18 @@ export default function DashboardPage({ params }: PageProps) {
 
   // Helper function to classify workflow health status with proper yesterday comparison
   const classifyWorkflowHealth = useCallback((workflowId: number): 'consistent' | 'improved' | 'regressed' | 'still_failing' | 'no_runs_today' => {
+    // Check if there's a currently running workflow from today's runs
+    const currentlyRunning = workflowRuns.find(run => 
+      run.workflow_id === workflowId && 
+      (run.status === 'in_progress' || run.status === 'queued')
+    );
+    
     const todayRuns = workflowRuns.filter(run => run.workflow_id === workflowId);
+    
+    // If currently running, don't show historical health status - just show no historical data
+    if (currentlyRunning) {
+      return todayRuns.length === 0 ? 'no_runs_today' : 'consistent';
+    }
     
     if (todayRuns.length === 0) {
       return 'no_runs_today'; // No runs today, show as no runs rather than failing
@@ -527,21 +402,18 @@ export default function DashboardPage({ params }: PageProps) {
       successfulRuns: todayRuns.filter(run => run.conclusion === 'success').length,
       failedRuns: todayRuns.filter(run => run.conclusion === 'failure').length
     };
-  }, [workflowRuns]);
+  }, [workflowRuns, classifyWorkflowHealth]);
 
   // Helper function to calculate health metrics from workflow health data
   const calculateHealthMetrics = useCallback(() => {
-    // Get all active workflows
-    const activeWorkflows = workflows.filter((w: any) => w.state !== 'disabled_manually');
-    
-    // Count workflows by health status
+    // Count workflows by health status (all workflows are active now)
     let consistentCount = 0;
     let improvedCount = 0;
     let regressedCount = 0;
     let stillFailingCount = 0;
     let noRunsTodayCount = 0;
     
-    activeWorkflows.forEach(workflow => {
+    workflows.forEach(workflow => {
       const healthStatus = classifyWorkflowHealth(workflow.id);
       switch (healthStatus) {
         case 'consistent':
@@ -569,7 +441,7 @@ export default function DashboardPage({ params }: PageProps) {
       stillFailingCount,
       noRunsTodayCount
     };
-  }, [workflows, workflowRuns]);
+  }, [workflows, classifyWorkflowHealth]);
 
   // Format repository display name - use the same logic as the repo card
   const repoDisplayName = addedRepoPath ? formatRepoDisplayName(addedRepoPath) : formatRepoDisplayName(repoSlug);
@@ -584,6 +456,16 @@ export default function DashboardPage({ params }: PageProps) {
           <h1 className="text-3xl font-bold tracking-tight">{repoDisplayName}</h1>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            className="flex items-center gap-2"
+            disabled={isLoadingWorkflows}
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoadingWorkflows ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -609,8 +491,6 @@ export default function DashboardPage({ params }: PageProps) {
               if (date) {
                 console.log('Setting selected date to:', date);
                 setSelectedDate(date);
-                // Load workflow runs for the newly selected date
-                loadWorkflowRuns(date);
               }
             }}
             placeholder="Select Date"
@@ -737,29 +617,42 @@ export default function DashboardPage({ params }: PageProps) {
             </CardContent>
           </Card>
         </div>
+      ) : !overviewData ? (
+        // Loading state while waiting for API data
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Card key={i} className="w-full">
+              <CardHeader>
+                <div className="h-6 bg-muted rounded animate-pulse" />
+              </CardHeader>
+              <CardContent>
+                <div className="h-36 bg-muted rounded animate-pulse" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : (() => {
-        const overviewMetrics = calculateOverviewMetrics();
         const healthMetrics = calculateHealthMetrics();
         
         return (
           <>
             <DailyMetrics
-              successRate={overviewMetrics.successRate}
-              passRate={overviewMetrics.passRate}
-              passedRuns={overviewMetrics.passedRuns}
-              failedRuns={overviewMetrics.failedRuns}
-              completedRuns={overviewMetrics.completedRuns}
-              totalRuntime={overviewMetrics.totalRuntime}
-              didntRunCount={overviewMetrics.didntRunCount}
-              activeWorkflows={workflows.filter((w: any) => w.state !== 'disabled_manually').length}
+              successRate={overviewData.successRate || 0}
+              passRate={overviewData.passRate || 0}
+              passedRuns={overviewData.passedRuns || 0}
+              failedRuns={overviewData.failedRuns || 0}
+              completedRuns={overviewData.completedRuns || 0}
+              totalRuntime={overviewData.totalRuntime || '0h 0m 0s'}
+              didntRunCount={overviewData.didntRunCount || 0}
+              activeWorkflows={workflows.length}
               consistentCount={healthMetrics.consistentCount}
               improvedCount={healthMetrics.improvedCount}
               regressedCount={healthMetrics.regressedCount}
               stillFailingCount={healthMetrics.stillFailingCount}
-              avgRunsPerHour={overviewMetrics.avgRunsPerHour}
-              minRunsPerHour={overviewMetrics.minRunsPerHour}
-              maxRunsPerHour={overviewMetrics.maxRunsPerHour}
-              runsByHour={generateRunsByHour()}
+              avgRunsPerHour={overviewData.avgRunsPerHour || 0}
+              minRunsPerHour={overviewData.minRunsPerHour || 0}
+              maxRunsPerHour={overviewData.maxRunsPerHour || 0}
+              runsByHour={overviewData.runsByHour || []}
               selectedDate={selectedDate}
             />
             
@@ -787,30 +680,27 @@ export default function DashboardPage({ params }: PageProps) {
             ))
           ) : (
             workflows
-              .filter((workflow: any) => workflow.state !== 'disabled_manually')
               .map((workflow: any) => {
                 const runData = getWorkflowRunData(workflow.id);
+                const healthData = getWorkflowHealthMetrics(workflow.id);
                 
-                // If no run data, create a mock run to show the workflow as idle
-                const mockRun: WorkflowRun = {
+                // Create a placeholder run object for workflows without run data
+                const displayRun: WorkflowRun = runData || {
                   id: 0,
                   name: workflow.name,
                   workflow_id: workflow.id,
                   path: workflow.path,
                   conclusion: null,
-                  status: 'idle',
+                  status: 'no_runs',
                   html_url: '',
                   run_started_at: '',
-                  updated_at: '',
-                  isMissing: true
+                  updated_at: ''
                 };
-
-                const healthData = getWorkflowHealthMetrics(workflow.id);
+                
                 return (
                   <WorkflowCard
                     key={workflow.id}
-                    run={runData || mockRun}
-                    workflowState={workflow.state}
+                    run={displayRun}
                     repoSlug={repoSlug}
                     healthStatus={healthData.status}
                     healthMetrics={healthData}
@@ -820,57 +710,6 @@ export default function DashboardPage({ params }: PageProps) {
           )}
         </div>
 
-        {/* Disabled Workflows */}
-        {(isLoadingWorkflows || isLoadingRuns) ? (
-          // Show skeleton section for disabled workflows during loading
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="h-6 bg-muted rounded w-32" />
-              <div className="h-5 bg-muted rounded w-8" />
-            </div>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 2 }).map((_, index) => (
-                <WorkflowCardSkeleton key={`disabled-${index}`} />
-              ))}
-            </div>
-          </div>
-        ) : workflows.filter((w: any) => w.state === 'disabled_manually').length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-medium">Disabled Workflows</h3>
-            </div>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {workflows
-                .filter((workflow: any) => workflow.state === 'disabled_manually')
-                .map((workflow: any) => {
-                  const runData = getWorkflowRunData(workflow.id);
-                  
-                  // If no run data, create a mock run to show the workflow as idle
-                  const mockRun: WorkflowRun = {
-                    id: 0,
-                    name: workflow.name,
-                    workflow_id: workflow.id,
-                    path: workflow.path,
-                    conclusion: null,
-                    status: 'idle',
-                    html_url: '',
-                    run_started_at: '',
-                    updated_at: '',
-                    isMissing: true
-                  };
-
-                  return (
-                    <WorkflowCard
-                      key={workflow.id}
-                      run={runData || mockRun}
-                      workflowState={workflow.state}
-                      repoSlug={repoSlug}
-                    />
-                  );
-                })}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

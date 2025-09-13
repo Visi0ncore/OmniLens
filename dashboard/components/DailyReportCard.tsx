@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Clock, XCircle, ArrowDown, ArrowUp } from "lucide-react";
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartContainer } from "@/components/ui/chart";
 import { RadialBar, RadialBarChart, Bar, BarChart, PieChart, Pie, Cell } from "recharts";
 import type { WorkflowRun } from "@/lib/github";
 
@@ -194,16 +194,18 @@ function compareDaily(todayRuns: WorkflowRun[], yesterdayRuns: WorkflowRun[]) {
   return { consistent, improved, regressed, regressing };
 }
 
-function CategoryBars({ runs, repoSlug }: { runs: WorkflowRun[]; repoSlug: string }) {
-  // Since we removed categorization, show a simple summary
+function WorkflowSummary({ runs, repoSlug }: { runs: WorkflowRun[]; repoSlug: string }) {
+  // Simple workflow summary
   const totalWorkflows = runs.length;
   const completedWorkflows = runs.filter(r => r.status === 'completed').length;
   const failedWorkflows = runs.filter(r => r.conclusion === 'failure').length;
+  const successfulWorkflows = runs.filter(r => r.conclusion === 'success').length;
   
   const rows = [
-    { label: 'Total Workflows', value: totalWorkflows },
-    { label: 'Completed', value: completedWorkflows },
-    { label: 'Failed', value: failedWorkflows }
+    { label: 'Total Workflows', value: totalWorkflows, color: 'bg-primary' },
+    { label: 'Successful', value: successfulWorkflows, color: 'bg-green-500' },
+    { label: 'Failed', value: failedWorkflows, color: 'bg-red-500' },
+    { label: 'Completed', value: completedWorkflows, color: 'bg-blue-500' }
   ];
   
   const max = Math.max(1, ...rows.map((r) => r.value));
@@ -216,7 +218,7 @@ function CategoryBars({ runs, repoSlug }: { runs: WorkflowRun[]; repoSlug: strin
             <span>{r.value}</span>
           </div>
           <div className="h-2 rounded bg-muted overflow-hidden">
-            <div className="h-2 bg-primary" style={{ width: `${Math.round((r.value / max) * 100)}%` }} />
+            <div className={`h-2 ${r.color}`} style={{ width: `${Math.round((r.value / max) * 100)}%` }} />
           </div>
         </div>
       ))}
@@ -299,7 +301,7 @@ export default function DailyReportCard({ repoSlug, todayRuns, yesterdayRuns, ov
                 <HourlyLegend runs={todayRuns} />
               </>
             ) : (
-              <CategoryBars runs={todayRuns} repoSlug={repoSlug} />
+              <WorkflowSummary runs={todayRuns} repoSlug={repoSlug} />
             )}
           </div>
         </div>

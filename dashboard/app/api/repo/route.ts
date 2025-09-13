@@ -8,7 +8,6 @@ export const dynamic = 'force-dynamic';
 const repositorySchema = z.object({
   slug: z.string(),
   displayName: z.string(),
-  hasConfig: z.boolean(),
   avatarUrl: z.string().nullable(),
   htmlUrl: z.string().optional()
 });
@@ -25,7 +24,6 @@ export async function GET() {
     const allRepos = userAddedRepos.map((repo: any) => ({
       slug: repo.slug,
       displayName: repo.displayName,
-      hasConfig: false, // User-added repos don't have config files initially
       avatarUrl: repo.avatarUrl || null,
       htmlUrl: repo.htmlUrl || null
     }));

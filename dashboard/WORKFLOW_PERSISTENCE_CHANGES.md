@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the changes made to implement workflow persistence and remove the categorization functionality from the OmniLens dashboard.
+This document outlines the changes made to implement workflow persistence and simplify the workflow management in the OmniLens dashboard.
 
 ## Changes Made
 
@@ -39,10 +39,10 @@ This document outlines the changes made to implement workflow persistence and re
 - Falls back to GitHub API if no saved workflows exist
 - Automatically saves workflows to database when fetched from GitHub
 
-### 4. Removed Categorization Logic
+### 4. Simplified Workflow Logic
 
 **File: `lib/utils.ts`**
-- Removed all categorization-related functions:
+- Removed all complex workflow categorization functions:
   - `getRepoConfig()`
   - `getAllConfiguredWorkflows()`
   - `filterWorkflowsByCategories()`
@@ -53,10 +53,10 @@ This document outlines the changes made to implement workflow persistence and re
 - Kept utility functions for name cleaning and repository validation
 
 **File: `lib/github.ts`**
-- Removed categorization imports and logic
-- Simplified `getLatestWorkflowRuns()` to work without categorization
+- Removed complex workflow categorization imports and logic
+- Simplified `getLatestWorkflowRuns()` to work with all workflows uniformly
 - Updated `calculateOverviewData()` to work with all workflows
-- Removed filtering based on configured workflows
+- Removed filtering based on workflow categories
 
 ### 5. Frontend Updates
 
@@ -90,9 +90,9 @@ This document outlines the changes made to implement workflow persistence and re
 ### Benefits
 
 1. **Performance**: Faster loading on subsequent visits
-2. **Simplicity**: Removed complex categorization logic
+2. **Simplicity**: Removed complex workflow categorization logic
 3. **Reliability**: Workflows are persisted and available offline
-4. **Maintainability**: Cleaner codebase without categorization complexity
+4. **Maintainability**: Cleaner codebase without workflow categorization complexity
 
 ## Testing
 
@@ -107,7 +107,7 @@ Run with: `node tests/workflow-persistence.test.js`
 
 - Existing repositories will automatically get their workflows saved on first fetch
 - No manual migration required
-- Categorization data is not migrated (as per requirements)
+- Legacy workflow categorization data is not migrated (simplified approach)
 - All existing functionality continues to work
 
 ## Future Enhancements

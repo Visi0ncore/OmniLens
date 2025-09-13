@@ -1,12 +1,10 @@
-import { Clock, ExternalLink, Check, Eye, CheckCircle, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { Clock, Eye, CheckCircle, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
 import type { WorkflowRun } from "@/lib/github";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cleanWorkflowName } from "@/lib/utils";
 
 function duration(start: string, end: string): string {
   const startTime = new Date(start);
@@ -33,7 +31,6 @@ function formatRunTime(dateString: string): string {
 interface WorkflowCardProps {
   run: WorkflowRun;
   repoSlug: string; // Repository slug for config context
-  workflowState?: string; // Workflow state from database (e.g., "active", "disabled_manually")
   isHighlighted?: boolean;
   highlightColor?: string;
   rightAction?: React.ReactNode; // Optional right-side action button (e.g., delete)
@@ -49,7 +46,6 @@ interface WorkflowCardProps {
 export default function WorkflowCard({
   run,
   repoSlug,
-  workflowState,
   isHighlighted = false,
   highlightColor = '',
   rightAction,
@@ -57,11 +53,9 @@ export default function WorkflowCard({
   healthMetrics
 }: WorkflowCardProps) {
   const status = run.conclusion ?? run.status;
-  const isMissing = (run as any).isMissing === true || status === 'missing' || status === 'idle';
-  const isSuccess = !isMissing && status === "success";
-  const isInProgress = !isMissing && (status === "in_progress" || status === 'queued');
-  const isIdle = isMissing && !run.run_started_at;
-  const isDisabled = workflowState === 'disabled_manually';
+  const isSuccess = status === "success";
+  const isInProgress = status === "in_progress" || status === 'queued';
+  const hasNoRuns = status === 'no_runs';
 
   // Determine border classes
   const getBorderClass = () => {
@@ -158,17 +152,14 @@ export default function WorkflowCard({
             })()}
             <Badge
               variant={
-                isIdle ? "secondary" : 
-                isDisabled ? "secondary" :
+                hasNoRuns ? "secondary" :
                 isSuccess ? "success" : 
                 isInProgress ? "destructive" : 
                 "destructive"
               }
               className={`shrink-0 ${isInProgress ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
             >
-              {isIdle ? "Idle" : 
-               isDisabled ? "Disabled" :
-               isMissing ? "Didn't Run" : 
+              {hasNoRuns ? "No Runs" :
                isSuccess ? "Pass" : 
                isInProgress ? "Running" : 
                "Fail"}
@@ -178,100 +169,104 @@ export default function WorkflowCard({
         </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
-        {/* Health Status Section */}
+        {/* Health Status Section - Show placeholder when running to maintain spacing */}
         {healthStatus && (
           <div className="flex items-center gap-2">
-            {(() => {
-              const getHealthIcon = () => {
-                switch (healthStatus) {
-                  case 'consistent':
-                    return <CheckCircle className="h-4 w-4 text-green-500" />;
-                  case 'improved':
-                    return <TrendingUp className="h-4 w-4 text-blue-500" />;
-                  case 'regressed':
-                    return <TrendingDown className="h-4 w-4 text-orange-500" />;
-                  case 'still_failing':
-                    return <AlertTriangle className="h-4 w-4 text-red-500" />;
-                  case 'no_runs_today':
-                    return <Clock className="h-4 w-4 text-muted-foreground" />;
-                  default:
-                    return null;
-                }
-              };
+            {isInProgress ? (
+              /* Placeholder content for running workflows to maintain spacing */
+              <>
+                <div className="h-4 w-4" /> {/* Invisible icon spacer */}
+                <span className="text-sm font-medium text-transparent select-none">
+                  Placeholder
+                </span>
+              </>
+            ) : (
+              (() => {
+                const getHealthIcon = () => {
+                  switch (healthStatus) {
+                    case 'consistent':
+                      return <CheckCircle className="h-4 w-4 text-green-500" />;
+                    case 'improved':
+                      return <TrendingUp className="h-4 w-4 text-blue-500" />;
+                    case 'regressed':
+                      return <TrendingDown className="h-4 w-4 text-orange-500" />;
+                    case 'still_failing':
+                      return <AlertTriangle className="h-4 w-4 text-red-500" />;
+                    case 'no_runs_today':
+                      return <Clock className="h-4 w-4 text-muted-foreground" />;
+                    default:
+                      return null;
+                  }
+                };
 
-              const getHealthLabel = () => {
-                switch (healthStatus) {
-                  case 'consistent':
-                    return 'Consistent';
-                  case 'improved':
-                    return 'Improved';
-                  case 'regressed':
-                    return 'Regressed';
-                  case 'still_failing':
-                    return 'Still Failing';
-                  case 'no_runs_today':
-                    return 'No Runs Today';
-                  default:
-                    return '';
-                }
-              };
+                const getHealthLabel = () => {
+                  switch (healthStatus) {
+                    case 'consistent':
+                      return 'Consistent';
+                    case 'improved':
+                      return 'Improved';
+                    case 'regressed':
+                      return 'Regressed';
+                    case 'still_failing':
+                      return 'Still Failing';
+                    case 'no_runs_today':
+                      return 'No Runs Today';
+                    default:
+                      return '';
+                  }
+                };
 
-              const getHealthColor = () => {
-                switch (healthStatus) {
-                  case 'consistent':
-                    return 'text-green-500';
-                  case 'improved':
-                    return 'text-blue-500';
-                  case 'regressed':
-                    return 'text-orange-500';
-                  case 'still_failing':
-                    return 'text-red-500';
-                  case 'no_runs_today':
-                    return 'text-muted-foreground';
-                  default:
-                    return 'text-muted-foreground';
-                }
-              };
+                const getHealthColor = () => {
+                  switch (healthStatus) {
+                    case 'consistent':
+                      return 'text-green-500';
+                    case 'improved':
+                      return 'text-blue-500';
+                    case 'regressed':
+                      return 'text-orange-500';
+                    case 'still_failing':
+                      return 'text-red-500';
+                    case 'no_runs_today':
+                      return 'text-muted-foreground';
+                    default:
+                      return 'text-muted-foreground';
+                  }
+                };
 
-              return (
-                <>
-                  {getHealthIcon()}
-                  <span className={`text-sm font-medium ${getHealthColor()}`}>
-                    {getHealthLabel()}
-                  </span>
-                </>
-              );
-            })()}
+                return (
+                  <>
+                    {getHealthIcon()}
+                    <span className={`text-sm font-medium ${getHealthColor()}`}>
+                      {getHealthLabel()}
+                    </span>
+                  </>
+                );
+              })()
+            )}
           </div>
         )}
         
         {/* Duration and View Button */}
-        {healthStatus !== 'no_runs_today' && (
+        {healthStatus !== 'no_runs_today' && !hasNoRuns && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
               <span>
-                {isIdle ? "No runs" : 
-                 isInProgress ? "Running" : 
+                {isInProgress ? "Running" : 
                  (run.run_started_at && run.updated_at ? duration(run.run_started_at, run.updated_at) : "No duration")}
               </span>
             </div>
-          <div className="flex items-center gap-2">
-            {run.html_url && !isIdle ? (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={run.html_url} target="_blank">
-                  <Eye className="h-3 w-3 mr-1" />
-                  View
-                </Link>
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" disabled>
-                <Eye className="h-3 w-3 mr-1" />
-                No Run
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {run.html_url && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={run.html_url} target="_blank">
+                    <Eye className="h-3 w-3 mr-1" />
+                    View
+                  </Link>
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
         )}
       </CardContent>
     </Card>
