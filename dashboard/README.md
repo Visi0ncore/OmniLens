@@ -39,7 +39,6 @@ Create a `.env.local` file in the dashboard directory:
 
 ```bash
 GITHUB_TOKEN=your_github_token_here
-GITHUB_REPO=your_org/your_repo
 ```
 
 ### 2. Install Dependencies

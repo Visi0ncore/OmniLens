@@ -240,51 +240,60 @@ export default function DailyMetrics({
           <CardTitle className="text-xl">Runs by hour</CardTitle>
         </CardHeader>
         <CardContent>
-          <ChartContainer
-            config={{
-              passed: {
-                label: "Passed",
-                color: "hsl(var(--chart-1))",
-              },
-              failed: {
-                label: "Failed", 
-                color: "hsl(var(--chart-2))",
-              },
-            }}
-            className="h-36 aspect-none"
-          >
-            <BarChart data={runsByHour} margin={{ left: 0, right: 12, top: 5, bottom: 5 }}>
-              <XAxis 
-                dataKey="hour" 
-                tickFormatter={(hour) => `${hour}:00`}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 12 }}
-              />
-              <YAxis 
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 12 }}
-                width={30}
-              />
-              <Bar 
-                dataKey="passed" 
-                stackId="runs"
-                fill="var(--color-passed)" 
-                radius={[0, 0, 0, 0]}
-              />
-              <Bar 
-                dataKey="failed" 
-                stackId="runs"
-                fill="var(--color-failed)" 
-                radius={[2, 2, 0, 0]}
-              />
-              <ChartTooltip 
-                content={<ChartTooltipContent labelFormatter={() => "Data"} />}
-                cursor={false}
-              />
-            </BarChart>
-          </ChartContainer>
+          {!runsByHour || runsByHour.length === 0 || runsByHour.every(hour => hour.total === 0) ? (
+            <div className="flex items-center justify-center h-36">
+              <div className="text-center">
+                <div className="text-sm font-medium text-muted-foreground">No Data</div>
+                <div className="text-xs text-muted-foreground">No runs today</div>
+              </div>
+            </div>
+          ) : (
+            <ChartContainer
+              config={{
+                passed: {
+                  label: "Passed",
+                  color: "hsl(var(--chart-1))",
+                },
+                failed: {
+                  label: "Failed", 
+                  color: "hsl(var(--chart-2))",
+                },
+              }}
+              className="h-36 aspect-none"
+            >
+              <BarChart data={runsByHour} margin={{ left: 0, right: 12, top: 5, bottom: 5 }}>
+                <XAxis 
+                  dataKey="hour" 
+                  tickFormatter={(hour) => `${hour}:00`}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12 }}
+                  width={30}
+                />
+                <Bar 
+                  dataKey="passed" 
+                  stackId="runs"
+                  fill="var(--color-passed)" 
+                  radius={[0, 0, 0, 0]}
+                />
+                <Bar 
+                  dataKey="failed" 
+                  stackId="runs"
+                  fill="var(--color-failed)" 
+                  radius={[2, 2, 0, 0]}
+                />
+                <ChartTooltip 
+                  content={<ChartTooltipContent labelFormatter={() => "Data"} />}
+                  cursor={false}
+                />
+              </BarChart>
+            </ChartContainer>
+          )}
         </CardContent>
       </Card>
     </div>
