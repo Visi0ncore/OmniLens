@@ -15,37 +15,26 @@ export async function GET(
   try {
     // Validate the slug parameter
     const validatedSlug = slugSchema.parse(params.slug);
-    console.log(`🔍 [OVERVIEW API] Request for repo slug: ${validatedSlug}`);
     
     // Check if the repository exists in our database
     const repo = await getUserRepo(validatedSlug);
     if (!repo) {
-      console.log(`❌ [OVERVIEW API] Repository not found in database: ${validatedSlug}`);
       return NextResponse.json(
         { error: 'Repository not found in dashboard' },
         { status: 404 }
       );
     }
     
-    console.log(`✅ [OVERVIEW API] Found repo in database:`, {
-      slug: validatedSlug,
-      repoPath: repo.repoPath,
-      displayName: repo.displayName
-    });
-    
     // Get date parameter (default to today)
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date');
     const date = dateParam ? dateSchema.parse(dateParam) : new Date().toISOString().split('T')[0];
-    
-    console.log(`📅 [OVERVIEW API] Fetching overview for date: ${date}`);
     
     // Get saved workflows from database (active only)
     const allSavedWorkflows = await getWorkflows(validatedSlug);
     const savedWorkflows = allSavedWorkflows.filter(workflow => workflow.state === 'active');
     
     if (savedWorkflows.length === 0) {
-      console.log(`⚠️ [OVERVIEW API] No active workflows found in database for ${validatedSlug}`);
       return NextResponse.json({
         repository: {
           slug: validatedSlug,
@@ -109,13 +98,9 @@ export async function GET(
     const repoData = await repoResponse.json();
     const defaultBranch = repoData.default_branch;
     
-    console.log(`📅 [OVERVIEW API] Repository default branch: ${defaultBranch}`);
-    
     // Get workflow runs for the specified date (from default branch only)
     const dateObj = new Date(date);
     const workflowRuns = await getWorkflowRunsForDate(dateObj, validatedSlug, defaultBranch);
-    
-    console.log(`📊 [OVERVIEW API] Fetched ${workflowRuns.length} workflow runs for ${date}`);
     
     // Calculate overview data using the existing function
     const overviewData = calculateOverviewData(workflowRuns);
@@ -174,11 +159,6 @@ export async function GET(
       date,
       generatedAt: new Date().toISOString()
     };
-    
-    console.log(`📤 [OVERVIEW API] Final response:`, {
-      overview_data: enhancedOverview,
-      date: response.date
-    });
     
     return NextResponse.json(response);
     

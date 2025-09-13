@@ -83,41 +83,29 @@ export async function GET(
   try {
     // Validate the slug parameter
     const validatedSlug = slugSchema.parse(params.slug);
-    console.log(`🔍 [WORKFLOW API] Request for repo slug: ${validatedSlug}`);
     
     // Check if the repository exists in our database
     const repo = await getUserRepo(validatedSlug);
     if (!repo) {
-      console.log(`❌ [WORKFLOW API] Repository not found in database: ${validatedSlug}`);
       return NextResponse.json(
         { error: 'Repository not found in dashboard' },
         { status: 404 }
       );
     }
     
-    console.log(`✅ [WORKFLOW API] Found repo in database:`, {
-      slug: validatedSlug,
-      repoPath: repo.repoPath,
-      displayName: repo.displayName
-    });
-    
     // Check if this is a request for workflow runs (with date parameter)
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
     const grouped = searchParams.get('grouped') === 'true';
     
-    console.log(`📊 [WORKFLOW API] Request parameters:`, { date, grouped });
-    
     if (date) {
       try {
         // Validate date parameter
         const validatedDate = dateSchema.parse(date);
-        console.log(`📅 [WORKFLOW API] Fetching workflow runs for date: ${validatedDate}, grouped: ${grouped}`);
         // Handle workflow runs request
         return await handleWorkflowRunsRequest(validatedSlug, repo, validatedDate, grouped);
       } catch (error) {
         if (error instanceof z.ZodError) {
-          console.log(`❌ [WORKFLOW API] Invalid date format: ${date}`);
           return NextResponse.json(
             { error: 'Invalid date format. Use YYYY-MM-DD format.' },
             { status: 400 }
@@ -130,7 +118,6 @@ export async function GET(
     // For basic workflow listing, check if we have cached workflows first
     const savedWorkflows = await getWorkflows(validatedSlug);
     if (savedWorkflows.length > 0) {
-      console.log(`📋 [WORKFLOW API] Returning ${savedWorkflows.length} cached workflows for ${validatedSlug}`);
       
       const response = {
         repository: {
@@ -147,7 +134,6 @@ export async function GET(
     }
     
     // Always fetch fresh workflows from GitHub to ensure we have current data
-    console.log(`📋 Fetching fresh workflows from GitHub for ${validatedSlug}...`);
     
     // Extract owner and repo name from the repository path
     const [owner, repoName] = repo.repoPath.split('/');
@@ -190,8 +176,6 @@ export async function GET(
     const repoData = await repoResponse.json();
     const defaultBranch = repoData.default_branch;
     
-    console.log(`📋 [WORKFLOW API] Repository default branch: ${defaultBranch}`);
-    
     // Fetch workflows from GitHub API (only active workflows)
     const githubResponse = await fetch(
       `https://api.github.com/repos/${owner}/${repoName}/actions/workflows?state=active`,
@@ -226,13 +210,6 @@ export async function GET(
     
     const workflowsData: GitHubWorkflowsResponse = await githubResponse.json();
     
-    console.log(`📋 [WORKFLOW API] GitHub API response:`, {
-      total_count: workflowsData.total_count,
-      workflows_count: workflowsData.workflows.length,
-      workflow_ids: workflowsData.workflows.map(w => w.id),
-      workflow_names: workflowsData.workflows.map(w => w.name)
-    });
-    
     // Filter workflows to only include those active on the default branch
     // We need to check each workflow's runs to see if it has runs on the default branch
     const workflowsOnDefaultBranch = [];
@@ -265,13 +242,6 @@ export async function GET(
       }
     }
     
-    console.log(`📋 [WORKFLOW API] Filtered workflows on default branch (${defaultBranch}):`, {
-      original_count: workflowsData.workflows.length,
-      filtered_count: workflowsOnDefaultBranch.length,
-      workflow_ids: workflowsOnDefaultBranch.map(w => w.id),
-      workflow_names: workflowsOnDefaultBranch.map(w => w.name)
-    });
-    
     // Transform the response to match our API format
     const workflows = workflowsOnDefaultBranch.map(workflow => ({
       id: workflow.id,
@@ -283,12 +253,9 @@ export async function GET(
       deletedAt: workflow.deleted_at
     }));
     
-    console.log(`🔄 [WORKFLOW API] Transformed workflows:`, workflows);
-    
     // Save workflows to database for persistence
     try {
       await saveWorkflows(validatedSlug, workflows);
-      console.log(`💾 [WORKFLOW API] Successfully saved ${workflows.length} workflows to database`);
     } catch (error) {
       console.error('❌ [WORKFLOW API] Error saving workflows to database:', error);
       // Continue with the response even if saving fails
@@ -303,12 +270,6 @@ export async function GET(
       workflows: workflows,
       totalCount: workflows.length
     };
-    
-    console.log(`📤 [WORKFLOW API] Final response:`, {
-      repository: response.repository,
-      workflows_count: response.workflows.length,
-      total_count: response.totalCount
-    });
     
     return NextResponse.json(response);
     
@@ -336,14 +297,11 @@ async function handleWorkflowRunsRequest(
   grouped: boolean = false
 ) {
   try {
-    console.log(`🏃 [WORKFLOW RUNS] Starting request for slug: ${slug}, date: ${date}, grouped: ${grouped}`);
     
     // Get active workflows from database to filter runs
     const allSavedWorkflows = await getWorkflows(slug);
     const activeWorkflows = allSavedWorkflows.filter(workflow => workflow.state === 'active');
     const activeWorkflowIds = new Set(activeWorkflows.map(w => w.id));
-    
-    console.log(`🏃 [WORKFLOW RUNS] Filtering runs for ${activeWorkflowIds.size} active workflows out of ${allSavedWorkflows.length} total workflows`);
     
     // Get the repository's default branch for filtering runs
     const githubToken = process.env.GITHUB_TOKEN;
@@ -384,8 +342,6 @@ async function handleWorkflowRunsRequest(
     const repoData = await repoResponse.json();
     const defaultBranch = repoData.default_branch;
     
-    console.log(`🏃 [WORKFLOW RUNS] Repository default branch: ${defaultBranch}`);
-    
     // The getWorkflowRunsForDate function handles all GitHub API calls and error handling
     const dateObj = new Date(date);
     const allWorkflowRuns = grouped 
@@ -394,12 +350,6 @@ async function handleWorkflowRunsRequest(
     
     // Filter to only include runs from active workflows
     const workflowRuns = allWorkflowRuns.filter(run => activeWorkflowIds.has(run.workflow_id));
-    
-    console.log(`🏃 [WORKFLOW RUNS] Fetched ${workflowRuns.length} workflow runs:`, {
-      run_count: workflowRuns.length,
-      workflow_ids: [...new Set(workflowRuns.map(r => r.workflow_id))],
-      run_statuses: workflowRuns.map(r => ({ id: r.id, workflow_id: r.workflow_id, status: r.status, conclusion: r.conclusion }))
-    });
     
     // Calculate overview data
     const completedRuns = workflowRuns.filter(run => run.status === 'completed').length;
@@ -440,12 +390,6 @@ async function handleWorkflowRunsRequest(
       workflowRuns,
       overviewData
     };
-    
-    console.log(`📤 [WORKFLOW RUNS] Final response:`, {
-      workflow_runs_count: response.workflowRuns.length,
-      overview_data: response.overviewData,
-      unique_workflow_ids: [...new Set(response.workflowRuns.map(r => r.workflow_id))]
-    });
     
     return NextResponse.json(response);
     

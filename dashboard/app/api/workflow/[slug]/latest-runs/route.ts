@@ -14,30 +14,21 @@ export async function GET(
   try {
     // Validate the slug parameter
     const validatedSlug = slugSchema.parse(params.slug);
-    console.log(`🔍 [LATEST RUNS API] Request for repo slug: ${validatedSlug}`);
     
     // Check if the repository exists in our database
     const repo = await getUserRepo(validatedSlug);
     if (!repo) {
-      console.log(`❌ [LATEST RUNS API] Repository not found in database: ${validatedSlug}`);
       return NextResponse.json(
         { error: 'Repository not found in dashboard' },
         { status: 404 }
       );
     }
     
-    console.log(`✅ [LATEST RUNS API] Found repo in database:`, {
-      slug: validatedSlug,
-      repoPath: repo.repoPath,
-      displayName: repo.displayName
-    });
-    
     // Get saved workflows from database (active only)
     const allSavedWorkflows = await getWorkflows(validatedSlug);
     const savedWorkflows = allSavedWorkflows.filter(workflow => workflow.state === 'active');
     
     if (savedWorkflows.length === 0) {
-      console.log(`⚠️ [LATEST RUNS API] No active workflows found in database for ${validatedSlug}`);
       return NextResponse.json({
         repository: {
           slug: validatedSlug,
@@ -90,10 +81,6 @@ export async function GET(
     const repoData = await repoResponse.json();
     const defaultBranch = repoData.default_branch;
     
-    console.log(`🏃 [LATEST RUNS API] Repository default branch: ${defaultBranch}`);
-    
-    console.log(`🏃 [LATEST RUNS API] Fetching latest runs for ${savedWorkflows.length} active workflows...`);
-    
     // Fetch latest runs for each active workflow
     const latestRuns: WorkflowRun[] = [];
     
@@ -117,7 +104,6 @@ export async function GET(
           const runningData = await runningResponse.json();
           if (runningData.workflow_runs && runningData.workflow_runs.length > 0) {
             foundRun = runningData.workflow_runs[0];
-            console.log(`🏃 [LATEST RUNS API] Found running workflow ${workflow.id}: status=${foundRun.status}, conclusion=${foundRun.conclusion}`);
           }
         }
         
@@ -138,7 +124,6 @@ export async function GET(
             const queuedData = await queuedResponse.json();
             if (queuedData.workflow_runs && queuedData.workflow_runs.length > 0) {
               foundRun = queuedData.workflow_runs[0];
-              console.log(`🏃 [LATEST RUNS API] Found queued workflow ${workflow.id}: status=${foundRun.status}, conclusion=${foundRun.conclusion}`);
             }
           }
         }
@@ -183,12 +168,6 @@ export async function GET(
         console.error(`Error fetching latest run for workflow ${workflow.id}:`, error);
       }
     }
-    
-    console.log(`📤 [LATEST RUNS API] Fetched ${latestRuns.length} latest runs:`, {
-      run_count: latestRuns.length,
-      workflow_ids: latestRuns.map(r => r.workflow_id),
-      run_statuses: latestRuns.map(r => ({ id: r.id, workflow_id: r.workflow_id, status: r.status, conclusion: r.conclusion }))
-    });
     
     const response = {
       repository: {

@@ -14,30 +14,21 @@ export async function GET(
   try {
     // Validate the slug parameter
     const validatedSlug = slugSchema.parse(params.slug);
-    console.log(`🔍 [HEALTH METRICS API] Request for repo slug: ${validatedSlug}`);
     
     // Check if the repository exists in our database
     const repo = await getUserRepo(validatedSlug);
     if (!repo) {
-      console.log(`❌ [HEALTH METRICS API] Repository not found in database: ${validatedSlug}`);
       return NextResponse.json(
         { error: 'Repository not found in dashboard' },
         { status: 404 }
       );
     }
     
-    console.log(`✅ [HEALTH METRICS API] Found repo in database:`, {
-      slug: validatedSlug,
-      repoPath: repo.repoPath,
-      displayName: repo.displayName
-    });
-    
     // Get saved workflows from database (active only)
     const allSavedWorkflows = await getWorkflows(validatedSlug);
     const savedWorkflows = allSavedWorkflows.filter(workflow => workflow.state === 'active');
     
     if (savedWorkflows.length === 0) {
-      console.log(`⚠️ [HEALTH METRICS API] No active workflows found in database for ${validatedSlug}`);
       return NextResponse.json({
         repository: {
           slug: validatedSlug,
@@ -90,10 +81,6 @@ export async function GET(
     const repoData = await repoResponse.json();
     const defaultBranch = repoData.default_branch;
     
-    console.log(`📊 [HEALTH METRICS API] Repository default branch: ${defaultBranch}`);
-    
-    console.log(`📊 [HEALTH METRICS API] Calculating health metrics for ${savedWorkflows.length} workflows...`);
-    
     // Get today's and yesterday's dates
     const today = new Date();
     const yesterday = new Date(today);
@@ -104,11 +91,6 @@ export async function GET(
       getWorkflowRunsForDate(today, validatedSlug, defaultBranch),
       getWorkflowRunsForDate(yesterday, validatedSlug, defaultBranch)
     ]);
-    
-    console.log(`📊 [HEALTH METRICS API] Fetched runs:`, {
-      today_runs: todayRuns.length,
-      yesterday_runs: yesterdayRuns.length
-    });
     
     // Calculate health metrics for each workflow
     const healthMetrics = savedWorkflows.map(workflow => {
@@ -179,11 +161,6 @@ export async function GET(
       summary,
       generatedAt: new Date().toISOString()
     };
-    
-    console.log(`📤 [HEALTH METRICS API] Final response:`, {
-      health_metrics_count: response.healthMetrics.length,
-      summary: response.summary
-    });
     
     return NextResponse.json(response);
     
