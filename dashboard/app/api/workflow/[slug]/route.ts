@@ -375,12 +375,12 @@ async function handleWorkflowRunsRequest(
     const passedRuns = workflowRuns.filter(run => run.conclusion === 'success').length;
     const failedRuns = workflowRuns.filter(run => run.conclusion === 'failure').length;
     
-    // Calculate total runtime (simplified - would need more detailed API calls for accurate runtime)
+    // Calculate total runtime in seconds (simplified - would need more detailed API calls for accurate runtime)
     const totalRuntime = workflowRuns.reduce((total, run) => {
       if (run.status === 'completed' && run.run_started_at && run.updated_at) {
         const start = new Date(run.run_started_at).getTime();
         const end = new Date(run.updated_at).getTime();
-        return total + (end - start);
+        return total + Math.floor((end - start) / 1000); // Convert milliseconds to seconds
       }
       return total;
     }, 0);

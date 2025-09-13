@@ -642,7 +642,7 @@ export default function DashboardPage({ params }: PageProps) {
               passedRuns={overviewData.passedRuns || 0}
               failedRuns={overviewData.failedRuns || 0}
               completedRuns={overviewData.completedRuns || 0}
-              totalRuntime={overviewData.totalRuntime || '0h 0m 0s'}
+              totalRuntime={overviewData.totalRuntime || 0}
               didntRunCount={overviewData.didntRunCount || 0}
               activeWorkflows={workflows.length}
               consistentCount={healthMetrics.consistentCount}

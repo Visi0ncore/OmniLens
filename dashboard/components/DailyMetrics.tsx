@@ -10,7 +10,7 @@ interface DailyMetricsProps {
   passedRuns: number;
   failedRuns: number;
   completedRuns: number;
-  totalRuntime: string;
+  totalRuntime: number;
   didntRunCount: number;
   activeWorkflows: number;
   consistentCount: number;
@@ -22,6 +22,21 @@ interface DailyMetricsProps {
   maxRunsPerHour: number;
   runsByHour?: Array<{ hour: number; passed: number; failed: number; total: number }>;
   selectedDate: Date;
+}
+
+// Format duration from seconds to human readable format
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${secs}s`;
+  } else {
+    return `${secs}s`;
+  }
 }
 
 // Pass/Fail Pie Chart Component
@@ -186,7 +201,7 @@ export default function DailyMetrics({
                 <Clock className="h-4 w-4 text-purple-500" />
                 <span className="text-sm">Total Runtime</span>
               </div>
-              <span className="text-sm font-medium">{totalRuntime}</span>
+              <span className="text-sm font-medium">{formatDuration(totalRuntime)}</span>
             </div>
           </div>
         </CardContent>
