@@ -99,11 +99,19 @@ export async function GET(
     const defaultBranch = repoData.default_branch;
     
     // Get workflow runs for the specified date (from default branch only)
-    const dateObj = new Date(date);
+    const dateObj = new Date(date!); // date is guaranteed to be defined by this point
     const workflowRuns = await getWorkflowRunsForDate(dateObj, validatedSlug, defaultBranch);
     
     // Calculate overview data using the existing function
     const overviewData = calculateOverviewData(workflowRuns);
+    
+    // Calculate workflows that didn't run today
+    const activeWorkflowIds = new Set(savedWorkflows.map(workflow => workflow.id));
+    const workflowsWithRuns = new Set(workflowRuns.map(run => run.workflow_id));
+    const missingWorkflows = savedWorkflows
+      .filter(workflow => !workflowsWithRuns.has(workflow.id))
+      .map(workflow => workflow.name);
+    const didntRunCount = missingWorkflows.length;
     
     // Calculate additional metrics
     const successRate = overviewData.completedRuns > 0 
@@ -140,6 +148,9 @@ export async function GET(
     
     const enhancedOverview = {
       ...overviewData,
+      didntRunCount, // Override with correct calculation
+      missingWorkflows, // Override with correct calculation
+      totalWorkflows: savedWorkflows.length, // Override with correct total
       successRate,
       passRate,
       avgRunsPerHour,

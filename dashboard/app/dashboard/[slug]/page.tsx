@@ -102,6 +102,7 @@ export default function DashboardPage({ params }: PageProps) {
   const [groupedWorkflowRuns, setGroupedWorkflowRuns] = useState<WorkflowRun[]>([]);
   const [yesterdayWorkflowRuns, setYesterdayWorkflowRuns] = useState<WorkflowRun[]>([]);
   const [latestRuns, setLatestRuns] = useState<WorkflowRun[]>([]);
+  const [overviewData, setOverviewData] = useState<any>(null);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true);
   const [isLoadingRuns, setIsLoadingRuns] = useState(false);
 
@@ -163,21 +164,32 @@ export default function DashboardPage({ params }: PageProps) {
       setIsLoadingRuns(true);
       try {
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        const response = await fetch(`/api/workflow/${repoSlug}?date=${dateStr}&grouped=true`);
-        if (response.ok) {
-          const data = await response.json();
-          setWorkflowRuns(data.workflowRuns || []);
-          setGroupedWorkflowRuns(data.workflowRuns || []);
-          console.log(`📊 Loaded ${data.workflowRuns?.length || 0} workflow runs for ${dateStr}`);
+        
+        // Fetch workflow runs
+        const runsResponse = await fetch(`/api/workflow/${repoSlug}?date=${dateStr}&grouped=true`);
+        
+        // Fetch overview data
+        const overviewResponse = await fetch(`/api/workflow/${repoSlug}/overview?date=${dateStr}`);
+        
+        if (runsResponse.ok && overviewResponse.ok) {
+          const runsData = await runsResponse.json();
+          const overviewDataResponse = await overviewResponse.json();
+          
+          setWorkflowRuns(runsData.workflowRuns || []);
+          setGroupedWorkflowRuns(runsData.workflowRuns || []);
+          setOverviewData(overviewDataResponse.overview || null);
+          console.log(`📊 Loaded ${runsData.workflowRuns?.length || 0} workflow runs for ${dateStr}`);
         } else {
-          console.error('Failed to load workflow runs');
+          console.error('Failed to load workflow data');
           setWorkflowRuns([]);
           setGroupedWorkflowRuns([]);
+          setOverviewData(null);
         }
       } catch (error) {
         console.error('Error loading workflow runs:', error);
         setWorkflowRuns([]);
         setGroupedWorkflowRuns([]);
+        setOverviewData(null);
       } finally {
         setIsLoadingRuns(false);
       }
@@ -285,83 +297,7 @@ export default function DashboardPage({ params }: PageProps) {
     return latestRuns.find(run => run.workflow_id === workflowId) || null;
   }, [latestRuns]);
 
-  // Helper function to generate runs by hour data
-  const generateRunsByHour = useCallback(() => {
-    const hourlyData = Array.from({ length: 24 }, (_, hour) => ({ 
-      hour, 
-      passed: 0, 
-      failed: 0,
-      total: 0
-    }));
-    
-    workflowRuns.forEach(run => {
-      if (run.run_started_at) {
-        const startDate = new Date(run.run_started_at);
-        const hour = startDate.getHours();
-        if (hour >= 0 && hour < 24) {
-          hourlyData[hour].total++;
-          if (run.conclusion === 'success') {
-            hourlyData[hour].passed++;
-          } else if (run.conclusion === 'failure') {
-            hourlyData[hour].failed++;
-          }
-        }
-      }
-    });
-    
-    // Only return hours that have actual runs
-    return hourlyData.filter(data => data.total > 0);
-  }, [workflowRuns]);
 
-  // Helper function to calculate overview metrics
-  const calculateOverviewMetrics = useCallback(() => {
-    const completedRuns = workflowRuns.filter(run => run.status === 'completed').length;
-    const totalRuns = workflowRuns.length;
-    
-    // Calculate actual pass/fail rates from completed runs
-    const completedWorkflowRuns = workflowRuns.filter(run => run.status === 'completed');
-    const passedRuns = completedWorkflowRuns.filter(run => run.conclusion === 'success').length;
-    const failedRuns = completedWorkflowRuns.filter(run => run.conclusion === 'failure').length;
-    const passRate = completedWorkflowRuns.length > 0 ? Math.round((passedRuns / completedWorkflowRuns.length) * 100) : 0;
-    
-    // Legacy success rate (completed vs total)
-    const successRate = totalRuns > 0 ? Math.round((completedRuns / totalRuns) * 100) : 0;
-    
-    // Calculate total runtime
-    const totalRuntimeMs = workflowRuns.reduce((total, run) => {
-      if (run.run_started_at && run.updated_at) {
-        const start = new Date(run.run_started_at);
-        const end = new Date(run.updated_at);
-        return total + (end.getTime() - start.getTime());
-      }
-      return total;
-    }, 0);
-    
-    const hours = Math.floor(totalRuntimeMs / (1000 * 60 * 60));
-    const minutes = Math.floor((totalRuntimeMs % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((totalRuntimeMs % (1000 * 60)) / 1000);
-    const totalRuntime = `${hours}h ${minutes}m ${seconds}s`;
-    
-    // Calculate runs per hour stats
-    const runsByHour = generateRunsByHour();
-    const counts = runsByHour.map(r => r.total);
-    const avgRunsPerHour = counts.length > 0 ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length * 10) / 10 : 0;
-    const minRunsPerHour = Math.min(...counts);
-    const maxRunsPerHour = Math.max(...counts);
-    
-    return {
-      successRate,
-      passRate,
-      passedRuns,
-      failedRuns,
-      completedRuns,
-      totalRuntime,
-      didntRunCount: totalRuns - completedRuns,
-      avgRunsPerHour,
-      minRunsPerHour,
-      maxRunsPerHour
-    };
-  }, [workflowRuns, generateRunsByHour]);
 
 
 
@@ -680,29 +616,42 @@ export default function DashboardPage({ params }: PageProps) {
             </CardContent>
           </Card>
         </div>
+      ) : !overviewData ? (
+        // Loading state while waiting for API data
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Card key={i} className="w-full">
+              <CardHeader>
+                <div className="h-6 bg-muted rounded animate-pulse" />
+              </CardHeader>
+              <CardContent>
+                <div className="h-36 bg-muted rounded animate-pulse" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : (() => {
-        const overviewMetrics = calculateOverviewMetrics();
         const healthMetrics = calculateHealthMetrics();
         
         return (
           <>
             <DailyMetrics
-              successRate={overviewMetrics.successRate}
-              passRate={overviewMetrics.passRate}
-              passedRuns={overviewMetrics.passedRuns}
-              failedRuns={overviewMetrics.failedRuns}
-              completedRuns={overviewMetrics.completedRuns}
-              totalRuntime={overviewMetrics.totalRuntime}
-              didntRunCount={overviewMetrics.didntRunCount}
+              successRate={overviewData.successRate || 0}
+              passRate={overviewData.passRate || 0}
+              passedRuns={overviewData.passedRuns || 0}
+              failedRuns={overviewData.failedRuns || 0}
+              completedRuns={overviewData.completedRuns || 0}
+              totalRuntime={overviewData.totalRuntime || '0h 0m 0s'}
+              didntRunCount={overviewData.didntRunCount || 0}
               activeWorkflows={workflows.filter((w: any) => w.state !== 'disabled_manually').length}
               consistentCount={healthMetrics.consistentCount}
               improvedCount={healthMetrics.improvedCount}
               regressedCount={healthMetrics.regressedCount}
               stillFailingCount={healthMetrics.stillFailingCount}
-              avgRunsPerHour={overviewMetrics.avgRunsPerHour}
-              minRunsPerHour={overviewMetrics.minRunsPerHour}
-              maxRunsPerHour={overviewMetrics.maxRunsPerHour}
-              runsByHour={generateRunsByHour()}
+              avgRunsPerHour={overviewData.avgRunsPerHour || 0}
+              minRunsPerHour={overviewData.minRunsPerHour || 0}
+              maxRunsPerHour={overviewData.maxRunsPerHour || 0}
+              runsByHour={overviewData.runsByHour || []}
               selectedDate={selectedDate}
             />
             
